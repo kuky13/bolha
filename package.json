@@ -1,0 +1,44 @@
+{
+  "name": "bolha",
+  "productName": "Bolha",
+  "version": "0.1.0",
+  "description": "Drippy passeando pela sua tela, com música e animações locais.",
+  "author": "André Ribeiro Lima (KukySolutions)",
+  "license": "GPL-3.0-only",
+  "homepage": "https://github.com/kuky13/bolha",
+  "repository": { "type": "git", "url": "https://github.com/kuky13/bolha.git" },
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:win": "npm run build && electron-builder --win --publish never",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "node scripts/run-tests.mjs",
+    "test:smoke": "node scripts/smoke.mjs",
+    "audit:standalone": "node scripts/audit-standalone.mjs"
+  },
+  "dependencies": {
+    "electron-store": "8.2.0",
+    "electron-updater": "6.8.11",
+    "framer-motion": "11.18.2",
+    "lucide-react": "0.451.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.10.2",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "autoprefixer": "10.4.20",
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0",
+    "electron-vite": "2.3.0",
+    "esbuild": "0.25.12",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.6.3",
+    "vite": "5.4.21"
+  }
+}
