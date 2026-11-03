@@ -11,6 +11,7 @@ export { validBrainEvent } from '../shared/brainProtocol';
 export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, initialPreferences: Preferences, onReady: () => void) {
   let child: ChildProcessWithoutNullStreams | undefined, snapshot: BrainSnapshot | null = null, desktop = initialDesktop, preferences = initialPreferences;
   let stopping = false, buffer = '', cursorTimer: ReturnType<typeof setInterval> | undefined;
+  let stopTask: Promise<void> | undefined;
   const send = (value: unknown) => {
     if (child?.stdin.writable) child.stdin.write(JSON.stringify(value) + '\n');
   };
@@ -25,6 +26,8 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
     if (!win.isDestroyed()) win.webContents.send('bolha:brain',{ ...fallback, ...snapshot, ready:false, visible:false, objects:[], error:message });
   };
   const start = () => {
+    if (child?.pid && child.exitCode === null) return;
+    stopping = false; buffer = ''; snapshot = null; stopTask = undefined;
     const root = app.isPackaged ? join(process.resourcesPath, 'brain') : join(__dirname, '../../brain');
     const command = app.isPackaged ? join(root, 'BolhaBrain.exe') : (process.env.BOLHA_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3.11'));
     const args = [...(app.isPackaged ? [] : [join(root, 'worker.py')]), '--data-dir', join(app.getPath('userData'), 'brain'), '--content-dir', join(app.isPackaged ? root : join(__dirname,'../../assets/drippy'), 'content')];
@@ -62,16 +65,18 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
     },100);
     cursorTimer.unref();
   };
-  const stop = async () => {
-    if (stopping || !child || child.exitCode !== null) return;
+  const stop = (): Promise<void> => {
+    if (stopTask) return stopTask;
+    if (!child || child.exitCode !== null) return Promise.resolve();
     stopping = true;
     if (cursorTimer) clearInterval(cursorTimer);
     send({ type: 'quit' });
     child.stdin.end();
-    await new Promise<void>(resolve => {
+    stopTask = new Promise<void>(resolve => {
       const timer = setTimeout(() => { child?.kill(); resolve(); }, 5000);
       child!.once('exit', () => { clearTimeout(timer); resolve(); });
     });
+    return stopTask;
   };
   return {
     start, stop,

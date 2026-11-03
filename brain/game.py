@@ -30,6 +30,7 @@ from pestinha.sense.senses import ComputerSenses, ActivityTracker, detect_activi
 from pestinha.paths import PetPaths, ConteudoPaths
 from pestinha.store import read_json, write_json
 from pestinha.scene import set_scene, Ball, FloatingThing
+from geometry import fullscreen_monitors
 
 
 class Burst:
@@ -208,15 +209,17 @@ class Game:
             previous_blocked=set(self.blocked)
             self.blocked.clear()
             if self.prefs.get('senseWindows', True):
+                windows = []
                 for hwnd, (left, top, right, _bottom), maximized in native.janelas_visiveis(self.excluded):
+                    style = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_STYLE)
+                    extended = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_EXSTYLE)
+                    if extended & native.win32con.WS_EX_LAYERED:
+                        continue
+                    windows.append(((left, top, right, _bottom), maximized, bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))))
                     left, top = self.native_point(left, top)
                     right, _ = self.native_point(right, _bottom)
                     if not maximized: self.platforms.append((hwnd, left + 10, right - 65, top))
-                if native.win32gui.GetForegroundWindow() not in self.excluded and native.tela_cheia():
-                    rect = native.retangulo_ativo()
-                    if rect:
-                        x, y = self.native_point((rect[0]+rect[2])/2, (rect[1]+rect[3])/2)
-                        self.blocked = {i for i,a in enumerate(self.areas) if a[0] <= x < a[2] and a[1] <= y < a[3]}
+                self.blocked = fullscreen_monitors(windows, self.displays)
             if self.available_areas():
                 if previous_blocked != self.blocked:
                     self.fit(self.body)

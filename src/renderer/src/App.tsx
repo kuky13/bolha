@@ -67,6 +67,9 @@ export function App() {
   useEffect(()=>{panelAnchor.current=panel&&state?{x:state.x,y:state.y}:null;event({type:'panel',value:panel==='settings'});event({type:'monitor',value:panel==='brain'});return()=>{event({type:'panel',value:false});event({type:'monitor',value:false});};},[panel]);
   useEffect(()=>{if(state?.panicked||(state?.blocked?.length&&state.blocked.length===boot?.desktop.areas.length))setPanel(null);},[state?.panicked,state?.blocked?.length,boot?.desktop.areas.length]);
   useEffect(()=>{
+    if(state&&!state.visible){const g=drag.current;if(g)event({type:'drag-end',id:g.id,x:g.x,y:g.y,vx:0,vy:0});drag.current=null;interactive.current=false;api.setClickThrough(true);}
+  },[state?.visible]);
+  useEffect(()=>{
     const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer);
   },[]);
   useEffect(()=>{

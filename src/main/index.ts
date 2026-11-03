@@ -104,7 +104,7 @@ else {
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', event => { event.preventDefault(); });
     win.webContents.on('render-process-gone', (_event, details) => log('error', `Renderizador: ${details.reason}`));
-    updater = createUpdater(win, async () => { await brain?.stop(); });
+    updater = createUpdater(win, async () => { await brain?.stop(); }, () => { if (!quitting) brain?.start(); });
     brain = createBrain(win, desktop, preferences, () => { void healthy(); });
 
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => !!win && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame;

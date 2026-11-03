@@ -8,7 +8,7 @@ import { cleanupAppliedUpdate, recordUpdate } from './updateCleanup';
 import type { UpdateState } from '../shared/types';
 import { log } from './diagnostics';
 
-export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<void>) {
+export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<void>, recoverBrain: () => void) {
   let state: UpdateState = { phase: 'idle' }, checking = false, installing = false;
   let checkTimer: ReturnType<typeof setInterval> | undefined, installTimer: ReturnType<typeof setTimeout> | undefined;
   const marker = join(app.getPath('userData'), 'pending-update.json');
@@ -17,6 +17,7 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
   try {
     const saved = JSON.parse(readFileSync(deferFile, 'utf8'));
     if (typeof saved.version === 'string' && Number.isFinite(saved.until) && saved.until > Date.now()) {
+      compareVersions(saved.version, saved.version);
       deferredVersion = saved.version;
       deferredUntil = Math.min(saved.until, Date.now() + DEFER_INTERVAL);
     }
@@ -45,7 +46,7 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
     if (installTimer) clearTimeout(installTimer);
     send({ ...state, phase: 'installing', message: 'Instalando. A Bolha vai reabrir em instantes.' });
     try { await beforeInstall(); autoUpdater.quitAndInstall(true, true); }
-    catch (error) { installing = false; send({ phase: 'error', message: String(error) }); }
+    catch (error) { installing = false; recoverBrain(); send({ phase: 'error', message: String(error) }); }
   };
   const schedule = (deferred: boolean) => {
     if (state.phase !== 'ready') return;
@@ -74,7 +75,9 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
     })();
   });
   autoUpdater.on('error', error => {
+    const wasInstalling = installing;
     installing = false;
+    if (wasInstalling) recoverBrain();
     if (installTimer) clearTimeout(installTimer);
     send({ phase: 'error', message: 'Não foi possível atualizar agora. Você pode continuar usando a bolha.' });
     log('error', `Atualização: ${error.message}`);

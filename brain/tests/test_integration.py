@@ -66,3 +66,28 @@ def test_memes_novos_e_objetos_sem_qt(tmp_path):
     item=game.mischief._make('meme','feliz',False)
     assert item.valida and item.image=='carinho'
     assert 'PySide6' not in sys.modules
+
+
+def test_castigo_fuga_aprendida_e_perdao(tmp_path,monkeypatch):
+    clock=[100.]
+    monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=Game(tmp_path,CONTENT)
+    game.castigo.toggle(game.bounds())
+    plaque=game.castigo.plaquinha
+    game.body.x=plaque.x()+plaque.width()/2
+    game.body.y=game.bounds()[3]-game.body.half_h
+    game.body.grounded=True
+    game.body.held=True
+    game.castigo.act(clock[0],game.body,game.bounds(),game.cursor,game.state,game.rates)
+    clock[0]+=.1;game.body.held=False
+    game.castigo.act(clock[0],game.body,game.bounds(),game.cursor,game.state,game.rates)
+    assert game.castigo.dentro and game.state.castigo
+    game.castigo._iniciar_fuga(clock[0],game.bounds())
+    zone=game.castigo.zona_fuga
+    game.body.x=zone[1]+50 if game.castigo.fuga_para_direita else zone[0]-50
+    game.castigo._checar_fuga(clock[0]+1,game.body)
+    assert game.castigo.vitorias['fugir']==1
+    assert json.loads(game.pet_paths.castigo.read_text())['vitorias']['fugir']==1
+    game.castigo._entrar(clock[0]+2,game.state)
+    game.castigo._decidir(clock[0]+2,.1,game.body,game.bounds(),{'ACEITAR':20.})
+    assert not game.castigo.dentro and not game.state.castigo
