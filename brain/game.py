@@ -427,6 +427,7 @@ class Game:
             self.think(min(.1,now-self.last_think),now); self.last_think = now
         area = self.bounds()
         areas = self.available_areas()
+        monitors = [monitor for i, monitor in enumerate(self.monitors) if i not in self.blocked]
         self.behavior.screen_areas = areas
         self.behavior.toy = (self.ball.body.x,self.ball.body.y) if not self.ball_stored else None
         platforms = getattr(self,'platforms',[]) if self.prefs.get('senseWindows',True) else []
@@ -435,10 +436,10 @@ class Game:
         if resting and not self.body.held: self.body.vx = 0
         elif not self.body.held: self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms)
         if self.burst.phase(now)=='shy': self.body.vx *= max(.1,1-(self.burst.shy_until-now)/60)
-        self.body.step(dt,area,platforms,areas,self.monitors)
+        self.body.step(dt,area,platforms,areas,monitors)
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
-            self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,self.monitors)
+            self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors)
         for strength in self.body.pop_impacts(): self.senses.impact(min(1.,strength / 1600))
         self.mesa.set_visible(not self.mesa.escondido)
         self.protest_ctl.carry(now,self.sleep.asleep); self.sad_ctl.carry(now,self.sleep.asleep)

@@ -59,6 +59,22 @@ def test_monitores_negativos_e_remocao_recolocam_corpo(tmp_path):
     game.desktop({'areas':[dict(x=0,y=0,width=1200,height=800,id=2,scaleFactor=1.5)]})
     assert 0<=game.body.x<1200 and 0<=game.body.y<800
 
+def test_passagem_entre_monitores_livres_quando_primeiro_esta_ocupado(tmp_path):
+    game=Game(tmp_path,CONTENT)
+    game.desktop({'areas':[dict(x=-1920,y=0,width=1920,height=1040,id=0,scaleFactor=1,monitorHeight=1080),
+                           dict(x=0,y=0,width=1920,height=1040,id=1,scaleFactor=1,monitorHeight=1080),
+                           dict(x=1920,y=0,width=1280,height=680,id=2,scaleFactor=1.5,monitorHeight=720)]})
+    game.blocked={0}
+    game.read_context=lambda *_:None
+    game.think=lambda *_:None
+    game.behavior.tick=lambda *_:None
+    game.body.x,game.body.y=1800,400
+    game.body.half_w=game.body.half_h=10
+    for i in range(100):
+        game.body.vx=450
+        game.tick(.016,100+i*.016)
+    assert game.body.x>1920
+
 def test_memes_novos_e_objetos_sem_qt(tmp_path):
     game=Game(tmp_path,CONTENT)
     options=game.mischief.available('feliz',dict(travessuras=True,memes=True,bilhetes=True,fotos=False))
