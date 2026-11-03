@@ -78,7 +78,8 @@ class Game:
         self.hover = False
         self.panel = False
         self.hidden = False
-        self.panicked = False
+        session=read_json(self.data_dir / 'session.json',default={})
+        self.panicked = session.get('panicked') is True if isinstance(session,dict) else False
         self.monitor_open = False
         self.media_playing = False
         self.paused_at = None
@@ -387,6 +388,7 @@ class Game:
         if now - self.last_save >= 30: self.save(); self.last_save = now
 
     def save(self):
+        write_json(self.data_dir / 'session.json',dict(panicked=self.panicked))
         self.brain.save(self.pet_paths.nervous)
         self.drives.save(self.pet_paths.drives)
         self.conditioning.save()

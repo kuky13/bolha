@@ -5,15 +5,8 @@ import { join } from 'node:path';
 import type { BrainSnapshot, DesktopLayout, Preferences } from '../shared/types';
 import { log } from './diagnostics';
 
-const EVENTS = new Set(['panic','hide','monitor','panel','hover','music','drag-start','drag','drag-end','poke','caress','spin','sleep','work','notebook','corner','ball','mischief','dismiss']);
-export function validBrainEvent(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const p = value as Record<string, unknown>;
-  if (!EVENTS.has(String(p.type)) || Object.keys(p).some(k => !['type','x','y','vx','vy','value','id'].includes(k))) return false;
-  for (const key of ['x','y','vx','vy'] as const) if (p[key] !== undefined && (typeof p[key] !== 'number' || !Number.isFinite(p[key]) || Math.abs(p[key]) > 100000)) return false;
-  if (String(p.type).startsWith('drag') && (p.x === undefined || p.y === undefined)) return false;
-  return (p.id === undefined || typeof p.id === 'string' && /^\d{1,8}$/.test(p.id)) && (p.value === undefined || typeof p.value === 'boolean' || typeof p.value === 'number' && Number.isFinite(p.value));
-}
+import { validBrainEvent } from '../shared/brainProtocol';
+export { validBrainEvent } from '../shared/brainProtocol';
 
 export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, initialPreferences: Preferences, onReady: () => void) {
   let child: ChildProcessWithoutNullStreams | undefined, snapshot: BrainSnapshot | null = null, desktop = initialDesktop, preferences = initialPreferences;
@@ -26,6 +19,10 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
     let handle: number | undefined;
     if (process.platform === 'win32') handle = Number(win.getNativeWindowHandle().readBigUInt64LE());
     send({ type: 'desktop', value: { ...desktop, exclude: handle === undefined ? [] : [handle] } });
+  };
+  const failed = (message: string) => {
+    const fallback: BrainSnapshot = { ready:false,panicked:false,blocked:[],shyness:0,x:desktop.bounds.x+200,y:desktop.bounds.y+200,angle:0,emotion:'observando',phase:'normal',visible:false,held:false,caressing:false,gaze:[0,0],speech:'',objects:[],energy:0,stimulation:0,lonely:0,protest:0,castigo:false,escapes:0,activity:'IDLE',motors:{},learned:[],neurons:470,error:message };
+    if (!win.isDestroyed()) win.webContents.send('bolha:brain',{ ...fallback, ...snapshot, ready:false, visible:false, objects:[], error:message });
   };
   const start = () => {
     const root = app.isPackaged ? join(process.resourcesPath, 'brain') : join(__dirname, '../../brain');
@@ -50,12 +47,12 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
         } catch (error) { log('error',`Resposta inválida do cérebro: ${String(error)}`); }
       }
     });
-    child.on('error', error => { log('error',`Cérebro: ${error.message}`); });
+    child.on('error', error => { log('error',`Cérebro: ${error.message}`); failed('Não consegui iniciar o cérebro. Consulte o diagnóstico local.'); });
     child.on('exit', code => {
       if (cursorTimer) clearInterval(cursorTimer);
       if (!stopping) {
         log('error', `O cérebro encerrou (${code}).`);
-        if (!win.isDestroyed()) win.webContents.send('bolha:brain', { ...snapshot, ready: false, error: 'O cérebro foi interrompido. Feche e abra a Bolha para recuperar a memória salva.' });
+        failed('O cérebro foi interrompido. Feche e abra a Bolha para recuperar a memória salva.');
       }
     });
     setDesktop(desktop);

@@ -50,6 +50,7 @@ def test_panic_congela_simulacao_e_nao_reaparece_sozinha(tmp_path):
     game.tick(.05,time.monotonic()+50)
     assert game.brain.time_ms==before
     assert not game.snapshot()['visible']
+    assert Game(tmp_path,CONTENT).panicked is True
 
 def test_monitores_negativos_e_remocao_recolocam_corpo(tmp_path):
     game=Game(tmp_path,CONTENT)

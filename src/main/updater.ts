@@ -2,7 +2,8 @@
 import { app, type BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { join } from 'node:path';
-import { COUNTDOWN, CHECK_INTERVAL, installationDeadline } from '../shared/updatePolicy';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { COUNTDOWN, CHECK_INTERVAL, DEFER_INTERVAL, compareVersions, installationDeadline } from '../shared/updatePolicy';
 import { cleanupAppliedUpdate, recordUpdate } from './updateCleanup';
 import type { UpdateState } from '../shared/types';
 import { log } from './diagnostics';
@@ -11,6 +12,15 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
   let state: UpdateState = { phase: 'idle' }, checking = false, installing = false;
   let checkTimer: ReturnType<typeof setInterval> | undefined, installTimer: ReturnType<typeof setTimeout> | undefined;
   const marker = join(app.getPath('userData'), 'pending-update.json');
+  const deferFile = join(app.getPath('userData'), 'update-deferred.json');
+  let deferredVersion = '', deferredUntil = 0;
+  try {
+    const saved = JSON.parse(readFileSync(deferFile, 'utf8'));
+    if (typeof saved.version === 'string' && Number.isFinite(saved.until) && saved.until > Date.now()) {
+      deferredVersion = saved.version;
+      deferredUntil = Math.min(saved.until, Date.now() + DEFER_INTERVAL);
+    }
+  } catch { /* No deferred update. */ }
   const cacheRoot = join(process.env.LOCALAPPDATA ?? join(app.getPath('appData'), '..', 'Local'), 'bolha-updater');
   const send = (next: UpdateState) => {
     state = next;
@@ -40,7 +50,13 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
   const schedule = (deferred: boolean) => {
     if (state.phase !== 'ready') return;
     if (installTimer) clearTimeout(installTimer);
-    const installAt = installationDeadline(Date.now(), deferred);
+    const installAt = Math.max(installationDeadline(Date.now(), deferred), state.version === deferredVersion ? deferredUntil : 0);
+    if (deferred) {
+      deferredVersion = state.version ?? '';
+      deferredUntil = installAt;
+      try { writeFileSync(deferFile, JSON.stringify({ version: deferredVersion, until: deferredUntil })); }
+      catch (error) { log('warn', `Não consegui guardar o adiamento: ${String(error)}`); }
+    }
     send({ ...state, installAt });
     installTimer = setTimeout(install, installAt - Date.now());
   };
@@ -52,7 +68,7 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
     void (async () => {
       try {
         await recordUpdate(marker, { version: info.version, installer: info.downloadedFile }, cacheRoot);
-        send({ phase: 'ready', version: info.version });
+        state = { phase: 'ready', version: info.version };
         schedule(false);
       } catch (error) { send({ phase: 'error', message: `Não consegui preparar a atualização: ${String(error)}` }); }
     })();
@@ -76,6 +92,7 @@ export function createUpdater(win: BrowserWindow, beforeInstall: () => Promise<v
     try {
       const cleaned = await cleanupAppliedUpdate(marker, app.getVersion(), cacheRoot);
       if (!cleaned) return;
+      if (deferredVersion && compareVersions(app.getVersion(), deferredVersion) >= 0) rmSync(deferFile, { force: true });
     } catch (error) {
       log('warn', `Limpeza será tentada novamente: ${String(error)}`);
       const retry = setTimeout(() => { void healthy(); }, COUNTDOWN);

@@ -33,7 +33,7 @@ else {
       writeFileSync(join(app.getPath('userData'), 'health.json'), JSON.stringify({ version: app.getVersion(), ready: true, neurons: brain.getState()!.neurons }));
     }
     updater!.start();
-    if (process.env.BOLHA_TEST === '1' && process.env.BOLHA_TEST_EXIT_VERSION === app.getVersion()) setTimeout(() => app.quit(), 1500);
+    if (process.env.BOLHA_TEST === '1' && process.env.BOLHA_TEST_EXIT_VERSION === app.getVersion()) setTimeout(() => app.quit(), 45000);
   };
   let mediaPending: Promise<MediaState | null> | null = null;
   const mediaCall = (action: 'state' | 'playpause' | 'next' | 'previous') => {

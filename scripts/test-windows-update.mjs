@@ -42,8 +42,9 @@ try{
   await first.page.waitForFunction(async()=> (await window.bolha.bootstrap()).update.phase==='error',{},{timeout:120000});
   assert.equal((await first.page.evaluate(()=>window.bolha.bootstrap())).brain.neurons,470);
   corrupt=false;await first.page.evaluate(()=>window.bolha.checkUpdates());
-  await first.page.waitForFunction(async()=> (await window.bolha.bootstrap()).update.phase==='ready',{},{timeout:120000});
+  await first.page.waitForFunction(async()=> { const state=(await window.bolha.bootstrap()).update; return state.phase==='ready'&&Number.isFinite(state.installAt); },{},{timeout:120000});
   let state=(await first.page.evaluate(()=>window.bolha.bootstrap())).update;
+  console.log(JSON.stringify({stage:'download-ready',state,now:Date.now(),remaining:state.installAt-Date.now()}));
   assert.ok(state.installAt-Date.now()<=31000&&state.installAt-Date.now()>15000);
   await first.page.evaluate(()=>window.bolha.deferUpdate());
   state=(await first.page.evaluate(()=>window.bolha.bootstrap())).update;
