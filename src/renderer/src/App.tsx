@@ -4,6 +4,7 @@ import { motion, useSpring } from 'framer-motion';
 import { X, Settings, Music2, Sparkles, Brain, Pause, Play, SkipBack, SkipForward, Heart, Circle, Laptop, Moon, Flag, Hand, EyeOff, Download, Copy, RotateCcw, Power } from 'lucide-react';
 import { BolhaAvatar } from './components/avatar/BolhaAvatar';
 import { areaAt } from '../../shared/roaming';
+import { mergeBrainSnapshot } from '../../shared/brainProtocol';
 import { formatAccelerator } from '../../shared/shortcuts';
 import type { Bootstrap, BrainEvent, BrainSnapshot, LogEntry, MediaState, Preferences, SceneObject, UpdateState } from '../../shared/types';
 
@@ -55,6 +56,7 @@ export function App() {
   const companionX=useSpring(0,{stiffness:850,damping:45,mass:.4});
   const companionY=useSpring(0,{stiffness:850,damping:45,mass:.4});
   const positioned=useRef(false);
+  const monitorOpen=useRef(false);
   const lastRub=useRef({x:0,dir:0,changes:0,time:0});
   const interactive=useRef(false);
   const panelAnchor=useRef<{x:number;y:number}|null>(null);
@@ -65,13 +67,13 @@ export function App() {
 
   useEffect(()=>{
     let active=true;
-    const stop=[api.onBrain(value=>{if(!active)return;setState(value);const desktop=desktopRef.current;if(desktop&&(!drag.current||drag.current.id)){const x=value.x-desktop.bounds.x,y=value.y-desktop.bounds.y;if(!positioned.current){companionX.jump(x);companionY.jump(y);positioned.current=true;}else{companionX.set(x);companionY.set(y);}}}),api.onUpdate(setUpdate),api.onPreferences(setPrefs),api.onDesktop(desktop=>{
+    const stop=[api.onBrain(value=>{if(!active)return;setState(previous=>mergeBrainSnapshot(value,previous,monitorOpen.current));const desktop=desktopRef.current;if(desktop&&(!drag.current||drag.current.id)){const x=value.x-desktop.bounds.x,y=value.y-desktop.bounds.y;if(!positioned.current){companionX.jump(x);companionY.jump(y);positioned.current=true;}else{companionX.set(x);companionY.set(y);}}}),api.onUpdate(setUpdate),api.onPreferences(setPrefs),api.onDesktop(desktop=>{
       desktopRef.current=desktop;setBoot(b=>b?{...b,desktop}:b);
     }),api.onOpenSettings(()=>setPanel('settings'))];
     void api.bootstrap().then(value=>{if(!active)return;setBoot(value);desktopRef.current=value.desktop;setPrefs(value.preferences);setState(value.brain);if(value.brain){companionX.jump(value.brain.x-value.desktop.bounds.x);companionY.jump(value.brain.y-value.desktop.bounds.y);positioned.current=true;}setStartup(value.startup);setUpdate(value.update);void api.ready();}).catch(fail);
     return ()=>{active=false;stop.forEach(fn=>fn());cancelAnimationFrame(dragFrame.current);};
   },[]);
-  useEffect(()=>{panelAnchor.current=panel&&state?{x:state.x,y:state.y}:null;event({type:'panel',value:!!panel});event({type:'monitor',value:panel==='brain'});return()=>{event({type:'panel',value:false});event({type:'monitor',value:false});};},[panel]);
+  useEffect(()=>{monitorOpen.current=panel==='brain';panelAnchor.current=panel&&state?{x:state.x,y:state.y}:null;event({type:'panel',value:!!panel});event({type:'monitor',value:panel==='brain'});return()=>{monitorOpen.current=false;event({type:'panel',value:false});event({type:'monitor',value:false});};},[panel]);
   useEffect(()=>{if(state?.panicked||(state?.blocked?.length&&state.blocked.length===boot?.desktop.areas.length))setPanel(null);},[state?.panicked,state?.blocked?.length,boot?.desktop.areas.length]);
   useEffect(()=>{
     if(state&&!state.visible){const g=drag.current;if(g)event({type:'drag-end',id:g.id,x:g.x,y:g.y,vx:0,vy:0});drag.current=null;cancelAnimationFrame(dragFrame.current);dragFrame.current=0;pendingDrag.current=null;interactive.current=false;api.setClickThrough(true);}

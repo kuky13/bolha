@@ -48,7 +48,7 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
           if (!next.ready || !Number.isFinite(next.x) || !Number.isFinite(next.y) || !Array.isArray(next.objects)) throw new Error('Estado inválido');
           const first = !snapshot;
           snapshot = mergeBrainSnapshot(next,snapshot,monitorOpen);
-          if (!win.isDestroyed()) win.webContents.send('bolha:brain', snapshot);
+          if (!win.isDestroyed()) win.webContents.send('bolha:brain', next);
           if (first) onReady();
         } catch (error) { log('error',`Resposta inválida do cérebro: ${String(error)}`); }
       }

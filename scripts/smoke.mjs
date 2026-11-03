@@ -31,6 +31,12 @@ try {
   await page.getByRole('heading',{name:'Por dentro da Bolha'}).waitFor();
   await page.waitForFunction(()=>document.querySelector('canvas')?.width===420);
   await page.getByRole('heading',{name:'Objetivo agora'}).waitFor();
+  const packets=await page.evaluate(()=>new Promise(resolve=>{
+    let total=0,neural=0;
+    const stop=window.bolha.onBrain(state=>{total++;if(state.neural)neural++;});
+    setTimeout(()=>{stop();resolve({total,neural});},1200);
+  }));
+  assert.ok(packets.neural>0&&packets.total>packets.neural*1.5,'Quadros de movimento não devem repetir o pacote neural.');
   await mkdir('validation',{recursive:true});
   await page.screenshot({path:'validation/neural-smoke.png'});
   await page.getByRole('button',{name:'Fechar painel'}).click();
