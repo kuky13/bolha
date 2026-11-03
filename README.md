@@ -11,7 +11,7 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-*A composição acima mostra o código em desenvolvimento, versão 0.2.1
+*Composição estática a partir do código da versão 0.2.1
 ([commit 8d67085](https://github.com/kuky13/bolha/commit/8d6708574ebe636b9ecce58e50dc89342a7ea4a4)).
 O download leva à versão publicada mais recente. Artes de André Ribeiro Lima
 (KukySolutions), sob [CC BY-NC 4.0](licenses/BOLHA-ASSETS.md);
