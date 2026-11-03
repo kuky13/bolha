@@ -60,13 +60,14 @@ def _tem_vizinha(areas, atual, lado, coordenada, extensao, monitores=None):
 
 class Body:
     """Corpo na tela: posição, velocidade, ângulo e contato com as superfícies (chão e janelas)."""
-    def __init__(self, x, y, half_w, half_h):
+    def __init__(self, x, y, half_w, half_h, circular=False):
         """Cria o corpo em (x, y), com metade da largura e da altura (para medir o contato)."""
         self.x, self.y = x, y
         self.vx = self.vy = 0.0
         self.angle = 0.0          # graus, 0 = em pé
         self.omega = 0.0          # graus/s
         self.half_w, self.half_h = half_w, half_h
+        self.circular = circular
         self.grounded = False
         self.platform = None      # hwnd da janela onde está pousado, ou None (chão)
         self.surface = 0.0        # y da superfície onde está apoiado
@@ -80,6 +81,8 @@ class Body:
 
     def extents(self):
         """Metade da largura e da altura do corpo já girado (para saber onde a base encosta)."""
+        if self.circular:
+            return self.half_w, self.half_h
         a = math.radians(self.angle)
         c, s = abs(math.cos(a)), abs(math.sin(a))
         return self.half_w * c + self.half_h * s, self.half_w * s + self.half_h * c

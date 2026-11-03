@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-const EVENTS = new Set(['panic','hide','monitor','panel','hover','music','drag-start','drag','drag-end','poke','caress','spin','sleep','work','notebook','corner','ball','mischief','dismiss','quiet','reset-memory']);
+import type { BrainSnapshot } from './types';
+const EVENTS = new Set(['panic','hide','monitor','panel','hover','music','drag-start','drag','drag-end','poke','caress','spin','sleep','rest','work','notebook','corner','ball','mischief','dismiss','quiet','reset-memory']);
+
+export function mergeBrainSnapshot(next: BrainSnapshot, previous: BrainSnapshot | null, monitorOpen: boolean): BrainSnapshot {
+  if (!monitorOpen || next.neural) return next;
+  return { ...next, neural: previous?.neural, intelligence: previous?.intelligence, learned: previous?.learned ?? [] };
+}
 export function validBrainEvent(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const p = value as Record<string, unknown>;

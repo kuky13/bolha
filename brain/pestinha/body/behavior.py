@@ -104,7 +104,7 @@ class Behavior:
                 self.mischief.release(thing)
         self.mission = None
 
-    def tick(self, dt, now, cursor, bounds, prof, platforms=()):
+    def tick(self, dt, now, cursor, bounds, prof, platforms=(), allow_roaming=True):
         """Um passo do comportamento: anda, mexe na bolinha e reage ao cursor, respeitando as plataformas."""
         body = self.body
         st = self.state
@@ -144,6 +144,10 @@ class Behavior:
         if body.held:
             self.drop_carried()
             self.tipped_since = None
+            return
+
+        if not allow_roaming:
+            body.vx = 0.0
             return
 
         # objeto carregado acompanha (e solta se o pet cair/voar)

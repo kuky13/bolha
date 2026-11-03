@@ -76,10 +76,10 @@ else {
   };
   const refreshTray = () => {
     tray?.setContextMenu(Menu.buildFromTemplate([
-      { label: 'Mostrar a Drippy', click: show },
-      { label: 'Esconder a Drippy', click: hide },
+      { label: 'Mostrar a Bolha', click: show },
+      { label: 'Esconder a Bolha', click: hide },
       { type: 'separator' },
-      { label: 'Pausar / retomar a Drippy', click: () => brain?.event({type:'panic'}) },
+      { label: 'Pausar / retomar a Bolha', click: () => brain?.event({type:'panic'}) },
       { label: 'Passear pela tela', type: 'checkbox', checked: preferences.roaming, click: () => save({ roaming: !preferences.roaming }) },
       { label: 'Configurações', click: () => { show(); win?.webContents.send('bolha:open-settings'); } },
       { label: 'Verificar atualização', click: () => { void updater?.check(); } },
@@ -147,11 +147,11 @@ else {
       rendererReady = true;
       await healthy();
     });
-    const iconPath = app.isPackaged ? join(process.resourcesPath, 'tray.png') : join(__dirname, '../../assets/drippy/tray.png');
+    const iconPath = app.isPackaged ? join(process.resourcesPath, 'tray.png') : join(__dirname, '../../assets/bolha/tray.png');
     const icon = nativeImage.createFromPath(iconPath);
     if (icon.isEmpty()) log('warn', 'Ícone da bandeja indisponível.');
     tray = new Tray(icon.isEmpty() ? icon : icon.resize({ width: 20, height: 20 }));
-    tray.setToolTip('Bolha · Drippy');
+    tray.setToolTip('Bolha');
     tray.on('click', () => { if (win?.isVisible()) hide(); else show(); });
     syncShortcuts();
     refreshTray();

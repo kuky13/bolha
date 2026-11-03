@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import shapes from '../../../../../assets/drippy/shapes.json';
+import shapes from '../../../../../assets/bolha/shapes.json';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useId } from 'react';
 
@@ -18,11 +18,11 @@ export function SleepPillow({ asleep, waking, startled }: { asleep: boolean; wak
   const gradId = `pillow-${uid}`;
 
   return (
-    <svg viewBox={shapes.DrippySleep_0} aria-hidden="true" style={{ ...LAYER_STYLE, zIndex: 0 }}>
+    <svg viewBox={shapes.BolhaSleep_0} aria-hidden="true" style={{ ...LAYER_STYLE, zIndex: 0 }}>
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset={shapes.DrippySleep_1} stopColor={shapes.DrippySleep_2} />
-          <stop offset={shapes.DrippySleep_3} stopColor={shapes.DrippySleep_4} />
+          <stop offset={shapes.BolhaSleep_1} stopColor={shapes.BolhaSleep_2} />
+          <stop offset={shapes.BolhaSleep_3} stopColor={shapes.BolhaSleep_4} />
         </linearGradient>
       </defs>
       <AnimatePresence>
@@ -45,28 +45,28 @@ export function SleepPillow({ asleep, waking, startled }: { asleep: boolean; wak
             style={{ originX: '50px', originY: '96px' }}
           >
             {}
-            <ellipse cx={shapes.DrippySleep_5} cy={shapes.DrippySleep_6} rx={shapes.DrippySleep_7} ry={shapes.DrippySleep_8} fill={shapes.DrippySleep_9} style={{ filter: 'blur(5px)' }} />
+            <ellipse cx={shapes.BolhaSleep_5} cy={shapes.BolhaSleep_6} rx={shapes.BolhaSleep_7} ry={shapes.BolhaSleep_8} fill={shapes.BolhaSleep_9} style={{ filter: 'blur(5px)' }} />
 
             {}
             <path
-              d={shapes.DrippySleep_10}
+              d={shapes.BolhaSleep_10}
               fill={`url(#${gradId})`}
             />
             {}
             <path
-              d={shapes.DrippySleep_11}
-              fill={shapes.DrippySleep_12}
-              stroke={shapes.DrippySleep_13}
-              strokeWidth={shapes.DrippySleep_14}
-              strokeLinecap={shapes.DrippySleep_15 as 'round'}
+              d={shapes.BolhaSleep_11}
+              fill={shapes.BolhaSleep_12}
+              stroke={shapes.BolhaSleep_13}
+              strokeWidth={shapes.BolhaSleep_14}
+              strokeLinecap={shapes.BolhaSleep_15 as 'round'}
             />
             {}
             <path
-              d={shapes.DrippySleep_16}
-              fill={shapes.DrippySleep_17}
-              stroke={shapes.DrippySleep_18}
-              strokeWidth={shapes.DrippySleep_19}
-              strokeLinecap={shapes.DrippySleep_20 as 'round'}
+              d={shapes.BolhaSleep_16}
+              fill={shapes.BolhaSleep_17}
+              stroke={shapes.BolhaSleep_18}
+              strokeWidth={shapes.BolhaSleep_19}
+              strokeLinecap={shapes.BolhaSleep_20 as 'round'}
             />
           </motion.g>
         )}
@@ -85,18 +85,18 @@ const ZS = [
 
 export function SleepZs({ asleep, waking, startled, moodClass }: { asleep: boolean; waking: boolean; startled: boolean; moodClass: string }) {
   return (
-    <svg viewBox={shapes.DrippySleep_21} aria-hidden="true" className={moodClass} style={{ ...LAYER_STYLE, zIndex: 4 }}>
+    <svg viewBox={shapes.BolhaSleep_21} aria-hidden="true" className={moodClass} style={{ ...LAYER_STYLE, zIndex: 4 }}>
       <AnimatePresence>
         {(asleep || waking) && !startled &&
           ZS.map((z, i) => (
             <motion.text
               key={i}
-              x={shapes.DrippySleep_22}
-              y={shapes.DrippySleep_23}
-              fill={shapes.DrippySleep_24}
+              x={shapes.BolhaSleep_22}
+              y={shapes.BolhaSleep_23}
+              fill={shapes.BolhaSleep_24}
               fontSize={z.size}
-              fontWeight={shapes.DrippySleep_25}
-              fontFamily={shapes.DrippySleep_26}
+              fontWeight={shapes.BolhaSleep_25}
+              fontFamily={shapes.BolhaSleep_26}
               initial={{ opacity: 0, x: 0, y: 0, rotate: -6 }}
               animate={
                 waking
@@ -115,12 +115,12 @@ export function SleepZs({ asleep, waking, startled, moodClass }: { asleep: boole
           ZS.map((z, i) => (
             <motion.text
               key={`bang-${i}`}
-              x={shapes.DrippySleep_27}
-              y={shapes.DrippySleep_28}
-              fill={shapes.DrippySleep_29}
+              x={shapes.BolhaSleep_27}
+              y={shapes.BolhaSleep_28}
+              fill={shapes.BolhaSleep_29}
               fontSize={z.size}
-              fontWeight={shapes.DrippySleep_30}
-              fontFamily={shapes.DrippySleep_31}
+              fontWeight={shapes.BolhaSleep_30}
+              fontFamily={shapes.BolhaSleep_31}
               initial={{ opacity: 0.9, x: z.dx * 0.6, y: -30 }}
               animate={{ opacity: 0, x: (i - 1) * 60, y: -70 - i * 12, rotate: (i - 1) * 60 }}
               transition={{ duration: 0.6, ease: 'easeOut' }}

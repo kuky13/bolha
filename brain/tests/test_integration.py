@@ -2,11 +2,72 @@
 import sys
 import time
 import json
+import pytest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from game import Game, Burst
 
-CONTENT = Path(__file__).resolve().parents[2] / 'assets/drippy/content'
+CONTENT = Path(__file__).resolve().parents[2] / 'assets/bolha/content'
+
+def test_nome_novo_preserva_memoria_e_nao_sobrescreve_destino(tmp_path):
+    import numpy as np
+    game=Game(tmp_path,CONTENT)
+    game.brain.learned[0,0]=.06
+    game.save()
+    legacy=tmp_path/'drippy'
+    (tmp_path/'bolha').rename(legacy)
+    reopened=Game(tmp_path,CONTENT)
+    assert np.isclose(reopened.brain.learned[0,0],.06)
+    assert not legacy.exists()
+    legacy.mkdir()
+    marker=legacy/'preservar.txt';marker.write_text('não sobrescrever')
+    Game(tmp_path,CONTENT)
+    assert marker.read_text()=='não sobrescrever'
+
+def test_rosto_deita_levanta_e_arrasto_interrompe_descanso(tmp_path,monkeypatch):
+    monkeypatch.setattr(time,'monotonic',lambda:100.)
+    game=Game(tmp_path,CONTENT)
+    game.body.grounded=True;game.body.surface=760
+    game.interact({'type':'rest'})
+    assert game.snapshot()['pose']=='lying'
+    assert game.snapshot()['surface']==760
+    game.interact({'type':'rest'})
+    assert game.snapshot()['pose']=='idle'
+    game.body.angle=90
+    game.interact({'type':'rest'})
+    assert game.snapshot()['pose']=='idle'
+    game.interact({'type':'rest'})
+    game.interact({'type':'drag-start','x':500,'y':300})
+    assert game.snapshot()['pose']=='held'
+    assert game.lying_until==0
+
+def test_pausar_passeio_preserva_olhar_sem_movimento(tmp_path):
+    game=Game(tmp_path,CONTENT)
+    game.body.grounded=True;game.body.vx=100
+    game.behavior.look_at(game.body.x+200,game.body.y,100.)
+    game.behavior.tick(.016,100.,game.cursor,game.bounds(),game.prof,[],False)
+    assert game.state.gaze==(1.,0.)
+    assert game.body.vx==0
+
+def test_envio_prioriza_arrasto_e_envia_neural_apenas_quatro_vezes_por_segundo(tmp_path,monkeypatch):
+    clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=Game(tmp_path,CONTENT)
+    for body in (game.body,game.ball.body): body.grounded=True
+    assert game.output_interval()==.1
+    game.body.held=True
+    assert game.output_interval()==pytest.approx(1/60)
+    game.body.held=False;game.body.grounded=False
+    assert game.output_interval()==pytest.approx(1/30)
+    game.interact({'type':'monitor','value':True})
+    assert len(game.snapshot()['neural']['positions'])==470
+    assert 'neural' not in game.snapshot()
+    clock[0]+=.26
+    assert 'neural' in game.snapshot()
+    game.interact({'type':'monitor','value':False})
+    clock[0]+=1
+    assert 'neural' not in game.snapshot()
+    game.panicked=True
+    assert game.output_interval()==1
 
 def test_estouro_temporario_somente_por_arremessos_fortes():
     burst=Burst()
@@ -41,7 +102,7 @@ def test_cerebro_original_aprende_salva_e_reabre(tmp_path,monkeypatch):
     reopened=Game(tmp_path,CONTENT)
     import numpy as np
     assert np.allclose(reopened.brain.learned,learned,atol=1e-6)
-    assert (tmp_path/'drippy/nervous.json').exists()
+    assert (tmp_path/'bolha/nervous.json').exists()
 
 def test_panic_congela_simulacao_e_nao_reaparece_sozinha(tmp_path):
     game=Game(tmp_path,CONTENT)

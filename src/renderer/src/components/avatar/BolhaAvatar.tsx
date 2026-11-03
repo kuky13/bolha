@@ -1,25 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import shapes from '../../../../../assets/drippy/shapes.json';
-import { useEffect, useState, useRef, type CSSProperties } from 'react';
-import { motion } from 'framer-motion';
+import shapes from '../../../../../assets/bolha/shapes.json';
+import { memo, useEffect, useState, useRef, type CSSProperties } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useDragMotion } from './useDragMotion';
-import { DrippyGooTrail } from './DrippyGooTrail';
-import { CoveringHands } from './DrippyHands';
-import { SleepPillow, SleepZs } from './DrippySleep';
-import { CoffeeMug } from './DrippyProps';
-import { DrippyMusicNotes } from './DrippyMusicNotes';
-import '../../../../../assets/drippy/appearance.css';
+import { BolhaGooTrail } from './BolhaGooTrail';
+import { CoveringHands } from './BolhaHands';
+import { SleepZs } from './BolhaSleep';
+import { CoffeeMug } from './BolhaProps';
+import { BolhaMusicNotes } from './BolhaMusicNotes';
+import '../../../../../assets/bolha/appearance.css';
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
-interface DrippyAsciiAvatarProps {
+interface BolhaAvatarProps {
   state?: 'idle' | 'happy' | 'angry' | 'sleepy' | 'confused' | 'dizzy' | 'curious' | 'excited' | 'asleep' | 'sad' | 'scared' | 'dramatic' | 'shy';
   
   startled?: boolean;
   held?: boolean;
-  gaze?: number[];
+  gazeX?: number;
+  gazeY?: number;
+  pose?: 'idle' | 'held' | 'airborne' | 'lying' | 'sleeping' | 'working';
+  angle?: number;
+  velocityX?: number;
+  velocityY?: number;
+  landing?: number;
   
   eyesClosed?: boolean;
   size?: 'sm' | 'md' | 'lg' | number;
@@ -54,10 +60,9 @@ function getEyeParams(
   state: string,
   isDragging: boolean,
   blink: boolean,
-  side: 'left' | 'right',
   eyesClosed = false,
 ): EyeParams {
-  const base: EyeParams = { rx: 4.6, ry: 5.6, happy: false, dy: 0 };
+  const base: EyeParams = { rx: 5.2, ry: 6.4, happy: false, dy: 0 };
   if (eyesClosed) return { ...base, ry: 0.6 };
   if (state === 'asleep') return { ...base, rx: 5.2, ry: 0.75, dy: 2.4 };
   if (state === 'dizzy') return { ...base, rx: 5.6, ry: 5.6 };
@@ -73,10 +78,7 @@ function getEyeParams(
       return { ...base, happy: true };
     case 'sleepy':
       return { ...base, ry: 2, dy: 1.5 };
-    case 'confused':
-      return side === 'left'
-        ? { ...base, rx: 5, ry: 6.2 }
-        : { ...base, rx: 4.3, ry: 4.6 };
+    case 'confused': return { ...base, ry: 5.2 };
     case 'curious':
       return { ...base, rx: 5.6, ry: 6.8, dy: -0.8 };
     default:
@@ -84,7 +86,7 @@ function getEyeParams(
   }
 }
 
-export function DrippyAsciiAvatar({
+export const BolhaAvatar = memo(function BolhaAvatar({
   state = 'idle',
   size = 'md',
   className = '',
@@ -98,8 +100,13 @@ export function DrippyAsciiAvatar({
   forceCoffee = false,
   coffeeFalling = false,
   held,
-  gaze,
-}: DrippyAsciiAvatarProps) {
+  gazeX, gazeY, pose = 'idle', angle = 0, velocityX = 0, velocityY = 0, landing = 0,
+}: BolhaAvatarProps) {
+  const reducedMotion = useReducedMotion();
+  const controlledGaze = gazeX !== undefined && gazeY !== undefined;
+  const lying = !held && (pose === 'lying' || pose === 'sleeping');
+  const faceTilt = lying ? -72 : pose === 'airborne' ? Math.max(-16, Math.min(16, -velocityX * .018)) : 0;
+  const pixels = typeof size === 'number' ? size : size === 'sm' ? 80 : size === 'lg' ? 180 : 136;
   const [internalDragging, setIsDragging] = useState(false);
   const isDragging = held ?? internalDragging;
   const [isSquished, setIsSquished] = useState(false);
@@ -217,7 +224,6 @@ export function DrippyAsciiAvatar({
   const [pupil, setPupil] = useState({ x: 0, y: 0 });
   const [mouth, setMouth] = useState<{ d: string; fillOpacity: number }>(MOUTHS.soft);
   const [microSmile, setMicroSmile] = useState(false);
-  const earGlyphs = ['^', '^'] as const;
 
   const blinkRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pupilRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -228,12 +234,13 @@ export function DrippyAsciiAvatar({
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
+    if (controlledGaze) return;
     const onMove = (e: PointerEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY };
     };
     window.addEventListener('pointermove', onMove, { passive: true });
     return () => window.removeEventListener('pointermove', onMove);
-  }, []);
+  }, [controlledGaze]);
   const isTalking = false;
   const eyesCanBlink = !isDragging && !eyesClosed && state !== 'happy' && state !== 'angry' && state !== 'asleep';
   const cochilando = state === 'sleepy';
@@ -245,12 +252,10 @@ export function DrippyAsciiAvatar({
       if (!active) return;
       blinkRef.current = setTimeout(() => {
         if (!active) return;
-        const wink = !cochilando && Math.random() < 0.25;
-        const left = Math.random() < 0.5;
-        setBlink(wink ? { l: left, r: !left } : { l: true, r: true });
+        setBlink({ l: true, r: true });
         reopenTimer = setTimeout(
           () => { if (active) setBlink({ l: false, r: false }); },
-          cochilando ? 620 : wink ? 200 : 130,
+          cochilando ? 400 : 130,
         );
         loop();
       }, cochilando ? Math.random() * 900 + 650 : Math.random() * 3800 + 2200);
@@ -265,6 +270,7 @@ export function DrippyAsciiAvatar({
   }, [eyesCanBlink, cochilando]);
 
   useEffect(() => {
+    if (controlledGaze || state === 'asleep') return;
     let active = true;
     let glanceAwayUntil = 0;
     let nextGlanceAt = performance.now() + 3500 + Math.random() * 4500;
@@ -322,7 +328,7 @@ export function DrippyAsciiAvatar({
       active = false;
       if (pupilRef.current) clearTimeout(pupilRef.current);
     };
-  }, [state, isDragging, size]);
+  }, [state, isDragging, size, controlledGaze]);
 
   useEffect(() => {
     let active = true;
@@ -383,57 +389,31 @@ export function DrippyAsciiAvatar({
 
   const sphereSize = `${typeof size === 'number' ? size : size === 'sm' ? 80 : size === 'lg' ? 180 : 136}px`;
 
-  const moodClass =
-    state === 'dizzy'
-      ? 'text-lime-400 drop-shadow-[0_0_5px_rgba(163,230,53,0.7)]'
-      : state === 'angry'
-      ? 'text-red-500 drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]'
-      : state === 'happy'
-      ? 'text-emerald-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.6)]'
-      : state === 'excited'
-      ? 'text-fuchsia-400 drop-shadow-[0_0_5px_rgba(232,121,249,0.7)]'
-      : state === 'confused'
-      ? 'text-blue-400 drop-shadow-[0_0_4px_rgba(96,165,250,0.6)]'
-      : state === 'curious'
-      ? 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]'
-      : 'text-primary/95 drop-shadow-[0_0_4px_rgba(var(--drippy-glow-rgb),0.6)]';
-
-  const leftEye = getEyeParams(
-    state,
-    isDragging,
-    blink.l,
-    'left',
-    eyesClosed,
-  );
-  const rightEye = getEyeParams(
-    state,
-    isDragging,
-    blink.r,
-    'right',
-    eyesClosed,
-  );
+  const moodClass = 'bolha-face-light';
+  const eye = getEyeParams(state, isDragging, blink.l, eyesClosed);
   const earsAlert = state === 'happy' || state === 'excited' || isDragging;
 
-  const gazePupil = gaze ? { x: gaze[0] * 2.4, y: gaze[1] * 1.6 } : pupil;
+  const gazePupil = controlledGaze ? { x: gazeX * 2.4, y: gazeY * 1.6 } : pupil;
 
   const renderEye = (cx: number, eye: EyeParams) => (
     <g>
       <motion.path
         d={`M ${cx - 5} 37 Q ${cx} 29 ${cx + 5} 37`}
-        stroke={shapes.DrippyAsciiAvatar_0} strokeWidth={shapes.DrippyAsciiAvatar_1} strokeLinecap={shapes.DrippyAsciiAvatar_2 as 'round'} fill={shapes.DrippyAsciiAvatar_3}
+        stroke={shapes.BolhaAvatar_0} strokeWidth={shapes.BolhaAvatar_1} strokeLinecap={shapes.BolhaAvatar_2 as 'round'} fill={shapes.BolhaAvatar_3}
         initial={false}
         animate={{ opacity: eye.happy ? 1 : 0 }}
         transition={{ duration: 0.15 }}
       />
       <motion.g initial={false} animate={{ opacity: eye.happy ? 0 : 1 }} transition={{ duration: 0.15 }}>
         <motion.ellipse
-          fill={shapes.DrippyAsciiAvatar_4}
+          className="bolha-eye"
+          fill={shapes.BolhaAvatar_4}
           initial={false}
           animate={{ rx: eye.rx, ry: eye.ry, cx: cx + gazePupil.x, cy: 34 + eye.dy + gazePupil.y * 0.8 }}
           transition={{ duration: 0.22, ease: 'easeOut' }}
         />
         <motion.circle
-          r={shapes.DrippyAsciiAvatar_5} fill={shapes.DrippyAsciiAvatar_6}
+          r={shapes.BolhaAvatar_5} fill={shapes.BolhaAvatar_6}
           initial={false}
           animate={{
             cx: cx + gazePupil.x + 1.6,
@@ -446,24 +426,23 @@ export function DrippyAsciiAvatar({
     </g>
   );
 
-  const renderEar = (cx: number, glyph: string, delay: number) => (
+  const renderEar = (cx: number, delay: number) => (
     <motion.g
       initial={false}
       animate={earsAlert ? { rotate: [0, -6, 6, 0], y: -1 } : { rotate: 0, y: 0 }}
-      transition={earsAlert ? { duration: 0.6, repeat: Infinity, repeatDelay: 1.2, delay } : { duration: 0.3 }}
+      transition={earsAlert ? { duration: 0.6, repeat: reducedMotion ? 0 : Infinity, repeatDelay: 1.2, delay } : { duration: 0.3 }}
       style={{ originX: `${cx}px`, originY: '18px' }}
     >
-      <text
-        x={cx} y={shapes.DrippyAsciiAvatar_7} textAnchor="middle"
-        fill={shapes.DrippyAsciiAvatar_8} fontSize={shapes.DrippyAsciiAvatar_9} fontWeight={shapes.DrippyAsciiAvatar_10}
-        fontFamily={shapes.DrippyAsciiAvatar_11}
-      >{glyph}</text>
+      <path className="bolha-ear" d={`M ${cx - 5} 19 Q ${cx - 1} 9 ${cx} 11 Q ${cx + 1} 9 ${cx + 5} 19`}
+        fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </motion.g>
   );
 
   return (
     <motion.div
       ref={containerRef}
+      data-pose={pose}
+      data-face-tilt={faceTilt}
       drag={draggable}
       dragMomentum={false}
       onDragStart={draggable ? () => setIsDragging(true) : undefined}
@@ -474,7 +453,7 @@ export function DrippyAsciiAvatar({
               scale: 1.15,
               rotate: [-4, 4],
               transition: {
-                rotate: { duration: 0.5, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' },
+                rotate: { duration: 0.5, repeat: reducedMotion ? 0 : Infinity, repeatType: 'mirror', ease: 'easeInOut' },
                 scale: { duration: 0.15 },
               },
             }
@@ -486,7 +465,7 @@ export function DrippyAsciiAvatar({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       className={cn(
-        'drippy-avatar-container font-mono select-none transition-colors duration-300',
+        'bolha-avatar-container font-mono select-none transition-colors duration-300',
         onClick || onDoubleClick ? 'cursor-pointer' : '',
         className
       )}
@@ -494,78 +473,32 @@ export function DrippyAsciiAvatar({
         '--avatar-size': sphereSize
       } as CSSProperties}
     >
-      <DrippyGooTrail motion={dragMotion} opacity={bubbleOpacity} />
-      <SleepPillow asleep={state === 'asleep'} waking={isWaking} startled={startled} />
+      <BolhaGooTrail motion={dragMotion} opacity={bubbleOpacity} />
 
-      {}
-      <motion.div
-        className="drippy-sleep-body"
-        animate={
-          startled
-            ? { y: [7, -24, 4, -2, 0], rotate: [-11, 14, -5, 2, 0], scale: [1, 1.2, 0.94, 1.04, 1] }
-            : state === 'asleep'
-            ? { y: [7, 8.5, 7], rotate: [-11, -12.5, -11], scale: [1, 1.025, 1] }
-            : isWaking
-            ? // Espreguiça: estica pra cima, desendireita e assenta.
-              { y: [7, -7, 0], rotate: [-11, 3, 0], scale: [1, 1.09, 1] }
-            : cochilando
-            ? // Cabeceada de quem cochila sem querer: a cabeça vai pendendo
-              { y: [0, 8, 16, 15, 1, 0], rotate: [0, 4, 13, 12, -2, 0], scale: [1, 1, 1.01, 1.01, 0.99, 1] }
-            : dancingNow
-            ? // Dança: pulinho no tempo + gingado pro lado. A rotação leva o
-              { y: [0, -3.5, 0], rotate: [-2.8, 2.8, -2.8], scale: [1, 1.018, 1] }
-            : lightDance
-            ? // Gingado leve de idle (sem música real tocando), mesma ideia,
-              { y: [0, -2.5, 0], rotate: [-2, 2, -2], scale: [1, 1.015, 1] }
-            : { y: 0, rotate: 0, scale: 1 }
-        }
-        transition={
-            startled
-            ? { duration: 0.95, times: [0, 0.24, 0.46, 0.72, 1], ease: 'easeOut' }
-            : isWaking
-            ? { duration: 1, ease: [0.34, 1.3, 0.64, 1] }
-            : cochilando
-            ? { duration: 5.2, times: [0, 0.42, 0.6, 0.72, 0.86, 1], repeat: Infinity, ease: 'easeInOut' }
-            : dancingNow
-            ? {
-                y: { duration: 1.05, repeat: Infinity, ease: 'easeInOut' },
-                scale: { duration: 1.05, repeat: Infinity, ease: 'easeInOut' },
-                rotate: { duration: 2.1, repeat: Infinity, ease: 'easeInOut' },
-              }
-            : lightDance
-            ? {
-                y: { duration: 0.9, repeat: Infinity, ease: 'easeInOut' },
-                scale: { duration: 0.9, repeat: Infinity, ease: 'easeInOut' },
-                rotate: { duration: 1.8, repeat: Infinity, ease: 'easeInOut' },
-              }
-            : state === 'asleep'
-            ? {
-                scale: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' },
-                y: { type: 'spring', stiffness: 90, damping: 15 },
-                rotate: { type: 'spring', stiffness: 90, damping: 15 },
-              }
-            : { type: 'spring', stiffness: 260, damping: 20 }
-        }
-      >
-      {}
+      <div className="bolha-body-motion" data-asleep={state === 'asleep'} data-dancing={!isDragging && !lying && (dancingNow || lightDance)}>
       <div
-        className="drippy-goo-body"
+        className="bolha-goo-body"
         style={{
-          transform: `rotate(${dragMotion.angle}deg) scale(${1 + 0.3 * dragMotion.intensity}, ${1 - 0.19 * dragMotion.intensity}) rotate(${-dragMotion.angle}deg)`,
+          transform: `rotate(${angle}deg) scale(${1 + .18 * dragMotion.intensity + .12 * landing}, ${1 - .1 * dragMotion.intensity - .1 * landing})`,
         }}
       >
         <motion.div
           animate={{ opacity: bubbleOpacity }}
-          className={cn('drippy-avatar-ring', isTalking && 'drippy-avatar-ring--talking')}
+          className={cn('bolha-avatar-ring', isTalking && 'bolha-avatar-ring--talking')}
         />
         <motion.div
           animate={{ opacity: bubbleOpacity }}
-          className="drippy-avatar-core"
+          className="bolha-avatar-core"
         />
 
-      <div className="drippy-avatar-face">
+      </div>
+      </div>
+      <motion.div className="bolha-avatar-face" initial={false}
+        animate={{ x: isDragging ? 0 : (gazeX ?? 0) * pixels * .025, y: lying ? pixels * .08 : pose === 'airborne' ? Math.max(-pixels * .04, Math.min(pixels * .04, velocityY * .007)) : 0, rotate: faceTilt }}
+        transition={reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 125, damping: 17, mass: .6 }}>
+        <div className="bolha-face-float" data-floating={!isDragging}>
         <motion.div
-          className={cn('drippy-face-bob w-full h-full transition-colors duration-300', moodClass)}
+          className={cn('w-full h-full transition-colors duration-300', moodClass)}
           animate={
             state === 'angry'
               ? { x: [0, -1.5, 1.5, -1.5, 0] }
@@ -583,26 +516,26 @@ export function DrippyAsciiAvatar({
           }
           transition={
             state === 'angry'
-              ? { duration: 0.4, repeat: Infinity }
+              ? { duration: 0.4, repeat: reducedMotion ? 0 : Infinity }
               : state === 'dizzy'
-              ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
+              ? { duration: 1.4, repeat: reducedMotion ? 0 : Infinity, ease: 'easeInOut' }
               : state === 'sleepy'
-              ? { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }
+              ? { duration: 2.4, repeat: reducedMotion ? 0 : Infinity, ease: 'easeInOut' }
               : state === 'excited'
-              ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' }
+              ? { duration: 0.6, repeat: reducedMotion ? 0 : Infinity, ease: 'easeInOut' }
               : state === 'curious'
-              ? { duration: 2.3, repeat: Infinity, ease: 'easeInOut', repeatDelay: 0.7 }
+              ? { duration: 2.3, repeat: reducedMotion ? 0 : Infinity, ease: 'easeInOut', repeatDelay: 0.7 }
               : state === 'confused'
-              ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut', repeatDelay: 0.5 }
+              ? { duration: 1.8, repeat: reducedMotion ? 0 : Infinity, ease: 'easeInOut', repeatDelay: 0.5 }
               : { duration: 0.2 }
           }
         >
-          <svg viewBox={shapes.DrippyAsciiAvatar_12} className="w-full h-full" aria-hidden="true">
-            {renderEar(30, earGlyphs[0], 0)}
-            {renderEar(70, earGlyphs[1], 0.15)}
+          <svg viewBox={shapes.BolhaAvatar_12} className="w-full h-full" aria-hidden="true">
+            {renderEar(30, 0)}
+            {renderEar(70, 0)}
 
-            {renderEye(30, leftEye)}
-            {renderEye(70, rightEye)}
+            {renderEye(30, eye)}
+            {renderEye(70, eye)}
 
 
 
@@ -615,10 +548,10 @@ export function DrippyAsciiAvatar({
                 ].map((s, i) => (
                   <motion.text
                     key={i}
-                    x={s.x} y={s.y} fill={shapes.DrippyAsciiAvatar_13} fontSize={shapes.DrippyAsciiAvatar_14} fontWeight={shapes.DrippyAsciiAvatar_15}
+                    x={s.x} y={s.y} fill={shapes.BolhaAvatar_13} fontSize={shapes.BolhaAvatar_14} fontWeight={shapes.BolhaAvatar_15}
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: [0, 1, 0], scale: [0.5, 1, 0.5] }}
-                    transition={{ duration: state === 'excited' ? 0.8 : 1.4, repeat: Infinity, delay: s.delay, ease: 'easeInOut' }}
+                    transition={{ duration: state === 'excited' ? 0.8 : 1.4, repeat: reducedMotion ? 0 : Infinity, delay: s.delay, ease: 'easeInOut' }}
                     style={{ transformOrigin: `${s.x}px ${s.y}px` }}
                   >✦</motion.text>
                 ))}
@@ -628,20 +561,20 @@ export function DrippyAsciiAvatar({
             {}
             {state === 'curious' && (
               <motion.text
-                x={shapes.DrippyAsciiAvatar_16} y={shapes.DrippyAsciiAvatar_17} fill={shapes.DrippyAsciiAvatar_18} fontSize={shapes.DrippyAsciiAvatar_19} fontWeight={shapes.DrippyAsciiAvatar_20}
-                fontFamily={shapes.DrippyAsciiAvatar_21}
+                x={shapes.BolhaAvatar_16} y={shapes.BolhaAvatar_17} fill={shapes.BolhaAvatar_18} fontSize={shapes.BolhaAvatar_19} fontWeight={shapes.BolhaAvatar_20}
+                fontFamily={shapes.BolhaAvatar_21}
                 initial={{ opacity: 0, y: 26, rotate: -8 }}
                 animate={{ opacity: [0, 1, 1, 0], y: [26, 15, 10], rotate: [-8, 8, -5], scale: [0.8, 1.08, 1] }}
-                transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                transition={{ duration: 2.6, repeat: reducedMotion ? 0 : Infinity, ease: 'easeInOut' }}
               >?</motion.text>
             )}
 
             <motion.path
-              stroke={shapes.DrippyAsciiAvatar_22}
-              strokeWidth={shapes.DrippyAsciiAvatar_23}
-              strokeLinecap={shapes.DrippyAsciiAvatar_24 as 'round'}
+              stroke={shapes.BolhaAvatar_22}
+              strokeWidth={shapes.BolhaAvatar_23}
+              strokeLinecap={shapes.BolhaAvatar_24 as 'round'}
               strokeLinejoin="round"
-              fill={shapes.DrippyAsciiAvatar_25}
+              fill={shapes.BolhaAvatar_25}
               initial={false}
               animate={{ d: mouth.d, fillOpacity: mouth.fillOpacity, x: 0 }}
               transition={{ duration: isTalking ? 0.09 : 0.22, ease: 'easeOut' }}
@@ -652,14 +585,13 @@ export function DrippyAsciiAvatar({
           </svg>
         </motion.div>
         </div>
-      </div>
       </motion.div>
 
       {}
       <SleepZs asleep={state === 'asleep' && !isYawning} waking={isWaking} startled={startled} moodClass={moodClass} />
       <CoffeeMug active={(hasCoffee || forceCoffee)} falling={coffeeFalling} moodClass={moodClass} />
       {}
-      <DrippyMusicNotes active={dancingNow} moodClass={moodClass} />
+      <BolhaMusicNotes active={dancingNow} moodClass={moodClass} />
     </motion.div>
   );
-}
+});

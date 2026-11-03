@@ -137,7 +137,7 @@ def test_custo_incremental_limitado_em_simulacao_longa(tmp_path):
     assert time.process_time()-started < 15
 
 def test_apagar_todo_aprendizado_preserva_preferencias(tmp_path):
-    content=Path(__file__).resolve().parents[2]/'assets/drippy/content'
+    content=Path(__file__).resolve().parents[2]/'assets/bolha/content'
     game=Game(tmp_path, content)
     game.configure({'adaptiveBehavior':False,'learnRoutine':False,'avatarSize':152})
     game.brain.learned[0,0]=.05

@@ -14,7 +14,7 @@ def test_carinho_com_coracao_nao_encerra_worker_cp1252(tmp_path):
     root = Path(__file__).resolve().parents[2]
     process = subprocess.Popen(
         [sys.executable, str(root/'brain/worker.py'), '--data-dir', str(tmp_path/'memória'),
-         '--content-dir', str(root/'assets/drippy/content')],
+         '--content-dir', str(root/'assets/bolha/content')],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         env=dict(os.environ, PYTHONIOENCODING='cp1252', PYTHONUTF8='0', OPENBLAS_NUM_THREADS='1'),
     )
@@ -40,7 +40,7 @@ def test_carinho_com_coracao_nao_encerra_worker_cp1252(tmp_path):
         process.stdin.flush()
         assert process.wait(timeout=10) == 0
         assert 'UnicodeEncodeError' not in process.stderr.read().decode('utf-8')
-        assert (tmp_path/'memória/drippy/nervous.json').is_file()
+        assert (tmp_path/'memória/bolha/nervous.json').is_file()
     finally:
         if process.poll() is None: process.kill()
         process.wait(timeout=10)

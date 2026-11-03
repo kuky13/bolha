@@ -10,14 +10,14 @@ files:
 extraResources:
   - from: brain-dist/BolhaBrain
     to: brain
-  - from: assets/drippy/content
+  - from: assets/bolha/content
     to: brain/content
-  - from: assets/drippy/tray.png
+  - from: assets/bolha/tray.png
     to: tray.png
   - from: LICENSE
     to: licenses/GPL-3.0.txt
-  - from: licenses/DRIPPY-ASSETS.md
-    to: licenses/DRIPPY-ASSETS.md
+  - from: licenses/BOLHA-ASSETS.md
+    to: licenses/BOLHA-ASSETS.md
   - from: licenses/CC-BY-NC-4.0.txt
     to: licenses/CC-BY-NC-4.0.txt
   - from: brain/LICENSE-UPSTREAM
@@ -26,7 +26,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: assets/drippy/icon.ico
+  icon: assets/bolha/icon.ico
 nsis:
   oneClick: false
   perMachine: false

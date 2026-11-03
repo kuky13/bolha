@@ -13,7 +13,7 @@ const app=await electron.launch({executablePath:packaged,args,env:{...process.en
 const started=Date.now();
 const results={at:new Date().toISOString(),version:JSON.parse(await readFile('package.json','utf8')).version,scenarios:{},method:'Soma do RSS dos processos (memória compartilhada pode ser contada mais de uma vez); CPU em porcentagem de um núcleo.'};
 try{
-  const page=await app.firstWindow();await page.waitForSelector('[data-testid=drippy]',{timeout:45000});
+  const page=await app.firstWindow();await page.waitForSelector('[data-testid=bolha]',{timeout:45000});
   const measure=async name=>{
     const {stdout}=await promisify(execFile)(process.env.BOLHA_PYTHON??'python',['scripts/measure-tree.py',String(app.process().pid),process.env.BOLHA_BENCH_SECONDS??'20'],{maxBuffer:1024*1024,timeout:3700000});
     results.scenarios[name]=JSON.parse(stdout);console.log(name,stdout.trim());

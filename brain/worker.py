@@ -11,7 +11,7 @@ import traceback
 from pathlib import Path
 from game import Game
 
-ALLOWED = {'panic','hide','monitor','panel','hover','music','cursor','drag-start','drag','drag-end','poke','caress','spin','sleep','work','notebook','corner','ball','mischief','dismiss','quiet','reset-memory'}
+ALLOWED = {'panic','hide','monitor','panel','hover','music','cursor','drag-start','drag','drag-end','poke','caress','spin','sleep','rest','work','notebook','corner','ball','mischief','dismiss','quiet','reset-memory'}
 
 def finite(value, depth=0):
     if depth > 12: return False
@@ -62,7 +62,7 @@ def main():
         now = time.monotonic()
         game.tick(now - previous,now); previous = now
         paused = game.panicked or game.hidden or not game.available_areas()
-        if now - last_output >= (1. if paused else 1/30):
+        if now - last_output >= game.output_interval():
             print(json.dumps(game.snapshot(),ensure_ascii=False,allow_nan=False),flush=True)
             last_output = now
         time.sleep(max(0.,(.1 if paused else 1/60) - (time.monotonic()-start)))

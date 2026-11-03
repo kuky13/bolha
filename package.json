@@ -1,8 +1,8 @@
 {
   "name": "bolha",
   "productName": "Bolha",
-  "version": "0.1.1",
-  "description": "Drippy passeando pela sua tela, com música e animações locais.",
+  "version": "0.2.0",
+  "description": "Bolha passeando pela sua tela, com música e animações locais.",
   "author": "André Ribeiro Lima (KukySolutions)",
   "license": "GPL-3.0-only",
   "homepage": "https://github.com/kuky13/bolha",

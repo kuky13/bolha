@@ -494,6 +494,7 @@ class LIFBrain(Brain):
         for i, p in enumerate(self.pools):
             onehot[p["start"]:p["start"] + p["n"], i] = 1.0
         self.onehot = onehot
+        self.pool_starts = np.array([p["start"] for p in self.pools])
         self.pool_sizes = np.array([p["n"] for p in self.pools], dtype=float)
         self.pool_counts = np.zeros(len(self.pools))
         self.pool_rate = np.zeros(len(self.pools))
@@ -553,7 +554,9 @@ class LIFBrain(Brain):
         rng = self.rng
         Ns = self.Ns
 
-        drive = (self.spikes * self.pre_gain) @ self.W_lif
+        # Só neurônios que dispararam contribuem; preserva os pesos e o passo de 1 ms.
+        active = np.flatnonzero(self.spikes)
+        drive = self.pre_gain[active] @ self.W_lif[active]
 
         v = self.v
         v *= self.decay
@@ -582,7 +585,7 @@ class LIFBrain(Brain):
 
         self.trace *= TRACE_DECAY
         self.trace[self.spikes > 0] = 1.0
-        self.pool_counts += self.spikes @ self.onehot
+        self.pool_counts += np.add.reduceat(self.spikes, self.pool_starts)
 
     def step(self, dt_ms):
         """Avança a rede `dt_ms` milissegundos (em passos de 1 ms, no máximo 400 por chamada)."""

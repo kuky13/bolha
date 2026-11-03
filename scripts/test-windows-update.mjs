@@ -49,7 +49,7 @@ const launch=async (data,normalProfile=false)=>{
   if(normalProfile)delete env.BOLHA_TEST_USER_DATA;
   const app=await electron.launch({executablePath:exe,env,timeout:60000});
   apps.push(app);
-  const page=await app.firstWindow();await page.waitForSelector('[data-app-ready]',{timeout:45000});await page.waitForSelector('[data-testid=drippy]',{timeout:45000});return{app,page};
+  const page=await app.firstWindow();await page.waitForSelector('[data-app-ready]',{timeout:45000});await page.waitForSelector('.companion',{timeout:45000});return{app,page};
 };
 async function waitUpdate(page,predicate,timeout=120000){
   const deadline=Date.now()+timeout;let state;
@@ -91,12 +91,14 @@ try{
   const data=join(process.env.APPDATA,'bolha');
   assert.equal(await access(data).then(()=>true,()=>false),false,'Este teste precisa de um runner sem perfil Bolha anterior.');
   automaticData=data;
-  await mkdir(join(data,'brain/drippy'),{recursive:true});
+  const memoryFolder=(await readdir(join(firstData,'brain'),{withFileTypes:true})).find(entry=>entry.isDirectory());
+  assert.ok(memoryFolder,'A versão anterior deve ter salvo sua pasta de memória.');
+  await mkdir(join(data,'brain',memoryFolder.name),{recursive:true});
   await copyFile(join(firstData,'config.json'),join(data,'config.json'));
-  const seeded=JSON.parse(await readFile(join(firstData,'brain/drippy/nervous.json'),'utf8'));
+  const seeded=JSON.parse(await readFile(join(firstData,'brain',memoryFolder.name,'nervous.json'),'utf8'));
   const post=Object.keys(seeded.learned.PRESO)[0];
   seeded.learned.PRESO[post]=.06;
-  await writeFile(join(data,'brain/drippy/nervous.json'),JSON.stringify(seeded));
+  await writeFile(join(data,'brain',memoryFolder.name,'nervous.json'),JSON.stringify(seeded));
   const second=await launch(data,true);
   await second.page.evaluate(()=>window.bolha.brainEvent({type:'caress'}));
   const deadline=Date.now()+180000;
@@ -119,7 +121,7 @@ try{
     await writeFile('validation/native-update-debug.json',JSON.stringify(diagnostics,null,2));
   }
   assert.ok(applied,'A atualização automática e a limpeza não concluíram.');
-  const memory=JSON.parse(await readFile(join(data,'brain/drippy/nervous.json'),'utf8'));
+  const memory=JSON.parse(await readFile(join(data,'brain/bolha/nervous.json'),'utf8'));
   assert.equal(memory.seed,1313);
   assert.ok(memory.learned.PRESO[post]>.04,'O aprendizado anterior deve sobreviver à atualização.');
   assert.equal(JSON.parse(await readFile(join(data,'config.json'),'utf8')).preferences.avatarSize,152);

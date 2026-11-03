@@ -126,6 +126,28 @@ def test_sonolento_abaixo_do_limite():
 
 # ---------------- física ----------------
 
+def test_bolha_circular_nao_levita_quando_gira_no_chao():
+    b=Body(300.,732.,68.,68.,circular=True)
+    b.grounded=True;b.surface=800
+    for angle in (0,45,90,135,180,270):
+        b.angle=angle;b.omega=0
+        b.step(1/60,(0,0,1000,800),[])
+        assert b.extents()==(68.,68.)
+        assert b.y==pytest.approx(732.)
+
+@pytest.mark.parametrize('density',[0.,.03,.3,1.])
+def test_calculo_esparso_preserva_integracao_e_contagem_da_rede(density):
+    b=LIFBrain()
+    rng=np.random.default_rng(321)
+    b.spikes[:]=rng.random(b.N)<density
+    b.pre_gain[:]=rng.uniform(.3,1.,b.N)
+    b.W_lif=rng.normal(0,.002,b.W_lif.shape)
+    expected=(b.spikes*b.pre_gain)@b.W_lif
+    b.rng=SimpleNamespace(standard_normal=lambda n:np.zeros(n),random=lambda n:np.ones(n))
+    b._substep()
+    np.testing.assert_allclose(b.v,expected,atol=1e-12,rtol=1e-12)
+    np.testing.assert_array_equal(b.pool_counts,b.spikes@b.onehot)
+
 def test_corpo_cai_e_para_no_chao():
     b = Body(300.0, 0.0, 60.0, 45.0)
     for _ in range(600):

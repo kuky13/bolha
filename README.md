@@ -1,22 +1,24 @@
 # Bolha
 
-A Drippy passeia, pula e quica pela sua tela, brinca com uma bolinha, senta no
+A Bolha passeia, pula e quica pela sua tela, brinca com uma bolinha, senta no
 próprio notebook e aprende com suas interações. O desenho da bolha usa
 Electron/React; o cérebro é a rede neural local original do
 [Pestinha](https://github.com/mille-okws/pestinha), com 470 neurônios.
 
-**Primeira versão experimental, para Windows x64.**
+**Aplicativo experimental, para Windows x64.**
 
 [Baixar o instalador](https://github.com/kuky13/bolha/releases/latest)
 
 ## O que acompanha
 
-- Carinho, cutucada, arrasto, arremesso, giro e pouso sobre janelas.
+- Carinho, cutucada, arrasto direto, arremesso, giro e pouso sobre janelas.
+- Rosto vetorial com olhos simétricos, brilho suave e flutuação independente.
+  Deitar vira somente o rosto; a esfera continua redonda. O chão é físico e invisível.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
 - Bolinha, notebook de brincadeira, fogos, cartazes, protestos e castigo.
-- Oito memes novos da Drippy e bilhetes: no máximo uma travessura a cada cinco
+- Oito memes novos da Bolha e bilhetes: no máximo uma travessura a cada cinco
   minutos, até três objetos na tela; tudo configurável.
-- Se for muito arremessada, a Drippy estoura, some por 30 segundos e volta
+- Se for muito arremessada, a Bolha estoura, some por 30 segundos e volta
   tímida pelo canto. Carinho acelera a recuperação. O limite começa em 12
   arremessos fortes por minuto; os saltos dela não entram nessa conta.
 - Controles de música do Windows, com atalhos e dança.
@@ -35,10 +37,11 @@ não é necessário instalar Python separadamente.
 
 | Ação | Resultado |
 |---|---|
-| Clicar | Cutuca a Drippy |
+| Clicar | Cutuca a Bolha |
 | Passar o mouse de um lado para o outro sobre ela | Faz carinho |
 | Arrastar e soltar | Leva junto ou arremessa |
 | Rodinha | Gira |
+| Configurações → Bolha → Deitar / Levantar | Descansa o rosto e volta a olhar para você |
 | Botão direito | Abre configurações e atividades |
 | Duplo clique | Abre o painel do cérebro |
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
@@ -49,9 +52,10 @@ ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
 
 ## Dados e contexto
 
-Tudo o que a Drippy aprende fica em `%APPDATA%\bolha\brain`. Aparência e
+Tudo o que a Bolha aprende fica em `%APPDATA%\bolha\brain`. Aparência e
 preferências ficam no diretório próprio `%APPDATA%\bolha`, separado de outros
-aplicativos. Reinstalar ou atualizar preserva esses arquivos.
+aplicativos. Reinstalar ou atualizar preserva esses arquivos. A versão 0.2 migra
+a pasta de memória anterior automaticamente, sem sobrescrever uma pasta nova existente.
 
 Você pode desligar separadamente a leitura do nome do programa ativo, do
 tempo ocioso, da posição do cursor e da geometria das janelas. Não há captura
@@ -99,9 +103,9 @@ O resultado fica em `release/`. Nenhuma credencial, `.env` ou serviço externo
 
 ## Organização
 
-- `src/`: aplicativo, ponte Electron, interface e renderização da Drippy.
+- `src/`: aplicativo, ponte Electron, interface e renderização da Bolha.
 - `brain/`: cérebro original do Pestinha, adaptadores de cena e processo local.
-- `assets/drippy/`: geometrias, aparência, ícones e conteúdo da personagem.
+- `assets/bolha/`: geometrias, aparência, ícones e conteúdo da personagem.
 - `docs/`: notas e validação; `NOTICE.md`: autoria e origem do código.
 
 Não há dois motores disputando o corpo: Python decide física e comportamento,
@@ -114,8 +118,8 @@ não executa comandos no computador.
 Código próprio: **GPL-3.0-only**. O código derivado do Pestinha mantém seus
 avisos **GPL-3.0-or-later**. Consulte [LICENSE](LICENSE) e [NOTICE.md](NOTICE.md).
 
-As artes da Drippy são separadas, sob **CC BY-NC 4.0**, com atribuição e uso não
-comercial. Consulte [licença das artes](licenses/DRIPPY-ASSETS.md). Os memes e
+As artes da Bolha são separadas, sob **CC BY-NC 4.0**, com atribuição e uso não
+comercial. Consulte [licença das artes](licenses/BOLHA-ASSETS.md). Os memes e
 textos do pacote original do Pestinha não foram copiados.
 
 O código é aberto; a restrição não comercial se aplica às artes fornecidas,

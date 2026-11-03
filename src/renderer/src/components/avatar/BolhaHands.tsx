@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import shapes from '../../../../../assets/drippy/shapes.json';
+import shapes from '../../../../../assets/bolha/shapes.json';
 import { motion } from 'framer-motion';
 
 interface PawProps {
@@ -14,15 +14,15 @@ interface PawProps {
 export function Paw({ x, y, rotate = 0, scale = 1, flip = false }: PawProps) {
   const sx = flip ? -scale : scale;
   return (
-    <g transform={`translate(${x} ${y}) rotate(${rotate}) scale(${sx} ${scale})`} fill={shapes.DrippyHands_0}>
+    <g transform={`translate(${x} ${y}) rotate(${rotate}) scale(${sx} ${scale})`} fill={shapes.BolhaHands_0}>
       {}
-      <ellipse cx={shapes.DrippyHands_1} cy={shapes.DrippyHands_2} rx={shapes.DrippyHands_3} ry={shapes.DrippyHands_4} />
+      <ellipse cx={shapes.BolhaHands_1} cy={shapes.BolhaHands_2} rx={shapes.BolhaHands_3} ry={shapes.BolhaHands_4} />
       {}
-      <rect x={-4.3} y={-6.4} width={2.3} height={5.4} rx={shapes.DrippyHands_5} transform="rotate(-13 -3.15 -3.7)" />
-      <rect x={-1.25} y={-7.2} width={2.5} height={6.2} rx={shapes.DrippyHands_6} />
-      <rect x={shapes.DrippyHands_7} y={-6.4} width={2.3} height={5.4} rx={shapes.DrippyHands_8} transform="rotate(13 3.05 -3.7)" />
+      <rect x={-4.3} y={-6.4} width={2.3} height={5.4} rx={shapes.BolhaHands_5} transform="rotate(-13 -3.15 -3.7)" />
+      <rect x={-1.25} y={-7.2} width={2.5} height={6.2} rx={shapes.BolhaHands_6} />
+      <rect x={shapes.BolhaHands_7} y={-6.4} width={2.3} height={5.4} rx={shapes.BolhaHands_8} transform="rotate(13 3.05 -3.7)" />
       {}
-      <rect x={-6.9} y={-1.5} width={2.7} height={4.6} rx={shapes.DrippyHands_9} transform="rotate(-58 -5.55 0.8)" />
+      <rect x={-6.9} y={-1.5} width={2.7} height={4.6} rx={shapes.BolhaHands_9} transform="rotate(-58 -5.55 0.8)" />
     </g>
   );
 }
@@ -51,7 +51,7 @@ export function CoveringHands({ active }: { active: boolean }) {
           }}
           style={{ originX: `${cx}px`, originY: '40px' }}
         >
-          <Paw x={cx} y={shapes.DrippyHands_10} scale={1.68} flip={i === 1} rotate={i === 0 ? -10 : 10} />
+          <Paw x={cx} y={shapes.BolhaHands_10} scale={1.68} flip={i === 1} rotate={i === 0 ? -10 : 10} />
         </motion.g>
       ))}
     </g>

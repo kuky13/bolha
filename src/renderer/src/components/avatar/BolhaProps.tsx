@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import shapes from '../../../../../assets/drippy/shapes.json';
+import shapes from '../../../../../assets/bolha/shapes.json';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useId } from 'react';
 
@@ -19,11 +19,11 @@ export function CoffeeMug({ active, falling, moodClass }: { active: boolean; fal
   const gradId = `mug-${uid}`;
 
   return (
-    <svg viewBox={shapes.DrippyProps_0} aria-hidden="true" className={moodClass} style={LAYER_STYLE}>
+    <svg viewBox={shapes.BolhaProps_0} aria-hidden="true" className={moodClass} style={LAYER_STYLE}>
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset={shapes.DrippyProps_1} stopColor={shapes.DrippyProps_2} />
-          <stop offset={shapes.DrippyProps_3} stopColor={shapes.DrippyProps_4} />
+          <stop offset={shapes.BolhaProps_1} stopColor={shapes.BolhaProps_2} />
+          <stop offset={shapes.BolhaProps_3} stopColor={shapes.BolhaProps_4} />
         </linearGradient>
       </defs>
       <AnimatePresence>
@@ -47,10 +47,10 @@ export function CoffeeMug({ active, falling, moodClass }: { active: boolean; fal
               <motion.path
                 key={i}
                 d={`M ${s.x} 62 q -4 -7 0 -13 q 4 -6 0 -12`}
-                fill={shapes.DrippyProps_5}
-                stroke={shapes.DrippyProps_6}
-                strokeWidth={shapes.DrippyProps_7}
-                strokeLinecap={shapes.DrippyProps_8 as 'round'}
+                fill={shapes.BolhaProps_5}
+                stroke={shapes.BolhaProps_6}
+                strokeWidth={shapes.BolhaProps_7}
+                strokeLinecap={shapes.BolhaProps_8 as 'round'}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: [0, 0.7, 0], y: [6, -10, -26] }}
                 transition={{ duration: s.dur, delay: s.delay, repeat: Infinity, ease: 'easeOut' }}
@@ -58,17 +58,17 @@ export function CoffeeMug({ active, falling, moodClass }: { active: boolean; fal
             ))}
 
             {}
-            <path d={shapes.DrippyProps_9} fill={`url(#${gradId})`} />
+            <path d={shapes.BolhaProps_9} fill={`url(#${gradId})`} />
             {}
             <path
-              d={shapes.DrippyProps_10}
-              fill={shapes.DrippyProps_11}
-              stroke={shapes.DrippyProps_12}
-              strokeWidth={shapes.DrippyProps_13}
-              strokeLinecap={shapes.DrippyProps_14 as 'round'}
+              d={shapes.BolhaProps_10}
+              fill={shapes.BolhaProps_11}
+              stroke={shapes.BolhaProps_12}
+              strokeWidth={shapes.BolhaProps_13}
+              strokeLinecap={shapes.BolhaProps_14 as 'round'}
             />
             {}
-            <ellipse cx={shapes.DrippyProps_15} cy={shapes.DrippyProps_16} rx={shapes.DrippyProps_17} ry={shapes.DrippyProps_18} fill={shapes.DrippyProps_19} />
+            <ellipse cx={shapes.BolhaProps_15} cy={shapes.BolhaProps_16} rx={shapes.BolhaProps_17} ry={shapes.BolhaProps_18} fill={shapes.BolhaProps_19} />
 
           </motion.g>
         )}

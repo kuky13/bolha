@@ -1,6 +1,6 @@
 # Inteligência comportamental da Bolha
 
-Esta revisão aplica a proposta “Pestinha 2.0” à Drippy. Mantém Electron e o
+Esta revisão aplica a proposta “Pestinha 2.0” à Bolha. Mantém Electron e o
 cérebro Python original, conforme escolhido. Não inclui LLM, modelos para
 baixar, serviço residente adicional, chat ou treinamento pesado.
 
@@ -15,7 +15,7 @@ Memória episódica e bandit existentes + rotina compacta
           ↓
 Objetivo de 12–32 segundos, escolhido entre ações permitidas
           ↓
-Comportamento e física originais → desenho da Drippy no Electron
+Comportamento e física originais → desenho da Bolha no Electron
 ```
 
 O Pestinha já traz memória episódica, bandit contextual, condicionamento e
@@ -39,7 +39,7 @@ segunda tabela Q ou uma segunda simulação do corpo.
   ações permitidas. Ela não pode habilitar uma leitura ou atividade desligada.
 
 A iniciativa de trabalhar junto alimenta a rede, sem simular um pedido feito
-pelo usuário nem forçar a Drippy a sentar. O notebook continua sendo um brinquedo.
+pelo usuário nem forçar a Bolha a sentar. O notebook continua sendo um brinquedo.
 
 ## Frequências e limites
 
@@ -82,7 +82,7 @@ preferência e suspende o passeio por 30 segundos.
 Em **Contexto**, “Aprender minha rotina” controla separadamente a coleta e a
 influência desses padrões. “Apagar aprendizado e memória” pede confirmação e
 reinicia sinapses aprendidas, episódios, condicionamento, necessidades,
-protestos, castigo e hábitos da Drippy, preservando as configurações do app.
+protestos, castigo e hábitos da Bolha, preservando as configurações do app.
 
 ## Validação reproduzível
 
@@ -98,7 +98,7 @@ Para medir o aplicativo empacotado, defina `BOLHA_SMOKE_EXE` com o caminho de
 cenário por padrão). O resultado fica em `validation/performance-win32.json`.
 
 O benchmark acompanha a árvore inteira, separa RSS/CPU do cérebro e observa
-três cenários: Drippy ativa, monitor neural e pausa. CPU é apresentada como
+três cenários: Bolha ativa, monitor neural e pausa. CPU é apresentada como
 porcentagem de um núcleo; a do seletor é medida separadamente. Esses ensaios
 curtos não provam consumo máximo em sessões prolongadas ou hardware diferente.
 

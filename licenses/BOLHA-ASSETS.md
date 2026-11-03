@@ -1,8 +1,8 @@
-# Artes da Drippy
+# Artes da Bolha
 
 Copyright © 2026 André Ribeiro Lima (KukySolutions).
 
-Os desenhos, geometrias, aparência, ícones e memes em `assets/drippy/` são
+Os desenhos, geometrias, aparência, ícones e memes em `assets/bolha/` são
 licenciados separadamente sob **Creative Commons Atribuição-NãoComercial 4.0
 Internacional (CC BY-NC 4.0)**. Inclua autoria, link da licença e indicação
 de alterações quando redistribuir ou adaptar essas artes. O uso comercial

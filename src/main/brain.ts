@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import type { BrainSnapshot, DesktopLayout, Preferences } from '../shared/types';
 import { log } from './diagnostics';
 
-import { validBrainEvent } from '../shared/brainProtocol';
+import { mergeBrainSnapshot, validBrainEvent } from '../shared/brainProtocol';
 export { validBrainEvent } from '../shared/brainProtocol';
 
 export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, initialPreferences: Preferences, onReady: () => void) {
   let child: ChildProcessWithoutNullStreams | undefined, snapshot: BrainSnapshot | null = null, desktop = initialDesktop, preferences = initialPreferences;
-  let stopping = false, buffer = '', cursorTimer: ReturnType<typeof setInterval> | undefined;
+  let stopping = false, monitorOpen = false, buffer = '', cursorTimer: ReturnType<typeof setInterval> | undefined;
   let stopTask: Promise<void> | undefined;
   const send = (value: unknown) => {
     if (child?.stdin.writable) child.stdin.write(JSON.stringify(value) + '\n');
@@ -22,15 +22,16 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
     send({ type: 'desktop', value: { ...desktop, exclude: handle === undefined ? [] : [handle] } });
   };
   const failed = (message: string) => {
-    const fallback: BrainSnapshot = { ready:false,panicked:false,blocked:[],shyness:0,x:desktop.bounds.x+200,y:desktop.bounds.y+200,angle:0,emotion:'observando',phase:'normal',visible:false,held:false,caressing:false,gaze:[0,0],speech:'',objects:[],energy:0,stimulation:0,lonely:0,protest:0,castigo:false,escapes:0,activity:'IDLE',motors:{},learned:[],neurons:470,error:message };
-    if (!win.isDestroyed()) win.webContents.send('bolha:brain',{ ...fallback, ...snapshot, ready:false, visible:false, objects:[], error:message });
+    const fallback: BrainSnapshot = { pose:'idle',grounded:false,surface:desktop.bounds.height,vx:0,vy:0,landing:0,ready:false,panicked:false,blocked:[],shyness:0,x:desktop.bounds.x+200,y:desktop.bounds.y+200,angle:0,emotion:'observando',phase:'normal',visible:false,held:false,caressing:false,gaze:[0,0],speech:'',objects:[],energy:0,stimulation:0,lonely:0,protest:0,castigo:false,escapes:0,activity:'IDLE',motors:{},learned:[],neurons:470,error:message };
+    snapshot = { ...fallback,...snapshot,ready:false,visible:false,objects:[],error:message };
+    if (!win.isDestroyed()) win.webContents.send('bolha:brain', snapshot);
   };
   const start = () => {
     if (child?.pid && child.exitCode === null) return;
     stopping = false; buffer = ''; snapshot = null; stopTask = undefined;
     const root = app.isPackaged ? join(process.resourcesPath, 'brain') : join(__dirname, '../../brain');
     const command = app.isPackaged ? join(root, 'BolhaBrain.exe') : (process.env.BOLHA_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3.11'));
-    const args = [...(app.isPackaged ? [] : [join(root, 'worker.py')]), '--data-dir', join(app.getPath('userData'), 'brain'), '--content-dir', join(app.isPackaged ? root : join(__dirname,'../../assets/drippy'), 'content')];
+    const args = [...(app.isPackaged ? [] : [join(root, 'worker.py')]), '--data-dir', join(app.getPath('userData'), 'brain'), '--content-dir', join(app.isPackaged ? root : join(__dirname,'../../assets/bolha'), 'content')];
     child = spawn(command, args, { windowsHide: true, stdio: 'pipe', env: { ...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' } });
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
@@ -46,7 +47,7 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
           const next = JSON.parse(line) as BrainSnapshot;
           if (!next.ready || !Number.isFinite(next.x) || !Number.isFinite(next.y) || !Array.isArray(next.objects)) throw new Error('Estado inválido');
           const first = !snapshot;
-          snapshot = next;
+          snapshot = mergeBrainSnapshot(next,snapshot,monitorOpen);
           if (!win.isDestroyed()) win.webContents.send('bolha:brain', snapshot);
           if (first) onReady();
         } catch (error) { log('error',`Resposta inválida do cérebro: ${String(error)}`); }
@@ -62,8 +63,12 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
     });
     setDesktop(desktop);
     send({ type:'preferences', value: preferences });
+    let cursor: {x:number;y:number} | undefined;
     cursorTimer = setInterval(() => {
-      if (preferences.senseCursor && !stopping && snapshot?.visible) send({ type:'cursor', ...screen.getCursorScreenPoint() });
+      if (preferences.senseCursor && !stopping && snapshot?.visible) {
+        const point = screen.getCursorScreenPoint();
+        if (point.x !== cursor?.x || point.y !== cursor?.y) { cursor = point; send({type:'cursor',...point}); }
+      }
     },100);
     cursorTimer.unref();
   };
@@ -83,7 +88,7 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
   return {
     start, stop,
     getState: () => snapshot,
-    event: (value: unknown) => { if (validBrainEvent(value)) send(value); },
+    event: (value: unknown) => { if (validBrainEvent(value)) { if(value.type==='monitor') monitorOpen=!!value.value; send(value); } },
     desktop: setDesktop,
     preferences: (value: Preferences) => { preferences = value; send({ type:'preferences', value }); },
   };

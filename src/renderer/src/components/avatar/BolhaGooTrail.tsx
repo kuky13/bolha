@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import shapes from '../../../../../assets/drippy/shapes.json';
+import shapes from '../../../../../assets/bolha/shapes.json';
 import { useId } from 'react';
 import type { DragMotion } from './useDragMotion';
 
-interface DrippyGooTrailProps {
+interface BolhaGooTrailProps {
   motion: DragMotion;
   
   opacity: number;
@@ -31,11 +31,11 @@ function limitar(dx: number, dy: number, raioGota: number) {
   return { dx: dx * k, dy: dy * k };
 }
 
-export function DrippyGooTrail({ motion, opacity }: DrippyGooTrailProps) {
+export function BolhaGooTrail({ motion, opacity }: BolhaGooTrailProps) {
   const uid = useId().replace(/:/g, '');
-  const gooId = `drippy-goo-${uid}`;
-  const fillId = `drippy-goo-fill-${uid}`;
-  const glowId = `drippy-goo-glow-${uid}`;
+  const gooId = `bolha-goo-${uid}`;
+  const fillId = `bolha-goo-fill-${uid}`;
+  const glowId = `bolha-goo-glow-${uid}`;
 
   const { intensity, angle, trail } = motion;
   if (intensity < 0.05) return null;
@@ -55,7 +55,7 @@ export function DrippyGooTrail({ motion, opacity }: DrippyGooTrailProps) {
 
   return (
     <svg
-      viewBox={shapes.DrippyGooTrail_0}
+      viewBox={shapes.BolhaGooTrail_0}
       aria-hidden="true"
       style={{
         position: 'absolute',
@@ -69,37 +69,37 @@ export function DrippyGooTrail({ motion, opacity }: DrippyGooTrailProps) {
       }}
     >
       <defs>
-        <filter id={gooId} x={shapes.DrippyGooTrail_1} y={shapes.DrippyGooTrail_2} width="200%" height="200%">
+        <filter id={gooId} x={shapes.BolhaGooTrail_1} y={shapes.BolhaGooTrail_2} width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
           {}
           <feColorMatrix
             in="blur"
             mode="matrix"
-            values={shapes.DrippyGooTrail_3}
+            values={shapes.BolhaGooTrail_3}
           />
         </filter>
-        <radialGradient id={fillId} cx={shapes.DrippyGooTrail_4} cy={shapes.DrippyGooTrail_5} r={shapes.DrippyGooTrail_6}>
-          <stop offset={shapes.DrippyGooTrail_7} stopColor={shapes.DrippyGooTrail_8} />
-          <stop offset={shapes.DrippyGooTrail_9} stopColor={shapes.DrippyGooTrail_10} />
-          <stop offset={shapes.DrippyGooTrail_11} stopColor={shapes.DrippyGooTrail_12} />
+        <radialGradient id={fillId} cx={shapes.BolhaGooTrail_4} cy={shapes.BolhaGooTrail_5} r={shapes.BolhaGooTrail_6}>
+          <stop offset={shapes.BolhaGooTrail_7} stopColor={shapes.BolhaGooTrail_8} />
+          <stop offset={shapes.BolhaGooTrail_9} stopColor={shapes.BolhaGooTrail_10} />
+          <stop offset={shapes.BolhaGooTrail_11} stopColor={shapes.BolhaGooTrail_12} />
         </radialGradient>
         {}
         <linearGradient id={glowId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset={shapes.DrippyGooTrail_13} stopColor={shapes.DrippyGooTrail_14} />
-          <stop offset={shapes.DrippyGooTrail_15} stopColor={shapes.DrippyGooTrail_16} />
+          <stop offset={shapes.BolhaGooTrail_13} stopColor={shapes.BolhaGooTrail_14} />
+          <stop offset={shapes.BolhaGooTrail_15} stopColor={shapes.BolhaGooTrail_16} />
         </linearGradient>
       </defs>
 
       {}
       <g filter={`url(#${gooId})`}>
         {}
-        <circle cx={shapes.DrippyGooTrail_17} cy={shapes.DrippyGooTrail_18} r={shapes.DrippyGooTrail_19} fill={`url(#${glowId})`} opacity={0.5} />
+        <circle cx={shapes.BolhaGooTrail_17} cy={shapes.BolhaGooTrail_18} r={shapes.BolhaGooTrail_19} fill={`url(#${glowId})`} opacity={0.5} />
         {gotas.map((g, i) => (
           <circle key={`glow-${i}`} cx={g.cx} cy={g.cy} r={g.r + 4} fill={`url(#${glowId})`} opacity={0.5} />
         ))}
 
         {}
-        <circle cx={shapes.DrippyGooTrail_20} cy={shapes.DrippyGooTrail_21} r={shapes.DrippyGooTrail_22} fill={`url(#${fillId})`} />
+        <circle cx={shapes.BolhaGooTrail_20} cy={shapes.BolhaGooTrail_21} r={shapes.BolhaGooTrail_22} fill={`url(#${fillId})`} />
         {gotas.map((g, i) => (
           <circle key={i} cx={g.cx} cy={g.cy} r={g.r} fill={`url(#${fillId})`} />
         ))}

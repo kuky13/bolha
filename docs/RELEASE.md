@@ -1,14 +1,13 @@
-Bolha 0.1.1 corrige o encerramento do cérebro no Windows ao fazer carinho.
+Bolha 0.2.0 deixa o arrasto e as animações mais fluidos e adota Bolha como nome da personagem em todo o aplicativo.
 
-O coração ♡ da frase de carinho causava `UnicodeEncodeError` quando o Python
-empacotado usava a codificação cp1252. A comunicação com o cérebro agora usa
-UTF-8 explicitamente, inclusive nos logs e na leitura dos canais pelo Electron.
+O rosto agora flutua separado da esfera, com olhos simétricos, piscadas sincronizadas, orelhinhas vetoriais arredondadas e sorriso mais legível. Deitar vira somente o rosto; a esfera continua redonda e o chão permanece invisível. Use **Configurações → Bolha → Deitar / Levantar**.
 
-A atualização preserva a memória salva e as configurações. Inclui teste de
-regressão com cp1252 e interação de carinho no aplicativo Windows empacotado.
+O desenho acompanha o mouse diretamente ao arrastar, preservando o ponto onde você pegou a bolha. Os movimentos automáticos têm interpolação suave, e o pouso usa colisão circular para evitar a distância artificial do chão quando a esfera gira.
 
-Use **Configurações → App → Verificar atualização** ou instale
-`Bolha-Setup-0.1.1-x64.exe`.
+O cérebro mantém 470 neurônios, aprendizado e memória. Os cálculos de disparos e o envio de informações para o painel neural foram otimizados. A atualização migra a pasta de memória anterior sem apagar o aprendizado ou alterar suas preferências.
 
-O instalador experimental não possui assinatura digital. A validação em
-monitores físicos com escalas diferentes e players reais continua pendente.
+Inclui testes de simetria, rosto deitado, arrasto direto, ponto de pega, movimento reduzido, migração de memória e equivalência dos cálculos da rede. A publicação exige os testes do aplicativo Windows empacotado e da atualização automática.
+
+Use **Configurações → App → Verificar atualização** ou instale `Bolha-Setup-0.2.0-x64.exe`.
+
+O instalador experimental não possui assinatura digital. A validação com monitores físicos de escalas diferentes e players reais continua pendente.
