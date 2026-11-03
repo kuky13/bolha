@@ -6,7 +6,7 @@ export function defaults(): Preferences {
   return { avatarSize: 136, opacity: 1, roaming: true, mediaEnabled: false, showMedia: true, position: null,
     shortcuts: { playPause: 'MediaPlayPause', next: 'MediaNextTrack', previous: 'MediaPreviousTrack' },
     mischiefEnabled: true, mischiefInterval: 300, maxObjects: 3, burstLimit: 12,
-    senseApp: true, senseIdle: true, senseCursor: true, senseWindows: true };
+    senseApp: true, senseIdle: true, senseCursor: true, senseWindows: true, adaptiveBehavior: true, learnRoutine: true };
 }
 
 export function validShortcut(value: unknown): value is string {
@@ -21,7 +21,7 @@ export function sanitizePreferences(patch: unknown, previous: Preferences = defa
   const p = patch as Record<string, unknown>;
   if (typeof p.avatarSize === 'number' && Number.isFinite(p.avatarSize)) next.avatarSize = Math.round(Math.min(200, Math.max(80, p.avatarSize)));
   if (typeof p.opacity === 'number' && Number.isFinite(p.opacity)) next.opacity = Math.min(1, Math.max(0.2, p.opacity));
-  for (const key of ['roaming', 'mediaEnabled', 'showMedia', 'mischiefEnabled', 'senseApp', 'senseIdle', 'senseCursor', 'senseWindows'] as const) if (typeof p[key] === 'boolean') next[key] = p[key];
+  for (const key of ['roaming', 'mediaEnabled', 'showMedia', 'mischiefEnabled', 'senseApp', 'senseIdle', 'senseCursor', 'senseWindows', 'adaptiveBehavior', 'learnRoutine'] as const) if (typeof p[key] === 'boolean') next[key] = p[key];
   for (const [key, low, high] of [['mischiefInterval',60,1800],['maxObjects',1,5],['burstLimit',6,30]] as const) {
     if (typeof p[key] === 'number' && Number.isFinite(p[key])) next[key] = Math.round(Math.min(high, Math.max(low, p[key])));
   }

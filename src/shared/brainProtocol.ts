@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-const EVENTS = new Set(['panic','hide','monitor','panel','hover','music','drag-start','drag','drag-end','poke','caress','spin','sleep','work','notebook','corner','ball','mischief','dismiss']);
+const EVENTS = new Set(['panic','hide','monitor','panel','hover','music','drag-start','drag','drag-end','poke','caress','spin','sleep','work','notebook','corner','ball','mischief','dismiss','quiet','reset-memory']);
 export function validBrainEvent(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const p = value as Record<string, unknown>;

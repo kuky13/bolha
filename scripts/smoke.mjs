@@ -16,6 +16,7 @@ try {
   await page.waitForSelector('[data-testid=drippy]',{timeout:30000});
   const boot=await page.evaluate(()=>window.bolha.bootstrap());
   assert.equal(boot.preferences.roaming,true);assert.equal(boot.brain.neurons,470);
+  assert.equal(boot.preferences.adaptiveBehavior,true);assert.equal(boot.preferences.learnRoutine,true);
   await page.evaluate(()=>window.bolha.brainEvent({type:'panel',value:true}));
   await page.evaluate(()=>window.bolha.brainEvent({type:'monitor',value:true}));
   await page.evaluate(()=>window.dispatchEvent(new MouseEvent('contextmenu')));
@@ -26,6 +27,7 @@ try {
   await page.getByRole('button',{name:'Acompanhar o cérebro'}).click();
   await page.getByRole('heading',{name:'Por dentro da Drippy'}).waitFor();
   await page.waitForFunction(()=>document.querySelector('canvas')?.width===420);
+  await page.getByRole('heading',{name:'Objetivo agora'}).waitFor();
   await mkdir('validation',{recursive:true});
   await page.screenshot({path:'validation/neural-smoke.png'});
   await page.getByRole('button',{name:'Fechar painel'}).click();

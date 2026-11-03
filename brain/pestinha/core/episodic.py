@@ -20,9 +20,10 @@ import json
 import math
 import random
 import time
+from collections import deque
 from datetime import datetime
 
-from ..store import append_line, read_json, read_lines, write_json, write_lines
+from ..store import read_json, write_json, write_lines
 
 ACTIONS = ["meme", "foto", "bilhete", "atravessar", "nada"]
 CORNER_ACTIONS = ["meme_canto", "bilhete_canto", "nada"]
@@ -33,6 +34,8 @@ GLOBAL_WEIGHT = 3.0         # com poucos episódios no contexto, usa a média ge
 RECENCY_HALF_LIFE = 150     # episódios: na consolidação, metade do peso a cada 150
 MAX_COUNT = 40              # aprendizado online nunca fica "duro" demais
 KEEP_EPISODES = 500
+MAX_CONTEXTS = 256
+MAX_ACTIONS = 32
 CASTIGO_VALENCIA = -0.8     # travessura seguida de castigo conta como muito ruim
 
 
@@ -43,9 +46,9 @@ def _sem_nan(valor):
 
 def _episodio_valido(ep):
     """Um episódio salvo só vale se tiver contexto e ação do tipo certo; o resto é descartado ao carregar."""
-    if not isinstance(ep, dict) or not isinstance(ep.get("contexto"), str) or not ep.get("acao"):
+    if not isinstance(ep, dict) or not isinstance(ep.get("contexto"), str) or len(ep['contexto']) > 128 or not ep.get("acao"):
         return False
-    if not isinstance(ep.get("acao"), str):
+    if not isinstance(ep.get("acao"), str) or len(ep['acao']) > 40:
         return False
     v = ep.get("valencia")
     return type(v) in (int, float) and math.isfinite(v) and -1.0 <= v <= 1.0
@@ -69,9 +72,9 @@ def _tabela_valida(bruta, por_contexto):
     out = {}
     try:
         if por_contexto:
-            for ctx, acoes in bruta.items():
+            for ctx, acoes in list(bruta.items())[-MAX_CONTEXTS:]:
                 if isinstance(ctx, str) and isinstance(acoes, dict):
-                    out[ctx] = {a: _estatistica_valida(v) for a, v in acoes.items() if isinstance(a, str)}
+                    out[ctx] = {a: _estatistica_valida(v) for a, v in list(acoes.items())[-MAX_ACTIONS:] if isinstance(a, str) and len(a) <= 40}
         else:
             out = {a: _estatistica_valida(v) for a, v in bruta.items() if isinstance(a, str)}
     except (TypeError, ValueError):
@@ -97,6 +100,7 @@ class EpisodicMemory:
         self.last_choice = None     # (contexto, ação, motivo) para o terminal
         self.ultima_acao = None     # episódio da última travessura, para o castigo ensinar
         self._contador = 0
+        self.dirty = False
 
     # ---------------- escolha ----------------
 
@@ -112,7 +116,7 @@ class EpisodicMemory:
         base = (PRIOR * PRIOR_WEIGHT + gmean * min(gn, GLOBAL_WEIGHT)) / (PRIOR_WEIGHT + min(gn, GLOBAL_WEIGHT))
         return (n * mean + GLOBAL_WEIGHT * base) / (n + GLOBAL_WEIGHT)
 
-    def choose(self, ctx, allowed, epsilon):
+    def choose(self, ctx, allowed, epsilon, bias=None):
         """Escolhe uma ação permitida: a melhor na maior parte das vezes, e às vezes (epsilon) uma aleatória, para explorar."""
         if not allowed:
             return None
@@ -120,7 +124,7 @@ class EpisodicMemory:
             action = random.choice(allowed)
             self.last_choice = (ctx, action, "explorando")
             return action
-        scored = sorted(((self.estimate(ctx, a), a) for a in allowed), reverse=True)
+        scored = sorted(((self.estimate(ctx, a) + (bias or {}).get(a, 0), a) for a in allowed), reverse=True)
         best = scored[0][0]
         ties = [a for score, a in scored if score >= best - 1e-9]
         action = random.choice(ties)
@@ -131,6 +135,8 @@ class EpisodicMemory:
 
     def start(self, ctx, action, thing=None):
         """Começa um episódio: registra a ação e o contexto, esperando o resultado (aceitar, dispensar, fugir)."""
+        if len(self.open) >= 12:
+            self._resolve(self.open[0], 'sem resposta', 0.0)
         self._contador += 1
         episode = {
             "id": f"{time.time_ns()}-{self._contador}",     # identidade estável (para revisar depois)
@@ -168,25 +174,10 @@ class EpisodicMemory:
             return
         antigo = record["valencia"]
         record["resultado"], record["valencia"] = result, round(valence, 3)
+        self.dirty = True
         for stats in (self.table.setdefault(record["contexto"], {}).setdefault(record["acao"], [1, antigo]),
                       self.totals.setdefault(record["acao"], [1, antigo])):
             stats[1] += (valence - antigo) / max(stats[0], 1)    # substitui uma amostra da média
-        if self.episodes_path.exists():
-            linhas = []
-            for line in read_lines(self.episodes_path):
-                try:
-                    r = json.loads(line, parse_constant=_sem_nan)
-                except ValueError:
-                    linhas.append(line)
-                    continue
-                if isinstance(r, dict) and r.get("id") == ep_id:
-                    r["resultado"], r["valencia"] = result, round(valence, 3)
-                    line = json.dumps(r, ensure_ascii=False)
-                linhas.append(line)
-            try:
-                write_lines(self.episodes_path, linhas)
-            except OSError as error:
-                log(f"[memória] não revisou o episódio: {error}")
         log(f"[memória] {record['contexto']} -> {record['acao']}: revisado, {result} ({valence:+.2f})")
 
     def on_dismiss(self, thing, elapsed, patience):
@@ -202,13 +193,12 @@ class EpisodicMemory:
             ep["carinho"] = True
 
     def tick(self, now, keep_ok, window):
-        """Verifica os episódios abertos a cada passo: se a travessura ficou na tela sem ser dispensada, conta como aceita."""
+        """Ausência de resposta é neutra; carinho e dispensa são sinais explícitos."""
         for ep in list(self.open):
             age = now - ep["inicio"]
-            bonus = 0.3 if ep["carinho"] else 0.0
             if ep["thing"] is not None:
                 if age >= keep_ok:
-                    self._resolve(ep, f"ficou na tela {age:.0f} s", 0.3 + bonus)
+                    self._resolve(ep, 'recebeu carinho' if ep['carinho'] else 'sem resposta', 0.6 if ep['carinho'] else 0.0)
             elif age >= window:
                 result = "você deu atenção depois" if ep["carinho"] else "nada aconteceu"
                 self._resolve(ep, result, 0.5 if ep["carinho"] else 0.0)
@@ -240,10 +230,7 @@ class EpisodicMemory:
         self.recent.append(record)
         self.recent = self.recent[-KEEP_EPISODES:]
         self._learn(record["contexto"], record["acao"], valence)
-        try:
-            append_line(self.episodes_path, json.dumps(record, ensure_ascii=False))
-        except OSError as error:
-            log(f"[memória] não gravou o episódio: {error}")
+        self.dirty = True
         log(f"[memória] {record['contexto']} -> {record['acao']}: {result} ({valence:+.2f})")
 
     def _learn(self, ctx, action, valence):
@@ -252,6 +239,8 @@ class EpisodicMemory:
                       self.totals.setdefault(action, [0, 0.0])):
             stats[0] = min(stats[0] + 1, MAX_COUNT)
             stats[1] += (valence - stats[1]) / stats[0]
+        while len(self.table) > MAX_CONTEXTS:
+            del self.table[next(iter(self.table))]
 
     # ---------------- sono: consolidação ----------------
 
@@ -270,7 +259,7 @@ class EpisodicMemory:
                 stats[1] += w * ep["valencia"]
         self.table = {c: {a: [min(n, MAX_COUNT), s / n] for a, (n, s) in acts.items()} for c, acts in table.items()}
         self.totals = {a: [min(n, MAX_COUNT), s / n] for a, (n, s) in totals.items()}
-        self._trim_file(episodes)
+        self.dirty = True
         self.save()
         return self.preferences()
 
@@ -281,10 +270,12 @@ class EpisodicMemory:
 
     def _read_episodes(self):
         """Lê o histórico de episódios do arquivo, ignorando linhas inválidas."""
-        if not self.episodes_path.exists():
+        if self.dirty or not self.episodes_path.exists():
             return list(self.recent)
         out = []
-        for line in read_lines(self.episodes_path):
+        with self.episodes_path.open(encoding='utf-8', errors='replace') as source:
+            lines = deque(source, maxlen=KEEP_EPISODES)
+        for line in lines:
             try:
                 registro = json.loads(line, parse_constant=_sem_nan)
             except ValueError:
@@ -293,12 +284,6 @@ class EpisodicMemory:
                 out.append(registro)
         return out
 
-    def _trim_file(self, episodes):
-        """Mantém só os episódios mais recentes no arquivo, para ele não crescer sem limite."""
-        if len(episodes) <= KEEP_EPISODES:
-            return
-        write_lines(self.episodes_path, [json.dumps(ep, ensure_ascii=False) for ep in episodes[-KEEP_EPISODES:]])
-
     # ---------------- persistência ----------------
 
     def save(self):
@@ -306,6 +291,9 @@ class EpisodicMemory:
         data = {"tabela": self.table, "geral": self.totals, "saved_at": time.time()}
         try:
             write_json(self.prefs_path, data, indent=1)
+            if self.dirty:
+                write_lines(self.episodes_path, [json.dumps(ep, ensure_ascii=False) for ep in self.recent[-KEEP_EPISODES:]])
+                self.dirty = False
         except OSError as error:
             log(f"[memória] não salvou as preferências: {error}")
 
@@ -313,6 +301,7 @@ class EpisodicMemory:
         """Lê as preferências salvas, validando cada valor; o que estiver errado volta ao padrão."""
         data = read_json(self.prefs_path, default=None)
         if isinstance(data, dict):
-            self.table = _tabela_valida(data.get("tabela"), por_contexto=True)
-            self.totals = _tabela_valida(data.get("geral"), por_contexto=False)
+            self.table = dict(list(_tabela_valida(data.get("tabela"), por_contexto=True).items())[-MAX_CONTEXTS:])
+            self.totals = dict(list(_tabela_valida(data.get("geral"), por_contexto=False).items())[-MAX_ACTIONS:])
         self.recent = self._read_episodes()[-KEEP_EPISODES:]
+        self.dirty = True

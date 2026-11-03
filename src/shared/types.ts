@@ -22,14 +22,17 @@ export interface Preferences {
   senseIdle: boolean;
   senseCursor: boolean;
   senseWindows: boolean;
+  adaptiveBehavior: boolean;
+  learnRoutine: boolean;
 }
 export interface SceneObject { id: string; kind: 'ball' | 'paper' | 'notebook' | 'meme' | 'note' | 'corner' | 'sign' | 'fireworks'; x: number; y: number; width: number; height: number; text: string; image?: string; angle: number; working: boolean; carried: boolean }
 export interface BrainSnapshot {
   ready: boolean; panicked: boolean; blocked: number[]; shyness: number; x: number; y: number; angle: number; emotion: string; phase: 'normal' | 'burst' | 'away' | 'shy'; visible: boolean; held: boolean; caressing: boolean; gaze: number[]; speech: string;
   objects: SceneObject[]; energy: number; stimulation: number; lonely: number; protest: number; castigo: boolean; escapes: number; activity: string; motors: Record<string, number>; learned: Array<[string,string,number]>; neurons: number; error?: string | null;
   neural?: { positions: number[][]; trace: number[]; kind: number[]; pools: Record<string, number> };
+  intelligence?: { enabled: boolean; goal: string | null; label: string; slots: number; episodes: number; decisions: number; cpuSeconds: number; compatibility: string; brainRssMiB: number; routine: { attention:number; rest:number; familiarity:number } | null };
 }
-export interface BrainEvent { type: 'panic' | 'hide' | 'monitor' | 'panel' | 'hover' | 'music' | 'drag-start' | 'drag' | 'drag-end' | 'poke' | 'caress' | 'spin' | 'sleep' | 'work' | 'notebook' | 'corner' | 'ball' | 'mischief' | 'dismiss'; id?: string; x?: number; y?: number; vx?: number; vy?: number; value?: boolean | number }
+export interface BrainEvent { type: 'panic' | 'hide' | 'monitor' | 'panel' | 'hover' | 'music' | 'drag-start' | 'drag' | 'drag-end' | 'poke' | 'caress' | 'spin' | 'sleep' | 'work' | 'notebook' | 'corner' | 'ball' | 'mischief' | 'dismiss' | 'quiet' | 'reset-memory'; id?: string; x?: number; y?: number; vx?: number; vy?: number; value?: boolean | number }
 export type UpdatePhase = 'idle' | 'checking' | 'downloading' | 'ready' | 'installing' | 'error';
 export interface UpdateState { phase: UpdatePhase; version?: string; percent?: number; installAt?: number; message?: string }
 export interface LogEntry { time: string; level: 'info' | 'warn' | 'error'; message: string }

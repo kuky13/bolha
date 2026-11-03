@@ -55,6 +55,8 @@ class Behavior:
         self.march_dir = 1
         self.next_glance = 0.0
         self.screen_areas = []      # áreas de todos os monitores, atualizadas pelo app
+        self.adaptive_goal = None
+        self.adaptive_target = None
 
     def look_at(self, x, y, now):
         """Olha para um ponto da tela por alguns segundos."""
@@ -235,10 +237,26 @@ class Behavior:
             self._protest_move(dt, now, left, right)
             return
 
+        if self.adaptive_goal in ('watch', 'rest', 'work'):
+            body.vx = 0.
+            return
+
         # brincar com a bolinha (chutar ou arremessar, conforme o estilo do pet)
         if self.play is not None and self.ball is not None and self.emotion not in STILL and not st.at_desk:
             if self.play.tick(now, body, self.ball, cursor, self.emotion, self.play_pull):
                 body.jump(0.0, -180.0)              # pulinho de quem acabou de chutar
+
+        if self.adaptive_goal and self.emotion not in STILL:
+            target = self.toy[0] if self.adaptive_goal == 'play' and self.toy else self.adaptive_target
+            if target is not None and abs(target-body.x) > 16:
+                self._slide_to(target, self.tone.speed())
+            else:
+                body.vx = 0.
+            if self.adaptive_goal == 'explore' and now >= self.next_roam:
+                self.next_roam = now+3
+                if platforms and random.random() < self.tone.climb_chance() and self._jump_to_window(platforms): return
+                if random.random() < self.tone.hop_chance(): body.jump(body.vx, -self.tone.hop_power())
+            return
 
         # passeio: a emoção escolhe o destino, o tom motor escolhe o jeito
         tone = self.tone

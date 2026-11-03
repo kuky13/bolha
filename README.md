@@ -21,6 +21,12 @@ Electron/React; o cérebro é a rede neural local original do
   arremessos fortes por minuto; os saltos dela não entram nessa conta.
 - Controles de música do Windows, com atalhos e dança.
 - Painel com atividade neural, humor, necessidades e associações aprendidas.
+- Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
+  contexto. Carinho reforça preferências; ausência de resposta é neutra.
+- Opções para desligar o comportamento adaptativo e apagar todo o aprendizado.
+
+Veja [a implementação da inteligência e seu orçamento](docs/INTELLIGENCE.md).
+O alvo de 100 MB se aplica ao cérebro Python; o Electron é medido separadamente.
 
 ## Como usar
 

@@ -28,10 +28,10 @@ else {
     if (!rendererReady || !brain?.getState()?.ready || healthWritten) return;
     healthWritten = true;
     await updater!.healthy();
-    if (process.env.BOLHA_TEST === '1') {
+    try {
       mkdirSync(app.getPath('userData'), { recursive: true });
-      writeFileSync(join(app.getPath('userData'), 'health.json'), JSON.stringify({ version: app.getVersion(), ready: true, neurons: brain.getState()!.neurons }));
-    }
+      writeFileSync(join(app.getPath('userData'), 'health.json'), JSON.stringify({ version: app.getVersion(), ready: true, neurons: brain.getState()!.neurons, pid:process.pid }));
+    } catch (error) { log('warn', `Não consegui gravar o diagnóstico de abertura: ${String(error)}`); }
     updater!.start();
     if (process.env.BOLHA_TEST === '1' && process.env.BOLHA_TEST_EXIT_VERSION === app.getVersion()) setTimeout(() => app.quit(), 45000);
   };

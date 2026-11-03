@@ -48,6 +48,11 @@ jobs:
         run: |
           $env:BOLHA_SMOKE_EXE = Join-Path $PWD 'release/win-unpacked/Bolha.exe'
           node scripts/smoke.mjs
+      - name: Medir consumo da árvore completa e do cérebro
+        shell: pwsh
+        run: |
+          $env:BOLHA_SMOKE_EXE = Join-Path $PWD 'release/win-unpacked/Bolha.exe'
+          node scripts/benchmark.mjs
       - name: Gerar versão seguinte para testar atualização
         shell: pwsh
         run: |
@@ -57,6 +62,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Testar instalação e atualização automática reais
+        timeout-minutes: 9
         run: node scripts/test-windows-update.mjs
       - name: Gerar checksums
         shell: pwsh
@@ -71,6 +77,7 @@ jobs:
           name: bolha-windows-validation
           path: |
             validation/*.png
+            validation/*.json
             release/*.exe
             release/*.blockmap
             release/latest.yml

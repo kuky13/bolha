@@ -5,7 +5,7 @@ import { readFile,writeFile,copyFile,mkdir,mkdtemp,readdir,access,stat } from 'n
 import { createReadStream } from 'node:fs';
 import { join,basename } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn,spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 if(process.platform!=='win32')throw new Error('Este teste exige Windows.');
@@ -41,8 +41,13 @@ const server=createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}/`;
-const launch=async data=>{
-  const app=await electron.launch({executablePath:exe,env:{...process.env,BOLHA_TEST:'1',BOLHA_TEST_USER_DATA:data,BOLHA_TEST_UPDATE_URL:url,BOLHA_TEST_EXIT_VERSION:targetVersion},timeout:60000});
+const apps=[];
+let automaticData;
+const launch=async (data,normalProfile=false)=>{
+  const env={...process.env,BOLHA_TEST:'1',BOLHA_TEST_USER_DATA:data,BOLHA_TEST_UPDATE_URL:url,BOLHA_TEST_EXIT_VERSION:targetVersion};
+  if(normalProfile)delete env.BOLHA_TEST_USER_DATA;
+  const app=await electron.launch({executablePath:exe,env,timeout:60000});
+  apps.push(app);
   const page=await app.firstWindow();await page.waitForSelector('[data-app-ready]',{timeout:45000});await page.waitForSelector('[data-testid=drippy]',{timeout:45000});return{app,page};
 };
 async function waitUpdate(page,predicate,timeout=120000){
@@ -59,10 +64,12 @@ try{
   await waitUpdate(first.page,state=>state.phase==='error');
   const hashLogs=await first.page.evaluate(()=>window.bolha.logs());
   assert.ok(hashLogs.some(entry=>/checksum|sha512/i.test(entry.message)),'O download com checksum inválido deve ser rejeitado.');
+  console.log('Checksum inválido rejeitado; aplicativo continua funcionando.');
   assert.equal((await first.page.evaluate(()=>window.bolha.bootstrap())).brain.neurons,470);
   corrupt=false;interrupt=true;await first.page.evaluate(()=>window.bolha.checkUpdates());
   await waitUpdate(first.page,state=>state.phase==='error');
   assert.ok(interrupted,'A conexão de download deve ser interrompida pelo servidor de teste.');
+  console.log('Download interrompido tratado; aplicativo continua funcionando.');
   assert.equal((await first.page.evaluate(()=>window.bolha.bootstrap())).brain.neurons,470);
   interrupt=false;await first.page.evaluate(()=>window.bolha.checkUpdates());
   let state=await waitUpdate(first.page,state=>state.phase==='ready'&&Number.isFinite(state.installAt));
@@ -76,17 +83,20 @@ try{
   const resumed=await launch(firstData);
   state=await waitUpdate(resumed.page,state=>state.phase==='ready');
   assert.ok(state.installAt-Date.now()>3500000,'O adiamento deve sobreviver ao reinício.');
+  console.log('Adiamento de uma hora preservado após reiniciar.');
   await resumed.app.close();
 
-  // A separate test profile verifies the real 30-second automatic installation.
-  const data=join(root,'automatic');
+  // NSIS restarts through the Windows shell, which need not inherit test env vars.
+  const data=join(process.env.APPDATA,'bolha');
+  assert.equal(await access(data).then(()=>true,()=>false),false,'Este teste precisa de um runner sem perfil Bolha anterior.');
+  automaticData=data;
   await mkdir(join(data,'brain/drippy'),{recursive:true});
   await copyFile(join(firstData,'config.json'),join(data,'config.json'));
   const seeded=JSON.parse(await readFile(join(firstData,'brain/drippy/nervous.json'),'utf8'));
   const post=Object.keys(seeded.learned.PRESO)[0];
   seeded.learned.PRESO[post]=.06;
   await writeFile(join(data,'brain/drippy/nervous.json'),JSON.stringify(seeded));
-  const second=await launch(data);
+  const second=await launch(data,true);
   await second.page.evaluate(()=>window.bolha.brainEvent({type:'caress'}));
   const deadline=Date.now()+180000;
   let applied=false,downloadedInstaller;
@@ -99,6 +109,14 @@ try{
     }catch{}
     await new Promise(resolve=>setTimeout(resolve,500));
   }
+  if(!applied){
+    const diagnostics={};
+    for(const [name,path] of Object.entries({health:join(data,'health.json'),pending:join(data,'pending-update.json'),logs:join(data,'logs/session.log')})){
+      diagnostics[name]=await readFile(path,'utf8').catch(error=>String(error));
+    }
+    console.log(JSON.stringify({stage:'update-timeout',diagnostics}));
+    await writeFile('validation/native-update-debug.json',JSON.stringify(diagnostics,null,2));
+  }
   assert.ok(applied,'A atualização automática e a limpeza não concluíram.');
   const memory=JSON.parse(await readFile(join(data,'brain/drippy/nervous.json'),'utf8'));
   assert.equal(memory.seed,1313);
@@ -107,4 +125,16 @@ try{
   assert.ok(downloadedInstaller,'O teste deve observar o instalador no cache.');
   assert.equal(await access(downloadedInstaller).then(()=>true,()=>false),false,'O instalador deve ser apagado depois da nova versão saudável.');
   console.log('Windows nativo: instalação, hash inválido, download interrompido, continuidade, adiamento persistente de 1h, instalação automática após 30s, cérebro, memória e limpeza passaram.');
-}finally{server.close();}
+}finally{
+  server.closeAllConnections();server.close();
+  for(const app of apps){
+    try{await Promise.race([app.close(),new Promise(resolve=>setTimeout(resolve,5000))]);}catch{}
+    try{app.process().kill();}catch{}
+  }
+  if(automaticData){
+    try{
+      const health=JSON.parse(await readFile(join(automaticData,'health.json'),'utf8'));
+      if(health.version===targetVersion&&Number.isInteger(health.pid))spawnSync('taskkill',['/PID',String(health.pid),'/T','/F'],{stdio:'ignore'});
+    }catch{}
+  }
+}
