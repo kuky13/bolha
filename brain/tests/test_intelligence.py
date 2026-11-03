@@ -87,6 +87,27 @@ def test_modo_compativel_e_desligamento(tmp_path):
     mind.budget(101);mind.budget(101);mind.budget(101)
     assert mind.compatibility and mind.tick(200,WALL,'IDLE','feliz',{},.8,.3,['play']) is None
 
+def test_desligar_rotina_remove_influencia_do_horario(tmp_path):
+    mind=Intelligence(memory_at(tmp_path), tmp_path/'habits.json')
+    mind.learn_routine=False
+    mind.tick(100,WALL,'PROGRAMMING','feliz',{},.8,.3,['watch'])
+    assert not mind.habits.slots
+    assert mind.episode['contexto'] == 'objetivo|PROGRAMMING|feliz'
+
+def test_episodios_ilegivel_e_linha_grande_sao_tolerados(tmp_path,monkeypatch):
+    memory=memory_at(tmp_path)
+    record=dict(id='1',quando='2026',contexto='IDLE|feliz',acao='meme',resultado='sem resposta',valencia=0.)
+    memory.episodes_path.write_text('x'*100000+'\n'+json.dumps(record)+'\n')
+    memory.dirty=False
+    assert memory._read_episodes() == [record]
+    original=Path.open
+    def denied(path,*args,**kwargs):
+        if path == memory.episodes_path: raise PermissionError('teste')
+        return original(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'open',denied)
+    memory.load()
+    assert memory.recent == []
+
 def test_memoria_limitada_persistencia_em_lotes(tmp_path):
     memory=memory_at(tmp_path)
     for i in range(800):
@@ -122,7 +143,10 @@ def test_apagar_todo_aprendizado_preserva_preferencias(tmp_path):
     game.brain.learned[0,0]=.05
     game.intelligence.habits.observe('IDLE', True, False, WALL)
     game.save()
+    backup=game.pet_paths.nervous.with_name('nervous.json.corrompido')
+    backup.write_text('aprendizado anterior')
     game.reset_learning()
     assert game.prefs['avatarSize'] == 152 and not game.intelligence.enabled
     assert not game.brain.learned.any()
     assert not game.intelligence.habits.slots and not game.memory.recent
+    assert not backup.exists()

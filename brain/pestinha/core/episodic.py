@@ -273,8 +273,18 @@ class EpisodicMemory:
         if self.dirty or not self.episodes_path.exists():
             return list(self.recent)
         out = []
-        with self.episodes_path.open(encoding='utf-8', errors='replace') as source:
-            lines = deque(source, maxlen=KEEP_EPISODES)
+        lines = deque(maxlen=KEEP_EPISODES)
+        try:
+            with self.episodes_path.open(encoding='utf-8', errors='replace') as source:
+                while True:
+                    line = source.readline(4097)
+                    if not line: break
+                    if len(line) > 4096:
+                        while line and not line.endswith('\n'): line = source.readline(4097)
+                        continue
+                    lines.append(line)
+        except OSError:
+            return list(self.recent)
         for line in lines:
             try:
                 registro = json.loads(line, parse_constant=_sem_nan)

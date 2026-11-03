@@ -113,7 +113,8 @@ class Intelligence:
                         work=(.2 if activity in ('PROGRAMMING', 'DESIGNING') else 0.)+.1*neural('SENTAR'),
                         attention=.18*lonely+.12*habit['attention'])
             if self.last_goal and self.repeats >= 2: bias[self.last_goal] -= .2
-            ctx = f'rotina:{datetime.fromtimestamp(wall).hour//6}|{activity}|{emotion}'
+            prefix = f'rotina:{datetime.fromtimestamp(wall).hour//6}' if self.learn_routine else 'objetivo'
+            ctx = f'{prefix}|{activity}|{emotion}'
             actions = ['goal:'+g for g in allowed if g in GOALS]
             if not actions: return None
             action = self.memory.choose(ctx, actions, .12, {'goal:'+g:v for g,v in bias.items()})

@@ -314,7 +314,8 @@ class Game:
         preferences, displays = dict(self.prefs), list(self.displays)
         panicked, excluded = self.panicked, list(self.excluded)
         for path in self.pet_paths.todos() + [self.pet_paths.base / 'habits.json']:
-            path.unlink(missing_ok=True)
+            for suffix in ('', '.corrompido', '.tmp'):
+                path.with_name(path.name+suffix).unlink(missing_ok=True)
         self.__init__(self.data_dir, self.conteudo.proprio)
         self.panicked = panicked
         self.configure(preferences)
