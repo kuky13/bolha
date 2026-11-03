@@ -1,13 +1,21 @@
 # Bolha
 
+![Bolha tranquila, feliz ao receber carinho e dormindo](docs/images/bolha-states.jpg)
+
 A Bolha passeia, pula e quica pela sua tela, brinca com uma bolinha, senta no
-próprio notebook e aprende com suas interações. O desenho da bolha usa
-Electron/React; o cérebro é a rede neural local original do
-[Pestinha](https://github.com/mille-okws/pestinha), com 470 neurônios.
+próprio notebook e aprende com suas interações.
 
-**Aplicativo experimental, para Windows x64.**
+**Experimental · Windows x64.**
 
-[Baixar o instalador](https://github.com/kuky13/bolha/releases/latest)
+[Baixar o instalador](https://github.com/kuky13/bolha/releases/latest) ·
+[Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
+[Créditos](NOTICE.md)
+
+*A composição acima mostra o código em desenvolvimento, versão 0.2.1
+([commit 8d67085](https://github.com/kuky13/bolha/commit/8d6708574ebe636b9ecce58e50dc89342a7ea4a4)).
+O download leva à versão publicada mais recente. Artes de André Ribeiro Lima
+(KukySolutions), sob [CC BY-NC 4.0](licenses/BOLHA-ASSETS.md);
+composição e captura estática para esta apresentação.*
 
 ## O que acompanha
 
@@ -30,10 +38,12 @@ Electron/React; o cérebro é a rede neural local original do
 Veja [a implementação da inteligência e seu orçamento](docs/INTELLIGENCE.md).
 O alvo de 100 MB se aplica ao cérebro Python; o Electron é medido separadamente.
 
-## Como usar
+## Instalação e primeiros passos
 
 Instale o `.exe` da página de versões. O instalador já inclui o cérebro Python;
 não é necessário instalar Python separadamente.
+
+### Como interagir
 
 | Ação | Resultado |
 |---|---|
@@ -72,6 +82,12 @@ nova é baixada e verificada. Depois aparece um aviso de 30 segundos, com opçã
 de adiar por uma hora. Ao instalar, a Bolha salva e fecha o cérebro, atualiza
 e reabre. O instalador usado é removido depois que a nova interface e o cérebro
 confirmam a inicialização; arquivos ainda bloqueados são limpos depois.
+
+## Como funciona
+
+O desenho da Bolha usa Electron/React; o cérebro é uma adaptação da rede neural
+local original do [Pestinha](https://github.com/mille-okws/pestinha), com 470
+neurônios. A origem do motor e as adaptações estão em [NOTICE.md](NOTICE.md).
 
 ## Compilar pelo código
 
