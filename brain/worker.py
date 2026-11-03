@@ -21,6 +21,9 @@ def finite(value, depth=0):
     return isinstance(value,(str,int,bool,type(None)))
 
 def main():
+    # O Python empacotado pode ignorar PYTHONUTF8 e herdar cp1252 do Windows.
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        stream.reconfigure(encoding='utf-8', errors='backslashreplace' if stream is sys.stderr else 'strict')
     parser = argparse.ArgumentParser()
     parser.add_argument('--data-dir',required=True)
     parser.add_argument('--content-dir',required=True)

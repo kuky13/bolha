@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
-import { readFile,writeFile,copyFile,mkdir,mkdtemp,readdir,access,stat } from 'node:fs/promises';
+import { readFile,writeFile,copyFile,mkdir,mkdtemp,readdir,access,stat,rm } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { join,basename } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -12,9 +12,10 @@ if(process.platform!=='win32')throw new Error('Este teste exige Windows.');
 const root=await mkdtemp(join(tmpdir(),'bolha-native-')),installDir=join(root,'app');
 const setup=(await readdir('release')).find(x=>x.endsWith('.exe'));
 if(!setup)throw new Error('Instalador base não encontrado.');
-await new Promise((resolve,reject)=>{const proc=spawn(join(process.cwd(),'release',setup),['/S',`/D=${installDir}`],{stdio:'inherit'});proc.once('error',reject);proc.once('exit',code=>code===0?resolve():reject(new Error('Instalação base falhou: '+code)));});
+const baseInstaller=process.env.BOLHA_UPDATE_TEST_BASE??join(process.cwd(),'release',setup);
+await new Promise((resolve,reject)=>{const proc=spawn(baseInstaller,['/S',`/D=${installDir}`],{stdio:'inherit'});proc.once('error',reject);proc.once('exit',code=>code===0?resolve():reject(new Error('Instalação base falhou: '+code)));});
 const exe=join(installDir,'Bolha.exe');await access(exe);
-const feed=join(process.cwd(),'validation/update-feed');
+const feed=process.env.BOLHA_UPDATE_TEST_FEED??join(process.cwd(),'validation/update-feed');
 const versionMatch=(await readFile(join(feed,'latest.yml'),'utf8')).match(/^version:\s*['"]?([0-9.]+)/m);
 if(!versionMatch)throw new Error('Versão do feed ausente.');
 const targetVersion=versionMatch[1];
@@ -136,5 +137,6 @@ try{
       const health=JSON.parse(await readFile(join(automaticData,'health.json'),'utf8'));
       if(health.version===targetVersion&&Number.isInteger(health.pid))spawnSync('taskkill',['/PID',String(health.pid),'/T','/F'],{stdio:'ignore'});
     }catch{}
+    await rm(automaticData,{recursive:true,force:true,maxRetries:5,retryDelay:1000});
   }
 }

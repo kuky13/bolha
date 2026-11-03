@@ -61,6 +61,19 @@ jobs:
           npx electron-builder --win --publish never --config.directories.output=validation/update-feed --config.extraMetadata.version=$nextVersion
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Validar atualização da 0.1.0 para a correção UTF-8
+        timeout-minutes: 9
+        shell: pwsh
+        run: |
+          $previousDir = Join-Path $PWD 'validation/previous'
+          New-Item -ItemType Directory -Force $previousDir | Out-Null
+          $previousInstaller = Join-Path $previousDir 'Bolha-Setup-0.1.0-x64.exe'
+          Invoke-WebRequest 'https://github.com/kuky13/bolha/releases/download/v0.1.0/Bolha-Setup-0.1.0-x64.exe' -OutFile $previousInstaller
+          $expected = 'f7cbd370555ed81d9bcc3fb949c1a7091e61433299c65c0958ca97cf09dc8599'
+          if ((Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Checksum da versão anterior inválido.' }
+          $env:BOLHA_UPDATE_TEST_BASE = $previousInstaller
+          $env:BOLHA_UPDATE_TEST_FEED = Join-Path $PWD 'release'
+          node scripts/test-windows-update.mjs
       - name: Testar instalação e atualização automática reais
         timeout-minutes: 9
         run: node scripts/test-windows-update.mjs

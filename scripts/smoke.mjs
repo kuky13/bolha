@@ -17,6 +17,9 @@ try {
   const boot=await page.evaluate(()=>window.bolha.bootstrap());
   assert.equal(boot.preferences.roaming,true);assert.equal(boot.brain.neurons,470);
   assert.equal(boot.preferences.adaptiveBehavior,true);assert.equal(boot.preferences.learnRoutine,true);
+  await page.evaluate(()=>window.bolha.brainEvent({type:'caress'}));
+  await page.getByText('Tá, esse carinho eu aceito. ♡',{exact:true}).waitFor();
+  assert.equal((await page.evaluate(()=>window.bolha.bootstrap())).brain.ready,true);
   await page.evaluate(()=>window.bolha.brainEvent({type:'panel',value:true}));
   await page.evaluate(()=>window.bolha.brainEvent({type:'monitor',value:true}));
   await page.evaluate(()=>window.dispatchEvent(new MouseEvent('contextmenu')));

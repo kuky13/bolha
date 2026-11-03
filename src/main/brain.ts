@@ -32,6 +32,8 @@ export function createBrain(win: BrowserWindow, initialDesktop: DesktopLayout, i
     const command = app.isPackaged ? join(root, 'BolhaBrain.exe') : (process.env.BOLHA_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3.11'));
     const args = [...(app.isPackaged ? [] : [join(root, 'worker.py')]), '--data-dir', join(app.getPath('userData'), 'brain'), '--content-dir', join(app.isPackaged ? root : join(__dirname,'../../assets/drippy'), 'content')];
     child = spawn(command, args, { windowsHide: true, stdio: 'pipe', env: { ...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' } });
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdin.on('error', error => { if (!stopping) log('warn', `Canal do cérebro: ${error.message}`); });
     child.stderr.on('data', chunk => { log('warn', String(chunk).slice(0,2000)); });
     child.stdout.on('data', chunk => {

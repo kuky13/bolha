@@ -1,15 +1,14 @@
-Bolha 0.1.0: Drippy com cérebro neural local baseado no Pestinha.
+Bolha 0.1.1 corrige o encerramento do cérebro no Windows ao fazer carinho.
 
-- Física, carinho, bolinha, notebook, protestos, castigo e aprendizado local.
-- Retorno tímido após excesso de arremessos; limiar inicial de 12 por minuto.
-- Oito memes novos da própria bolha e recados locais.
-- Painel neural sob demanda, permissões de contexto e controles de música.
-- Rotina local com esquecimento, objetivos duradouros e preferência contextual;
-  silêncio neutro, opção de desligar e remoção do aprendizado.
-- Atualizações pelo GitHub, com aviso de 30 segundos e limpeza do instalador.
+O coração ♡ da frase de carinho causava `UnicodeEncodeError` quando o Python
+empacotado usava a codificação cp1252. A comunicação com o cérebro agora usa
+UTF-8 explicitamente, inclusive nos logs e na leitura dos canais pelo Electron.
 
-Instale o arquivo `Bolha-Setup-0.1.0-x64.exe`. O Python já acompanha o aplicativo.
+A atualização preserva a memória salva e as configurações. Inclui teste de
+regressão com cp1252 e interação de carinho no aplicativo Windows empacotado.
 
-O instalador não possui assinatura comercial. Consulte o README para licenças e
-o relatório de validação; múltiplos monitores, escala e players reais ainda
-exigem verificação visual em uma sessão Windows com esses dispositivos.
+Use **Configurações → App → Verificar atualização** ou instale
+`Bolha-Setup-0.1.1-x64.exe`.
+
+O instalador experimental não possui assinatura digital. A validação em
+monitores físicos com escalas diferentes e players reais continua pendente.
