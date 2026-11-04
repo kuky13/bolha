@@ -58,6 +58,42 @@ def _tem_vizinha(areas, atual, lado, coordenada, extensao, monitores=None):
     return False
 
 
+def _physical_neighbor(areas, displays, source, side, coordinate):
+    """Vizinha por pixels físicos: Qt/Windows pode deixar vãos artificiais em DIP."""
+    if not displays or source not in areas:return None
+    i=areas.index(source);a=displays[i];scale=a.get('scaleFactor',1)
+    ax,ay=a.get('nativeX',a['x']),a.get('nativeY',a['y'])
+    ar=ax+a.get('nativeWidth',a.get('monitorWidth',a['width'])*scale)
+    ab=ay+a.get('nativeHeight',a.get('monitorHeight',a['height'])*scale)
+    value=(ay+(coordinate-a.get('monitorY',a['y']))*scale) if side in ('left','right') else (ax+(coordinate-a.get('monitorX',a['x']))*scale)
+    for j,b in enumerate(displays):
+        if i==j:continue
+        sb=b.get('scaleFactor',1);bx,by=b.get('nativeX',b['x']),b.get('nativeY',b['y'])
+        br=bx+b.get('nativeWidth',b.get('monitorWidth',b['width'])*sb)
+        bb=by+b.get('nativeHeight',b.get('monitorHeight',b['height'])*sb)
+        adjacent=abs((br-ax) if side=='left' else (bx-ar) if side=='right' else (bb-ay) if side=='top' else (by-ab))<=2
+        target=areas[j]
+        mapped=(b.get('monitorY',b['y'])+(value-by)/sb) if side in ('left','right') else (b.get('monitorX',b['x'])+(value-bx)/sb)
+        lo,hi=(target[1],target[3]) if side in ('left','right') else (target[0],target[2])
+        if adjacent and lo<=mapped<hi:return j,mapped,scale/sb
+    return None
+
+def _transfer(body,areas,displays,source):
+    """Transporta o centro pela costura física e conserva a velocidade em pixels/s."""
+    for side,passed,coordinate in (('left',body.x<source[0],body.y),('right',body.x>=source[2],body.y),('top',body.y<source[1],body.x),('bottom',body.y>=source[3],body.x)):
+        if not passed:continue
+        peer=_physical_neighbor(areas,displays,source,side,coordinate)
+        if peer is None:continue
+        index,mapped,ratio=peer;target=areas[index]
+        if side=='left':body.x=target[2]-(source[0]-body.x)*ratio;body.y=mapped
+        elif side=='right':body.x=target[0]+(body.x-source[2])*ratio;body.y=mapped
+        elif side=='top':body.y=target[3]-(source[1]-body.y)*ratio;body.x=mapped
+        else:body.y=target[1]+(body.y-source[3])*ratio;body.x=mapped
+        body.vx*=ratio;body.vy*=ratio;body.grounded=False;body.platform=None
+        return target
+    return source
+
+
 class Body:
     """Corpo na tela: posição, velocidade, ângulo e contato com as superfícies (chão e janelas)."""
     def __init__(self, x, y, half_w, half_h, circular=False):
@@ -95,7 +131,7 @@ class Body:
         """Diz se o corpo está em pé (inclinado menos de 30 graus)."""
         return abs(wrap_angle(self.angle)) < 30.0
 
-    def step(self, dt, bounds, platforms, areas=None, monitors=None):
+    def step(self, dt, bounds, platforms, areas=None, monitors=None, displays=None):
         """
         bounds: (left, top, right, bottom) da área de trabalho.
         platforms: [(hwnd, left, right, top)] barras de título candidatas.
@@ -130,21 +166,27 @@ class Body:
         if bounds not in areas:                       # adaptadores/testes podem fornecer um mundo próprio
             areas = [bounds]
             monitors = [bounds]
-        atual = _area_em(areas, self.x, self.y) or bounds
+        if displays and len(displays)==len(areas):
+            atual = _transfer(self,areas,displays,bounds)
+            prev_bottom=self.y+ey-self.vy*dt
+        else:atual = _area_em(areas, self.x, self.y) or bounds
+        def neighbor(side,coordinate,extent):
+            if displays:return _physical_neighbor(areas,displays,atual,side,coordinate) is not None
+            return _tem_vizinha(areas,atual,side,coordinate,extent,monitors)
         left, top, right, bottom = atual
 
         # paredes: uma borda compartilhada com outro monitor é uma passagem
-        if self.x - ex < left and not _tem_vizinha(areas, atual, "left", self.y, ey, monitors):
+        if self.x - ex < left and not neighbor("left",self.y,ey):
             self.x = left + ex
             self.impacts.append(abs(self.vx))
             self.vx = abs(self.vx) * RESTITUTION
             self.omega += self.vy * 0.15
-        elif self.x + ex > right and not _tem_vizinha(areas, atual, "right", self.y, ey, monitors):
+        elif self.x + ex > right and not neighbor("right",self.y,ey):
             self.x = right - ex
             self.impacts.append(abs(self.vx))
             self.vx = -abs(self.vx) * RESTITUTION
             self.omega -= self.vy * 0.15
-        if self.y - ey < top and not _tem_vizinha(areas, atual, "top", self.x, ex, monitors):
+        if self.y - ey < top and not neighbor("top",self.x,ex):
             self.y = top + ey
             self.impacts.append(abs(self.vy))
             self.vy = abs(self.vy) * RESTITUTION
@@ -179,7 +221,7 @@ class Body:
                 return
 
         # chão (acima da barra de tarefas)
-        if self.y + ey >= bottom and not _tem_vizinha(areas, atual, "bottom", self.x, ex, monitors):
+        if self.y + ey >= bottom and not neighbor("bottom",self.x,ex):
             self._land(bottom, ey, None)
 
     def _land(self, surface, ey, platform):

@@ -1,13 +1,17 @@
-Bolha 0.2.1 deixa o arrasto e as animações mais fluidos e adota Bolha como nome da personagem em todo o aplicativo.
+Bolha0.3.0 troca a interface Electron por Python/Qt nativo, no mesmo processo do
+cérebro local com470neurônios. A esfera escura, os olhos dourados e as orelhinhas
+agora giram juntos, sem boca ou rosto separado do corpo.
 
-O rosto agora flutua separado da esfera, com olhos simétricos, piscadas sincronizadas, orelhinhas vetoriais arredondadas e sorriso mais legível. Deitar vira somente o rosto; a esfera continua redonda e o chão permanece invisível. Use **Configurações → Bolha → Deitar / Levantar**.
+Carinho, arrasto, arremesso, giro, sono, bolinha, notebook, fogos, protestos,
+castigo, fuga, perdão, memes e bilhetes continuam disponíveis. Música, atalhos de
+mídia, estouro e retorno tímido foram retirados. Configurações e painel neural
+abrem pelo menu nativo e pela bandeja.
 
-O desenho acompanha o mouse diretamente ao arrastar, preservando o ponto onde você pegou a bolha. Os movimentos automáticos têm interpolação suave, e o pouso usa colisão circular para evitar a distância artificial do chão quando a esfera gira.
+A migração faz backup antes de converter preferências, preserva aprendizado e
+sensores desligados e mantém a inicialização escolhida pelo usuário. Instalações
+novas continuam com iniciar com o Windows desligado. O atualizador valida tamanho
+e SHA-256, permite adiar por uma hora e prepara recuperação antes da troca.
+O instalador anterior e arquivos desconhecidos podem ficar preservados para recuperação.
 
-O cérebro mantém 470 neurônios, aprendizado e memória. Os cálculos de disparos e o envio de informações para o painel neural foram otimizados. A atualização migra a pasta de memória anterior sem apagar o aprendizado ou alterar suas preferências.
-
-Inclui testes de simetria, rosto deitado, arrasto direto, ponto de pega, movimento reduzido, migração de memória e equivalência dos cálculos da rede. A publicação exige os testes do aplicativo Windows empacotado e da atualização automática.
-
-Use **Configurações → App → Verificar atualização** ou instale `Bolha-Setup-0.2.1-x64.exe`.
-
-O instalador experimental não possui assinatura digital. A validação com monitores físicos de escalas diferentes e players reais continua pendente.
+A distribuição experimental não possui assinatura digital. Consulte o relatório
+de validação para separar os testes automatizados do uso em monitores físicos.

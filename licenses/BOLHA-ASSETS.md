@@ -13,5 +13,5 @@ Licença: https://creativecommons.org/licenses/by-nc/4.0/
 
 Essa condição é das artes e não acrescenta uma restrição não comercial ao
 código GPLv3. O código pode ser reutilizado sob a GPLv3 com artes substitutas.
-Os arquivos de renderização e a lógica do aplicativo em `src/` estão sob GPLv3;
+Os arquivos de renderização e a lógica do aplicativo em `bolha/` estão sob GPLv3;
 eles carregam os recursos visuais separados dessa pasta.

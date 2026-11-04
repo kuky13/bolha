@@ -221,7 +221,7 @@ class ComputerSenses:
 
         # TYPING é teclado: input recente com o mouse parado (e nunca durante o carinho,
         # que é mexer o mouse). Antes, mexer o mouse contava como digitar.
-        typing_now = 1.0 if idle_seconds < 0.3 and not mouse_moving and not caressing else 0.0
+        typing_now = 1.0 if idle_seconds is not None and idle_seconds < 0.3 and not mouse_moving and not caressing else 0.0
         self.typing += (typing_now - self.typing) * (1.0 - math.exp(-dt / 2.0))
 
         drag_now = 1.0 if self.dragging else 0.0
@@ -235,6 +235,6 @@ class ComputerSenses:
         intensities["TYPING"] = self.typing
         intensities["DRAG"] = self.drag
         intensities["CARESS"] = self.caress
-        intensities["SILENCE"] = clamp((idle_seconds - 5.0) / 60.0)
+        intensities["SILENCE"] = clamp((idle_seconds - 5.0) / 60.0) if idle_seconds is not None else 0.0
         intensities.update(drives)
         return intensities

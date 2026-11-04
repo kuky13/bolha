@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Uma Bolha: cérebro e física originais, cena enviada para Electron."""
+"""Modelo único da Bolha: cérebro, comportamento e física do Pestinha."""
 import math
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from collections import deque
 
 from pestinha import config
 from pestinha.core.nervous_system import LIFBrain
@@ -28,37 +27,10 @@ from pestinha.mind.revolucao import RevolucaoController
 from pestinha.world.mischief import MischiefEngine
 from pestinha.sense.senses import ComputerSenses, ActivityTracker, detect_activity
 from pestinha.paths import PetPaths, ConteudoPaths
-from pestinha.store import read_json, write_json
+from pestinha.store import read_json, write_json, preserve_invalid, clear_protection_after_backup
 from pestinha.scene import set_scene, Ball, FloatingThing
 from geometry import fullscreen_monitors
 from intelligence import Intelligence
-
-
-class Burst:
-    def __init__(self):
-        self.throws = deque()
-        self.away_until = 0.0
-        self.shy_until = 0.0
-        self.started = 0.0
-
-    def throw(self, now, speed, limit):
-        if speed < 900 or now < self.away_until: return False
-        while self.throws and now - self.throws[0] >= 60: self.throws.popleft()
-        self.throws.append(now)
-        if len(self.throws) < limit: return False
-        self.throws.clear()
-        self.started = now
-        self.away_until = now + 30
-        self.shy_until = now + 90
-        return True
-
-    def phase(self, now):
-        if self.started and now < self.started + 0.7: return 'burst'
-        if now < self.away_until: return 'away'
-        if now < self.shy_until: return 'shy'
-        return 'normal'
-
-    def caress(self, dt): self.shy_until -= dt * 4
 
 
 class Game:
@@ -68,6 +40,9 @@ class Game:
         # Única referência ao nome anterior: migração atômica preserva toda a memória.
         legacy = self.data_dir / 'drippy'
         if legacy.is_dir() and not (self.data_dir / 'bolha').exists():
+            import shutil
+            backup=self.data_dir/'backups'/('legacy-'+str(time.time_ns()))
+            shutil.copytree(legacy,backup)
             legacy.rename(self.data_dir / 'bolha')
         self.objects = {}
         self.next_id = 1
@@ -88,23 +63,20 @@ class Game:
         session=read_json(self.data_dir / 'session.json',default={})
         self.panicked = session.get('panicked') is True if isinstance(session,dict) else False
         self.monitor_open = False
-        self.media_playing = False
         self.paused_at = None
-        self.burst = Burst()
-        self.recovered = True
         self.excluded = set()
         self.activity = 'IDLE'
         self.idle = 0.
         self.last_native = self.last_save = self.last_think = 0.
-        self.speech = ''
-        self.speech_until = 0.
         self.pet_paths = PetPaths(self.data_dir / 'bolha')
         self.conteudo = ConteudoPaths(Path(content_dir), Path(content_dir))
         self.prof = dict(config.PROFILES['normal'])
         self.brain = LIFBrain(seed=1313, temperament={'CURIOUS': 1.3, 'PLAYFUL': 1.2, 'DRAG->FRUSTRATION': 0.45})
-        self.brain.load(self.pet_paths.nervous)
+        if not self.brain.load(self.pet_paths.nervous) and self.pet_paths.nervous.exists():
+            preserve_invalid(self.pet_paths.nervous,'Aprendizado neural inválido; original preservado e gravação protegida.')
         self.drives = Drives()
-        self.drives.load(self.pet_paths.drives, self.prof)
+        if not self.drives.load(self.pet_paths.drives,self.prof) and self.pet_paths.drives.exists():
+            preserve_invalid(self.pet_paths.drives,'Necessidades inválidas; original preservado e gravação protegida.')
         self.memory = EpisodicMemory(self.pet_paths.episodes, self.pet_paths.preferences)
         self.memory.load()
         self.conditioning = Conditioning(self.pet_paths.conditioning, self.prof['cond_rate'])
@@ -148,12 +120,12 @@ class Game:
         self.senses_app = None
         self.native_error = None
         self.quiet_until = 0.
-        self.lying_until = 0.
         self.landing = 0.
         self.last_monitor_snapshot = -1.
         self.intelligence = Intelligence(self.memory, self.pet_paths.base / 'habits.json')
         self.last_intelligence = self.last_metrics = 0.
-        self.brain_rss = 0.
+        self.app_rss_mib = 0.
+        self.brain_array_mib = 0.
 
     def available_areas(self):
         return [area for i, area in enumerate(self.areas) if i not in self.blocked]
@@ -174,7 +146,7 @@ class Game:
         if old != (body.x, body.y): body.grounded = False; body.platform = None
 
     def visible(self):
-        return not self.hidden and not self.panicked and bool(self.available_areas()) and self.burst.phase(time.monotonic()) not in ('burst', 'away')
+        return not self.hidden and not self.panicked and bool(self.available_areas())
 
     def configure(self, prefs):
         self.prefs.update(prefs)
@@ -219,9 +191,9 @@ class Game:
         if sys.platform != 'win32': return
         try:
             from pestinha.plataforma import windows as native
-            self.idle = native.ocioso_segundos() if self.prefs.get('senseIdle', True) else 0.
+            self.idle = native.ocioso_segundos() if self.prefs.get('senseIdle', True) else None
             active = native.processo_ativo() if self.prefs.get('senseApp', True) else 'unknown'
-            self.activity = detect_activity(active, self.idle, self.prof['away_after'])
+            self.activity = detect_activity(active, self.idle or 0., self.prof['away_after'])
             self.senses.on_events(self.tracker.observe(active, self.activity))
             self.platforms = []
             previous_blocked=set(self.blocked)
@@ -236,7 +208,7 @@ class Game:
                     windows.append(((left, top, right, _bottom), maximized, bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))))
                     left, top = self.native_point(left, top)
                     right, _ = self.native_point(right, _bottom)
-                    if not maximized: self.platforms.append((hwnd, left + 10, right - 65, top))
+                    if not maximized: self.platforms.append((hwnd, left + 10, right, top))
                 self.blocked = fullscreen_monitors(windows, self.displays)
             if self.available_areas():
                 if previous_blocked != self.blocked:
@@ -261,15 +233,13 @@ class Game:
             return
         if kind == 'panel': self.panel = bool(event.get('value')); return
         if kind == 'hover': self.hover = bool(event.get('value')); return
-        if kind == 'music': self.media_playing = bool(event.get('value')); return
         if kind == 'reset-memory': self.reset_learning(); return
         if kind == 'cursor':
             if self.prefs.get('senseCursor', True): self.cursor = (event['x'], event['y'])
             return
-        if self.panicked or self.hidden or self.burst.phase(now) in ('burst', 'away'): return
+        if self.panicked or self.hidden: return
         self.last_input = now
         if kind in ('drag-start', 'drag', 'drag-end'):
-            self.lying_until = 0.
             target = self.objects.get(str(event.get('id'))) if event.get('id') else None
             body = target.body if target and hasattr(target, 'body') else self.body
             if target and not hasattr(target, 'body'):
@@ -293,31 +263,18 @@ class Game:
                     speed = math.hypot(vx, vy)
                     self.senses.thrown(min(1., speed / 1800))
                     self.drives.stimulate('throw')
-                    if self.burst.throw(now, speed, self.prefs.get('burstLimit', 12)):
-                        self.behavior.drop_carried(); self.castigo.pausar(self.state); self.recovered = False
-                    self.say('Uuuui! Segura minhas orelhas!')
         elif kind == 'poke':
             self.senses.poke(); self.drives.touched('poke'); self.drives.stimulate('poke'); self.memory.on_interaction(); self.conditioning.outcome(now)
             if self.sleep.asleep: self.sleep.wake(True)
-            self.say('Ei! Eu estava pensando em... bolinhas.')
         elif kind == 'caress':
             if self.intelligence.enabled: self.intelligence.feedback(.8, now)
-            self.state.mark_caress(now); self.drives.touched('caress'); self.memory.on_interaction(); self.say('Tá, esse carinho eu aceito. ♡')
+            self.state.mark_caress(now); self.drives.touched('caress'); self.memory.on_interaction()
         elif kind == 'quiet':
             self.intelligence.feedback(-.8, now)
             self.quiet_until = now+30
             self.behavior.adaptive_goal = 'watch'
             self.behavior.drop_carried()
-            self.say('Tá bom. Vou ficar quietinha aqui.')
         elif kind == 'spin': self.body.omega += max(-500, min(500, event.get('value', 0)))
-        elif kind == 'rest':
-            was_lying = self.sleep.asleep or now < self.lying_until or not self.body.upright()
-            if self.sleep.asleep:
-                self.sleep.wake(False)
-                self.drives.energy = max(.2,self.drives.energy)
-            self.lying_until = 0. if was_lying else now + 45.
-            if was_lying: self.body.angle = self.body.omega = 0.
-            self.behavior.drop_carried()
         elif kind == 'sleep': self.drives.energy = .1
         elif kind == 'work': self.mesa.pedir(now)
         elif kind == 'notebook': self.mesa.alternar_notebook()
@@ -328,15 +285,15 @@ class Game:
             obj = self.objects.get(str(event.get('id')))
             if obj and obj.kind in ('meme','note','sign'): obj.clicked.emit(obj)
 
-    def say(self, text):
-        self.speech, self.speech_until = text, time.monotonic() + 4
-
     def reset_learning(self):
         preferences, displays = dict(self.prefs), list(self.displays)
         panicked, excluded = self.panicked, list(self.excluded)
-        for path in self.pet_paths.todos() + [self.pet_paths.base / 'habits.json']:
-            for suffix in ('', '.corrompido', '.tmp'):
-                path.with_name(path.name+suffix).unlink(missing_ok=True)
+        import os
+        backup = self.data_dir / 'backups' / ('learning-' + str(time.time_ns()))
+        if self.pet_paths.base.exists():
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            os.replace(self.pet_paths.base,backup)
+            clear_protection_after_backup(self.pet_paths.base)
         self.__init__(self.data_dir, self.conteudo.proprio)
         self.panicked = panicked
         self.configure(preferences)
@@ -352,7 +309,7 @@ class Game:
             if not self.ball_stored: allowed += ['play']
             if self.prefs.get('senseCursor', True): allowed += ['attention']
         if not self.mesa.escondido and self.activity in ('PROGRAMMING', 'DESIGNING'): allowed += ['work']
-        if self.panel or self.hover or self.body.held or self.sleep.asleep or self.castigo.dentro or self.castigo.fuga or self.protest.stage or self.sad.stage or self.behavior.mission or self.burst.phase(now) != 'normal': allowed = []
+        if self.panel or self.hover or self.body.held or self.sleep.asleep or self.castigo.dentro or self.castigo.fuga or self.protest.stage or self.sad.stage or self.behavior.mission: allowed = []
         before = self.intelligence.goal
         try:
             goal = self.intelligence.tick(now, time.time(), self.activity, self.state.emotion, self.rates, self.drives.energy, self.drives.contact, allowed, self.sleep.asleep)
@@ -369,21 +326,22 @@ class Game:
             self.behavior.adaptive_goal = None
         if now-self.last_metrics >= 30:
             import psutil
-            self.brain_rss = psutil.Process().memory_info().rss/1048576
-            self.intelligence.budget(self.brain_rss)
+            self.app_rss_mib = psutil.Process().memory_info().rss/1048576
+            import numpy as np
+            self.brain_array_mib = sum(v.nbytes for v in vars(self.brain).values() if isinstance(v,np.ndarray) and v.base is None)/1048576
             self.last_metrics = now
 
     def think(self, dt, now):
         moving = min(1., abs(self.body.vx) / 200 + (0 if self.body.grounded else 1))
         caressing = self.state.caressing(now)
         self.drives.update(dt, self.prof, self.sleep.asleep, moving, self.emotion.arousal, self.activity == 'AWAY', engaged=self.activity in ('PROGRAMMING', 'DESIGNING'), preso=self.castigo.dentro, visitado=self.castigo.visita > .5)
-        if caressing: self.drives.stimulate('caress', dt); self.drives.touched('caress', dt); self.burst.caress(dt)
+        if caressing: self.drives.stimulate('caress', dt); self.drives.touched('caress', dt)
         self.castigo.tick_lento(dt)
-        inputs = self.senses.update(self.activity, self.idle, self.drives.channels(), caressing, math.dist(self.cursor,self.last_cursor) > 2)
+        inputs = self.senses.update(self.activity, self.idle if self.prefs.get('senseIdle',True) else None, self.drives.channels(), caressing, self.prefs.get('senseCursor',True) and math.dist(self.cursor,self.last_cursor) > 2)
         self.last_cursor = self.cursor
         self.conditioning.set_cue('PRESS', self.state.pressing, now)
         distance = math.dist(self.cursor,(self.body.x,self.body.y))
-        self.conditioning.set_cue('APPROACH', self.prev_distance is not None and distance < 220 and (self.prev_distance - distance) / max(.01,dt) > 500, now)
+        self.conditioning.set_cue('APPROACH', self.prefs.get('senseCursor',True) and self.prev_distance is not None and distance < 220 and (self.prev_distance - distance) / max(.01,dt) > 500, now)
         self.prev_distance = distance
         self.conditioning.set_cue('PLACA', self.castigo.perto_da_placa(self.body), now)
         self.conditioning.tick(now)
@@ -395,7 +353,6 @@ class Game:
         inputs['PEDIDO'] = max(self.mesa.intensidade_pedido(now), .5 if self.behavior.adaptive_goal == 'work' else 0.)
         inputs.update(self.castigo.sinais(self.body))
         inputs['RECUSA'] = self.request_refused; self.request_refused = 0
-        if self.media_playing: inputs['SOUND'] = max(.8,inputs.get('SOUND',0))
         self.brain.stimulate(inputs)
         self.brain.step(min(100, max(1, round(dt * 1000))))
         self.inputs = inputs
@@ -437,15 +394,7 @@ class Game:
             self.castigo.deslocar(elapsed); self.mesa.deslocar(elapsed)
             self.memory.deslocar(elapsed)
             self.intelligence.until += elapsed
-            self.burst.away_until += elapsed if self.burst.phase(now) == 'away' else 0
             self.paused_at = None; self.last_think = now
-        if self.burst.phase(now) in ('away','burst'): return
-        if not self.recovered:
-            area = self.bounds()
-            self.body.x,self.body.y = area[0] + self.body.half_w + 14,area[3] - self.body.half_h - 14
-            self.body.vx = self.body.vy = self.body.omega = self.body.angle = 0
-            self.body.grounded = True; self.recovered = True
-            self.say('Voltei... posso ficar aqui no cantinho um pouquinho?')
         if now - self.last_think >= .1:
             self.think(min(.1,now-self.last_think),now); self.last_think = now
         area = self.bounds()
@@ -454,14 +403,13 @@ class Game:
         self.behavior.screen_areas = areas
         self.behavior.toy = (self.ball.body.x,self.ball.body.y) if not self.ball_stored else None
         platforms = getattr(self,'platforms',[]) if self.prefs.get('senseWindows',True) else []
-        self.castigo.act(now,self.body,area,self.cursor,self.state,self.rates,self.sleep.asleep)
-        resting = self.hover or self.panel or now < max(self.quiet_until,self.lying_until) or not self.prefs.get('roaming',True) or self.burst.phase(now) == 'shy' and self.burst.shy_until-now>30
+        self.castigo.act(now,self.body,area,self.cursor if self.prefs.get('senseCursor',True) else (1e9,1e9),self.state,self.rates,self.sleep.asleep)
+        resting = self.hover or self.panel or now < self.quiet_until or not self.prefs.get('roaming',True)
         self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting)
-        if self.burst.phase(now)=='shy': self.body.vx *= max(.1,1-(self.burst.shy_until-now)/60)
-        self.body.step(dt,area,platforms,areas,monitors)
+        self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
-            self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors)
+            self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
         impacts = self.body.pop_impacts()
         self.landing *= math.exp(-dt * 12)
         for strength in impacts:
@@ -471,7 +419,7 @@ class Game:
         self.protest_ctl.carry(now,self.sleep.asleep); self.sad_ctl.carry(now,self.sleep.asleep)
         self.mischief.tick(dt,area[3])
         perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), fotos=False)
-        if not self.castigo.dentro and not self.hover and not self.panel and now >= max(self.quiet_until,self.lying_until) and self.intelligence.goal not in ('watch','rest','work'):
+        if not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.tick(now,self.rates,self.state.emotion,self.body,self.visible() and not self.sleep.asleep,dt)
         self.revolucao.tick(now,dt,area,self.cursor,(0,0),self.body,self.visible(),self.protest.stage == 4,[],self.rates.get('PAPEL',0))
@@ -496,22 +444,14 @@ class Game:
             if obj.isVisible() and self.visible(): objects.append(data)
         pose = ('held' if self.body.held else 'airborne' if not self.body.grounded else
                 'sleeping' if self.sleep.asleep else 'working' if self.mesa.sentado else
-                'lying' if now < self.lying_until or not self.body.upright() else 'idle')
-        data = dict(ready=True,blocked=list(self.blocked),panicked=self.panicked,shyness=max(0.,min(1.,(self.burst.shy_until-now)/60)) if self.burst.phase(now)=='shy' else 0.,x=self.body.x,y=self.body.y,angle=self.body.angle,emotion=self.state.emotion,phase=self.burst.phase(now),visible=self.visible(),held=self.body.held,caressing=self.state.feliz_fechado(now),gaze=self.state.gaze,speech=self.speech if now < self.speech_until else '',objects=objects,energy=self.drives.energy,stimulation=self.drives.stimulation,lonely=self.drives.contact,protest=self.protest.stage,castigo=self.castigo.dentro,escapes=self.castigo.vitorias['fugir'],activity=self.activity,motors=self.rates,learned=[],neurons=self.brain.N,error=self.native_error,
+                'lying' if not self.body.upright() else 'idle')
+        data = dict(ready=True,blocked=list(self.blocked),panicked=self.panicked,x=self.body.x,y=self.body.y,angle=self.body.angle,emotion=self.state.emotion,visible=self.visible(),held=self.body.held,caressing=self.state.feliz_fechado(now),gaze=self.state.gaze,objects=objects,energy=self.drives.energy,stimulation=self.drives.stimulation,lonely=self.drives.contact,protest=self.protest.stage,castigo=self.castigo.dentro,escapes=self.castigo.vitorias['fugir'],activity=self.activity,motors=self.rates,learned=[],neurons=self.brain.N,error=self.native_error,
                     pose=pose,grounded=self.body.grounded,surface=self.body.surface if self.body.grounded else self.bounds()[3],vx=self.body.vx,vy=self.body.vy,landing=self.landing)
         if self.monitor_open:
             if now - self.last_monitor_snapshot >= .25:
                 data.update(
-                    intelligence=dict(self.intelligence.summary(self.activity,time.time()),brainRssMiB=self.brain_rss),
+                    intelligence=dict(self.intelligence.summary(self.activity,time.time()),appRssMiB=self.app_rss_mib,brainArrayMiB=self.brain_array_mib),
                     learned=self.brain.learned_summary(8),
                     neural=dict(positions=self.brain.pos.tolist(),trace=self.brain.trace.tolist(),kind=self.brain.kind.tolist(),pools=self.brain.pool_rates()))
                 self.last_monitor_snapshot = now
         return data
-
-    def output_interval(self):
-        if self.panicked or self.hidden or not self.available_areas(): return 1.
-        bodies = [self.body] + [obj.body for obj in self.objects.values() if obj.isVisible() and hasattr(obj,'body')]
-        if self.scene_dragging or any(body.held for body in bodies): return 1/60
-        if any(not body.grounded or abs(body.vx)>1 or abs(body.omega)>1 for body in bodies): return 1/30
-        if any(obj.isVisible() and abs(obj.vy)>1 for obj in self.objects.values()): return 1/30
-        return .1

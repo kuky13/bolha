@@ -5,7 +5,7 @@ import json
 import pytest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
-from game import Game, Burst
+from game import Game
 
 CONTENT = Path(__file__).resolve().parents[2] / 'assets/bolha/content'
 
@@ -24,22 +24,14 @@ def test_nome_novo_preserva_memoria_e_nao_sobrescreve_destino(tmp_path):
     Game(tmp_path,CONTENT)
     assert marker.read_text()=='não sobrescrever'
 
-def test_rosto_deita_levanta_e_arrasto_interrompe_descanso(tmp_path,monkeypatch):
-    monkeypatch.setattr(time,'monotonic',lambda:100.)
+def test_corpo_circular_tomba_e_arrasto_tem_prioridade(tmp_path):
     game=Game(tmp_path,CONTENT)
-    game.body.grounded=True;game.body.surface=760
-    game.interact({'type':'rest'})
+    game.body.grounded=True;game.body.surface=760;game.body.angle=90
     assert game.snapshot()['pose']=='lying'
-    assert game.snapshot()['surface']==760
-    game.interact({'type':'rest'})
-    assert game.snapshot()['pose']=='idle'
-    game.body.angle=90
-    game.interact({'type':'rest'})
-    assert game.snapshot()['pose']=='idle'
-    game.interact({'type':'rest'})
+    assert game.body.extents()==(68,68)
     game.interact({'type':'drag-start','x':500,'y':300})
     assert game.snapshot()['pose']=='held'
-    assert game.lying_until==0
+    assert not hasattr(game,'burst')
 
 def test_pausar_passeio_preserva_olhar_sem_movimento(tmp_path):
     game=Game(tmp_path,CONTENT)
@@ -49,41 +41,25 @@ def test_pausar_passeio_preserva_olhar_sem_movimento(tmp_path):
     assert game.state.gaze==(1.,0.)
     assert game.body.vx==0
 
-def test_envio_prioriza_arrasto_e_envia_neural_apenas_quatro_vezes_por_segundo(tmp_path,monkeypatch):
+def test_monitor_neural_somente_quando_solicitado(tmp_path,monkeypatch):
     clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     game=Game(tmp_path,CONTENT)
-    for body in (game.body,game.ball.body): body.grounded=True
-    assert game.output_interval()==.1
-    game.body.held=True
-    assert game.output_interval()==pytest.approx(1/60)
-    game.body.held=False;game.body.grounded=False
-    assert game.output_interval()==pytest.approx(1/30)
+    assert 'neural' not in game.snapshot()
     game.interact({'type':'monitor','value':True})
     assert len(game.snapshot()['neural']['positions'])==470
     assert 'neural' not in game.snapshot()
     clock[0]+=.26
     assert 'neural' in game.snapshot()
     game.interact({'type':'monitor','value':False})
-    clock[0]+=1
     assert 'neural' not in game.snapshot()
-    game.panicked=True
-    assert game.output_interval()==1
 
-def test_estouro_temporario_somente_por_arremessos_fortes():
-    burst=Burst()
-    for i in range(50): assert not burst.throw(100+i*.2,300,12)
-    for i in range(11): assert not burst.throw(200+i,1400,12)
-    assert burst.throw(211,1400,12)
-    assert burst.phase(211.2)=='burst'
-    assert burst.phase(225)=='away'
-    assert burst.phase(241)=='shy'
-    burst.caress(20)
-    assert burst.phase(241)=='normal'
-
-def test_janela_de_arremessos_expira():
-    burst=Burst()
-    for i in range(11): assert not burst.throw(i*10,1500,12)
-    assert burst.away_until==0
+def test_arremessos_repetidos_nao_escondem_a_bolha(tmp_path):
+    game=Game(tmp_path,CONTENT)
+    for _ in range(30):
+        game.interact(dict(type='drag-start',x=500,y=300))
+        game.interact(dict(type='drag-end',x=500,y=300,vx=1800,vy=-1500))
+        assert game.visible()
+    assert not hasattr(game,'media')
 
 def test_cerebro_original_aprende_salva_e_reabre(tmp_path,monkeypatch):
     clock=[100.]
@@ -142,7 +118,6 @@ def test_memes_novos_e_objetos_sem_qt(tmp_path):
     assert 'meme' in options and 'bilhete' in options
     item=game.mischief._make('meme','feliz',False)
     assert item.valida and item.image=='carinho'
-    assert 'PySide6' not in sys.modules
 
 
 def test_castigo_fuga_aprendida_e_perdao(tmp_path,monkeypatch):

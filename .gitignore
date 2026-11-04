@@ -13,3 +13,7 @@ brain-build/
 __pycache__/
 .pytest_cache/
 .venv/
+build/
+dist/
+*.spec
+*.egg-info/
