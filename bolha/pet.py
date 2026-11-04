@@ -12,6 +12,7 @@ from PySide6.QtGui import QPainter,QColor,QRegion
 from PySide6.QtWidgets import QWidget
 from .character import draw_character,draw_sleep_marks,draw_reaction_marks
 from .motion import ExpressionMotion
+from .grab import MouseGrab
 
 FLAGS = Qt.FramelessWindowHint|Qt.Tool|Qt.WindowStaysOnTopHint|Qt.WindowDoesNotAcceptFocus
 
@@ -64,6 +65,7 @@ class PetWindow(QWidget):
         self.setMouseTracking(True);self.setFixedSize(256,256)
         self.visual=PetVisual(self)
         self.press=None;self.offset=(0.,0.);self.dragging=False
+        self.mouse_grab=MouseGrab(self);self.drag_position=None
         self.rubs=deque();self.next_blink=time.monotonic()+3.4;self.blink_until=0.
         self.motion=ExpressionMotion(time.monotonic())
         self.sync()
@@ -99,11 +101,14 @@ class PetWindow(QWidget):
         if not self.press:self.game.hover=False
 
     def mousePressEvent(self,event):
-        if event.button()!=Qt.LeftButton:return
+        if event.button()!=Qt.LeftButton or self.press is not None or not self.game.visible():return
         pos=event.globalPosition();now=time.monotonic()
         self.press=(pos,now);self.offset=(pos.x()-self.body.x,pos.y()-self.body.y)
+        self.drag_position=QPointF(pos)
         self.game.state.pressing=True
         self.game.interact({'type':'hold-start'})
+        try:self.mouse_grab.begin()
+        except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
 
     def mouseMoveEvent(self,event):
         pos=event.globalPosition();now=time.monotonic()
@@ -114,32 +119,58 @@ class PetWindow(QWidget):
             if sum(a!=b for a,b in zip(directions,directions[1:]))>=3:
                 self.game.interact({'type':'caress'});self.rubs.clear()
             return
-        if not self.dragging and math.hypot(pos.x()-self.press[0].x(),pos.y()-self.press[0].y())<4:return
-        if not self.dragging:
-            self.dragging=True
-            self.game.interact(dict(type='drag-start',x=self.body.x,y=self.body.y))
-            self.body.grounded=False;self.body.platform=None
-        self.body.x,self.body.y=pos.x()-self.offset[0],pos.y()-self.offset[1]
-        self.game.fit(self.body)
-        self.sync()
+        if self._drag_to(pos):self.sync()
+
+    def _drag_to(self,pos):
+        if pos==self.drag_position:return False
+        kind='drag' if self.dragging else 'drag-start'
+        self.dragging=True;self.drag_position=QPointF(pos)
+        self.game.interact(dict(type=kind,x=pos.x()-self.offset[0],y=pos.y()-self.offset[1]))
+        return True
 
     def mouseReleaseEvent(self,event):
         if event.button()!=Qt.LeftButton or self.press is None:return
-        if self.dragging:
-            self.game.interact(dict(type='drag-end',x=self.body.x,y=self.body.y))
-        self.game.interact({'type':'hold-end'})
-        self.press=None;self.dragging=False;self.game.state.pressing=False
-        self.game.hover=self.mask().contains(self.mapFromGlobal(event.globalPosition().toPoint()))
+        try:sample=self.mouse_grab.sample()
+        except (OSError,AttributeError,RuntimeError,TypeError,ValueError):self.cancel_interaction();return
+        pos,down=sample if sample is not None else (event.globalPosition(),False)
+        if down:
+            if self._drag_to(pos):self.sync()
+            return
+        self._release_at(pos)
 
-    def contextMenuEvent(self,event):self.menu_requested.emit(event.globalPos())
+    def _release_at(self,pos):
+        moved=self.dragging or pos!=self.drag_position
+        self.press=None;self.dragging=False;self.drag_position=None
+        self.mouse_grab.stop()
+        if moved:self.game.interact(dict(type='drag-end',x=pos.x()-self.offset[0],y=pos.y()-self.offset[1]))
+        self.game.interact({'type':'hold-end'})
+        self.game.state.pressing=False
+        self.game.hover=self.mask().contains(self.mapFromGlobal(pos.toPoint()))
+
+    def poll_interaction(self):
+        if self.press is None:return
+        if not self.game.visible() or self.game.panel or not self.isVisible():self.cancel_interaction();return
+        try:sample=self.mouse_grab.sample()
+        except (OSError,AttributeError,RuntimeError,TypeError,ValueError):self.cancel_interaction();return
+        if sample is None:return
+        pos,down=sample
+        if down:self._drag_to(pos)
+        else:self._release_at(pos)
+
+    def contextMenuEvent(self,event):self.cancel_interaction();self.menu_requested.emit(event.globalPos())
     def wheelEvent(self,event):self.game.interact(dict(type='spin',value=event.angleDelta().y()/120*100))
     def cancel_interaction(self):
-        if self.press is not None:self.game.interact({'type':'hold-end','cancelled':True})
-        if self.dragging:
-            self.body.held=False;self.body.vx=self.body.vy=0;self.body.grounded=False
-        self.press=None;self.dragging=False;self.game.state.pressing=False;self.game.senses.set_dragging(False)
+        active=self.press is not None
+        self.press=None;self.dragging=False;self.drag_position=None
+        self.mouse_grab.stop()
+        if active:self.game.interact({'type':'hold-end','cancelled':True})
         self.game.hover=False
     def event(self,event):
-        if event.type()==QEvent.UngrabMouse and (getattr(self,'press',None) is not None or getattr(self,'dragging',False)):self.cancel_interaction()
+        if event.type()==QEvent.UngrabMouse and getattr(self,'press',None) is not None:
+            if self.mouse_grab.pointer is None:self.cancel_interaction()
+            else:self.poll_interaction()
         return super().event(event)
-    def closeEvent(self,event):self.visual.close();super().closeEvent(event)
+    def hideEvent(self,event):
+        self.cancel_interaction();super().hideEvent(event)
+    def closeEvent(self,event):
+        self.cancel_interaction();self.visual.close();super().closeEvent(event)

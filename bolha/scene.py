@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QWidget,QMenu
 from .pet import FLAGS
 from .character import draw_character
 from .objects import paint_notebook,paint_ball,paint_peanut,peanut_shape,notebook_shape
+from .grab import MouseGrab
 
 class ObjectWindow(QWidget):
     def __init__(self, scene, item):
@@ -18,6 +19,7 @@ class ObjectWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True)
         self.offset=None;self.press_position=None;self.dragged=False
+        self.mouse_grab=MouseGrab(self);self.drag_position=None
         self.resize(round(item.width()),round(item.height()))
         self._sync_mask()
     def _sync_mask(self):
@@ -58,34 +60,65 @@ class ObjectWindow(QWidget):
     def leaveEvent(self,event):
         if self.offset is None:self.scene.game.hover=False
     def mousePressEvent(self,event):
-        if event.button()!=Qt.LeftButton:return
+        if event.button()!=Qt.LeftButton or self.offset is not None or not self.scene.game.visible() or not self.item.isVisible():return
         p=event.globalPosition();self.offset=(p.x()-self.item._cx,p.y()-self.item._cy)
-        self.press_position=(p.x(),p.y());self.dragged=False
+        self.press_position=(p.x(),p.y());self.dragged=False;self.drag_position=QPointF(p)
         self.scene.game.interact(dict(type='drag-start',id=self.item.id,x=self.item._cx,y=self.item._cy))
+        try:self.mouse_grab.begin()
+        except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
     def mouseMoveEvent(self,event):
         if self.offset is None:return
-        p=event.globalPosition()
+        if self._drag_to(event.globalPosition()):self.sync()
+    def _drag_to(self,p):
+        if p==self.drag_position:return False
+        self.drag_position=QPointF(p)
         if math.dist(self.press_position,(p.x(),p.y()))>=4:self.dragged=True
-        self.scene.game.interact(dict(type='drag',id=self.item.id,x=p.x()-self.offset[0],y=p.y()-self.offset[1]));self.sync()
+        self.scene.game.interact(dict(type='drag',id=self.item.id,x=p.x()-self.offset[0],y=p.y()-self.offset[1]))
+        return True
     def mouseReleaseEvent(self,event):
         if event.button()!=Qt.LeftButton or self.offset is None:return
-        p=event.globalPosition()
-        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=p.x()-self.offset[0],y=p.y()-self.offset[1]))
-        if not self.dragged and math.dist(self.press_position,(p.x(),p.y()))<4:
+        try:sample=self.mouse_grab.sample()
+        except (OSError,AttributeError,RuntimeError,TypeError,ValueError):self.cancel_interaction();return
+        p,down=sample if sample is not None else (event.globalPosition(),False)
+        if down:
+            if self._drag_to(p):self.sync()
+            return
+        self._release_at(p)
+    def _release_at(self,p):
+        click=not self.dragged and math.dist(self.press_position,(p.x(),p.y()))<4
+        x,y=p.x()-self.offset[0],p.y()-self.offset[1]
+        self.offset=None;self.press_position=None;self.drag_position=None;self.dragged=False
+        self.mouse_grab.stop()
+        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=x,y=y))
+        if click:
             self.scene.game.interact(dict(type='dismiss',id=self.item.id))
-        self.offset=None;self.press_position=None
         self.scene.game.hover=self.item.kind!='ball' and self.mask().contains(self.mapFromGlobal(p.toPoint()))
+    def poll_interaction(self):
+        if self.offset is None:return
+        if not self.scene.game.visible() or self.scene.game.panel or not self.item.isVisible() or not self.isVisible():self.cancel_interaction();return
+        try:sample=self.mouse_grab.sample()
+        except (OSError,AttributeError,RuntimeError,TypeError,ValueError):self.cancel_interaction();return
+        if sample is None:return
+        p,down=sample
+        if down:self._drag_to(p)
+        else:self._release_at(p)
     def cancel_interaction(self):
         if self.offset is None:return
-        self.offset=None;self.press_position=None;self.dragged=False
+        self.offset=None;self.press_position=None;self.dragged=False;self.drag_position=None
+        self.mouse_grab.stop()
         self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=self.item._cx,y=self.item._cy))
         self.scene.game.hover=False
     def event(self,event):
-        if event.type()==QEvent.UngrabMouse and getattr(self,'offset',None) is not None:self.cancel_interaction()
+        if event.type()==QEvent.UngrabMouse and getattr(self,'offset',None) is not None:
+            if self.mouse_grab.pointer is None:self.cancel_interaction()
+            else:self.poll_interaction()
         return super().event(event)
+    def hideEvent(self,event):
+        self.cancel_interaction();super().hideEvent(event)
     def closeEvent(self,event):
         self.cancel_interaction();super().closeEvent(event)
     def contextMenuEvent(self,event):
+        self.cancel_interaction()
         menu=QMenu(self);action=menu.addAction('Guardar objeto')
         if menu.exec(event.globalPos())==action:
             if self.item.kind=='ball':self.scene.game.interact(dict(type='ball'))
@@ -124,6 +157,10 @@ class ObjectWindow(QWidget):
 
 class NativeScene:
     def __init__(self,game):self.game=game;self.windows={}
+    def poll_interactions(self):
+        for window in list(self.windows.values()):window.poll_interaction()
+    def cancel_interactions(self):
+        for window in list(self.windows.values()):window.cancel_interaction()
     def sync(self):
         for ident,item in list(self.game.objects.items()):
             if item.closed:

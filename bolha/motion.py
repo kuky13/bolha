@@ -32,8 +32,8 @@ def animation_pose(mode, seconds, strength=1.):
         irritation = _ease((t - .7) / 3.)
         pose.update(emotion='curioso' if t < .7 else 'entediado' if irritation < .3 else 'bravo',
                     eye_open=1.12 - .7 * irritation, ear_raise=1. - 5. * irritation,
-                    ear_tilt=14. * irritation, squash=.12 * irritation * math.sin(t * 13),
-                    angle_offset=irritation * (3.5 * math.sin(t * 12) + 2. * math.sin(t * 19)),
+                    ear_tilt=14. * irritation, squash=.03 * irritation * math.sin(t * 6),
+                    angle_offset=irritation * (math.sin(t * 5) + .5 * math.sin(t * 8)),
                     effect='bravo', effect_strength=irritation * strength)
     elif mode == 'sleeping':
         closing = _ease(t / 1.8);breath = math.sin(t * math.tau / 4.2)

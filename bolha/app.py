@@ -60,7 +60,7 @@ class NativeApp:
         self.qapp=qapp;self.data_dir=Path(data_dir or data_directory());self.data_dir.mkdir(parents=True,exist_ok=True)
         self.lock=QLockFile(str(self.data_dir/'native.lock'));self.lock.setStaleLockTime(0)
         if not self.lock.tryLock(0):raise RuntimeError('A Bolha já está aberta neste perfil.')
-        self.started=time.monotonic();self.errors=[];self.quitting=False;self.updating=False
+        self.started=time.monotonic();self.errors=[];self.quitting=False;self.updating=False;self.suspended=False
         self.frame_times=deque(maxlen=1800);self.think_times=deque(maxlen=600);self.first_paint=False;self.first_think=False;self.healthy=False
         self.dialogs=[];self.updater=None;self.connected_screens=set();self.update_dialog=None;self.reset_pending=False
         self._health(False)
@@ -77,6 +77,7 @@ class NativeApp:
             start=time.perf_counter();original_think(*args);self.think_times.append((time.perf_counter()-start)*1000);self.first_think=True
         self.game.think=measured_think
         self.pet=PetWindow(self.game);self.scene=NativeScene(self.game)
+        qapp.applicationStateChanged.connect(self._application_state_changed)
         self.pet.visual.painted.connect(self._painted)
         self.pet.menu_requested.connect(self.show_menu)
         self.tray=QSystemTrayIcon(icon(),qapp);self.tray.setToolTip('Bolha '+VERSION)
@@ -128,16 +129,24 @@ class NativeApp:
         exclude=[int(self.pet.winId()),int(self.pet.visual.winId())]+self.scene.ids()+[int(d.winId()) for d in self.dialogs]
         self.game.desktop(desktop_layout(self.qapp,exclude));self.game.last_native=0;self.game.read_context(time.monotonic());self.pet.sync();self.scene.sync()
     def tick(self):
-        if self.quitting or self.updating:return
+        if self.quitting or self.updating or self.suspended:
+            self.cancel_interactions();return
         now=time.monotonic();dt=now-self.last_tick;self.last_tick=now;self.frame_times.append(dt*1000)
         try:
+            self.pet.poll_interaction();self.scene.poll_interactions()
             if self.store.preferences.get('senseCursor',True):
                 point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()))
             else:self.game.cursor=(self.game.body.x,self.game.body.y)
             self.game.tick(dt,now);self.pet.sync();self.scene.sync()
             self.game.excluded.update(self.scene.ids())
         except Exception as error:
-            self.frame.stop();self.warn('A rotina foi pausada: '+str(error));log('[erro]',repr(error))
+            self.cancel_interactions();self.frame.stop();self.warn('A rotina foi pausada: '+str(error));log('[erro]',repr(error))
+    def cancel_interactions(self):
+        self.pet.cancel_interaction();self.scene.cancel_interactions()
+    def _application_state_changed(self,state):
+        self.suspended=state==Qt.ApplicationSuspended
+        if self.suspended:self.cancel_interactions()
+        else:self.last_tick=time.monotonic()
     def poll(self):
         test_profile=os.getenv('BOLHA_TEST_USER_DATA')
         if (os.getenv('BOLHA_TEST')=='1' and os.getenv('BOLHA_TEST_ALLOW_STOP')=='1' and test_profile
@@ -183,14 +192,15 @@ class NativeApp:
         action=updates.addAction('Verificar agora');action.triggered.connect(lambda:self.updater.check())
         action=updates.addAction('Adiar por uma hora');action.triggered.connect(lambda:self.updater.defer())
         menu.addSeparator();action=menu.addAction('Sair');action.triggered.connect(self.quit)
-        menu.aboutToShow.connect(lambda:setattr(self.game,'panel',True));menu.aboutToHide.connect(self._panel_closed)
+        menu.aboutToShow.connect(self._panel_opened);menu.aboutToHide.connect(self._panel_closed)
         return menu
     def show_menu(self,point):self.menu.popup(point)
     def _tray_activated(self,reason):
         if reason==QSystemTrayIcon.DoubleClick:self.show_settings()
     def _panel_closed(self,*_):self.game.panel=any(dialog.isVisible() for dialog in self.dialogs)
+    def _panel_opened(self):self.cancel_interactions();self.game.panel=True
     def _show_dialog(self,cls):
-        self.game.panel=True
+        self._panel_opened()
         for dialog in self.dialogs:
             if isinstance(dialog,cls):dialog.show();dialog.raise_();dialog.activateWindow();return
         dialog=cls(self);self.dialogs.append(dialog);dialog.finished.connect(self._panel_closed)

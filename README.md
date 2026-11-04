@@ -5,16 +5,18 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Experimental · Windows x64 · Fonte 0.3.1 em validação.**
+**Experimental · Windows x64 · Fonte 0.3.2 candidata de teste.**
 
 [Instalador publicado](https://github.com/kuky13/bolha/releases/latest) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A 0.3.1 tem instalador de teste compilado no CI Windows. A atualização real
-0.3.0 → 0.3.1 e os ensaios dirigidos passaram; a revisão manual prolongada
-continua pendente, sem release publicada. Resultados e limites estão em
-[validação da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
+A 0.3.2 prepara a correção da pega e uma animação mais firme enquanto a Bolha
+é segurada, como candidata de teste do [PR #2](https://github.com/kuky13/bolha/pull/2).
+A versão pública continua **0.3.0**. Compilação, instalação e entrada reais no
+Windows desta candidata aguardam evidência própria; veja a
+[validação da pega 0.3.2](docs/VALIDATION-GRAB.md). Os resultados anteriores
+permanecem no [histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
@@ -128,7 +130,8 @@ py -3.11 -m venv .venv
 
 O resultado fica em `release/`. O script usa PyInstaller e NSIS portátil fixado
 por checksum, sem instalar o compilador globalmente. Veja
-[compilação e testes Windows](docs/BUILD.md), [validação da 0.3.1](docs/VALIDATION-EXPRESSIONS.md)
+[compilação e testes Windows](docs/BUILD.md), [validação da pega 0.3.2](docs/VALIDATION-GRAB.md),
+[histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md)
 e [histórico da migração Qt 0.3.0](docs/VALIDATION-NATIVE.md).
 O pipeline da Bolha só roda manualmente ou por tag; salvar commits e abrir
 PRs não dispara compilações de instalador. Tags só publicam após os testes.
