@@ -9,20 +9,49 @@ from game import Game
 
 CONTENT = Path(__file__).resolve().parents[2] / 'assets/bolha/content'
 
-def test_nome_novo_preserva_memoria_e_nao_sobrescreve_destino(tmp_path):
+def test_memoria_legada_continua_no_caminho_original(tmp_path):
     import numpy as np
     game=Game(tmp_path,CONTENT)
     game.brain.learned[0,0]=.06
     game.save()
     legacy=tmp_path/'drippy'
-    (tmp_path/'bolha').rename(legacy)
+    (tmp_path/'bolha').rename(legacy)  # Fixture da pasta usada pela versão 0.1.
     reopened=Game(tmp_path,CONTENT)
+    assert reopened.pet_paths.base==legacy
     assert np.isclose(reopened.brain.learned[0,0],.06)
-    assert not legacy.exists()
-    legacy.mkdir()
-    marker=legacy/'preservar.txt';marker.write_text('não sobrescrever')
-    Game(tmp_path,CONTENT)
-    assert marker.read_text()=='não sobrescrever'
+    reopened.brain.learned[0,0]=.08
+    reopened.save()
+    assert not (tmp_path/'bolha').exists()
+    assert legacy.is_dir()
+    assert np.isclose(Game(tmp_path,CONTENT).brain.learned[0,0],.08)
+    reopened.reset_learning()
+    assert reopened.pet_paths.base==legacy
+    assert not np.any(reopened.brain.learned)
+    assert not (tmp_path/'bolha').exists()
+    backup=next((tmp_path/'backups').glob('learning-*/nervous.json'))
+    saved=json.loads(backup.read_text(encoding='utf-8'))
+    assert saved['seed']==1313
+    assert np.isclose(saved['learned'][reopened.brain.sensory_names[0]][reopened.brain.plastic_posts[0]],.08)
+
+
+def test_pasta_bolha_tem_preferencia_quando_ambas_existem(tmp_path):
+    import numpy as np
+    game=Game(tmp_path,CONTENT)
+    game.brain.learned[0,0]=.03
+    game.save()
+    legacy=tmp_path/'drippy';legacy.mkdir()
+    game.brain.learned[0,0]=.09
+    game.brain.save(legacy/'nervous.json')
+    before=(legacy/'nervous.json').read_bytes()
+    reopened=Game(tmp_path,CONTENT)
+    assert reopened.pet_paths.base==tmp_path/'bolha'
+    assert np.isclose(reopened.brain.learned[0,0],.03)
+    assert (legacy/'nervous.json').read_bytes()==before
+    reopened.reset_learning()
+    assert reopened.pet_paths.base==tmp_path/'bolha'
+    assert not np.any(reopened.brain.learned)
+    assert (legacy/'nervous.json').read_bytes()==before
+
 
 def test_corpo_circular_tomba_e_arrasto_tem_prioridade(tmp_path):
     game=Game(tmp_path,CONTENT)

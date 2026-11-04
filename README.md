@@ -66,7 +66,9 @@ Tudo o que a Bolha aprende fica em `%APPDATA%\bolha\brain`. Aparência e
 preferências ficam no diretório próprio `%APPDATA%\bolha`, separado de outros
 aplicativos. Reinstalar ou atualizar preserva esses arquivos. A versão 0.3 faz backup verificável antes de converter preferências e preserva
 a semente da rede e os formatos do aprendizado. A migração pode ser repetida
-sem sobrescrever uma pasta de memória nova existente.
+sem sobrescrever uma pasta de memória nova existente. Perfis da versão 0.1
+continuam lendo e gravando na pasta original de aprendizado, para uma recuperação
+da versão anterior encontrar a mesma memória; ela não é renomeada na atualização.
 
 Você pode desligar separadamente a leitura do nome do programa ativo, do
 tempo ocioso, da posição do cursor e da geometria das janelas. Não há captura

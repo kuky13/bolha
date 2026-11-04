@@ -206,12 +206,22 @@ def process_alive(pid, expected_exe):
     kernel.QueryFullProcessImageNameW.argtypes = (wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD))
     handle = kernel.OpenProcess(0x1000 | 0x100000, False, int(pid))
     if not handle:
-        return False
+        error = ctypes.get_last_error()
+        if error == 87:  # ERROR_INVALID_PARAMETER: o PID já não existe.
+            return False
+        raise ctypes.WinError(error)
     try:
+        status = kernel.WaitForSingleObject(handle, 0)
+        if status == 0:
+            return False
+        if status != 258:
+            raise ctypes.WinError(ctypes.get_last_error())
         size = wintypes.DWORD(32768)
         path = ctypes.create_unicode_buffer(size.value)
         if not kernel.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)):
-            return False
+            if kernel.WaitForSingleObject(handle, 0) == 0:
+                return False
+            raise ctypes.WinError(ctypes.get_last_error())
         if Path(path.value).resolve() != Path(expected_exe).resolve():
             raise AssertionError('PID não pertence ao executável isolado esperado.')
         return kernel.WaitForSingleObject(handle, 0) == 258
@@ -486,26 +496,133 @@ class NativeValidation:
                     write_json(self.output/'report.json', self.report)
 
 
+def verify_legacy_owner(data, install, token):
+    data, install = Path(data), Path(install)
+    root = install.parent
+    if (not re.fullmatch('[a-f0-9]{32}', token) or data.name.lower() != 'bolha'
+            or install.name != 'app' or not root.name.startswith('bolha-legacy-validation-')):
+        raise ValueError('Caminhos de teste legado inválidos.')
+    for path in (data, install, root, data/'.bolha-legacy-validation.json', root/'validation-owner.json'):
+        if path == install and not path.exists() and not path.is_symlink():
+            continue  # O desinstalador próprio pode já ter removido a pasta app.
+        if path.is_symlink() or getattr(path.lstat(), 'st_file_attributes', 0) & 0x400:
+            raise ValueError('O teste legado não aceita atalhos ou junctions.')
+    owner = read_json(data/'.bolha-legacy-validation.json') or {}
+    if (owner.get('token') != token or owner.get('createdBy') != 'bolha-legacy-validation'
+            or Path(owner.get('data', '')).resolve() != data.resolve()
+            or Path(owner.get('install', '')).resolve() != install.resolve()
+            or read_json(root/'validation-owner.json') != dict(token=token)):
+        raise ValueError('Perfil sem ownership verificável; nenhum arquivo será removido.')
+    # Não atravessa um link surgido em qualquer parte do perfil arquivado/removido.
+    for base in (data, root):
+        for parent, folders, files in os.walk(base, followlinks=False):
+            for name in folders+files:
+                path = Path(parent)/name
+                if path.is_symlink() or getattr(path.lstat(), 'st_file_attributes', 0) & 0x400:
+                    raise ValueError('Atalho no perfil de teste; limpeza cancelada.')
+    return owner
+
+
+def legacy_registration(install, version):
+    """Prova exata de GUID/caminho, nunca remoção por nome ou substring."""
+    import winreg
+    guid = 'efdda9e4-adbf-5481-bf79-1ee5a33cbceb'
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\'+guid, 0,
+                       winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
+        location = winreg.QueryValueEx(key, 'InstallLocation')[0]
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                       'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\'+guid,
+                       0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
+        installed_version = winreg.QueryValueEx(key, 'DisplayVersion')[0]
+        uninstaller = winreg.QueryValueEx(key, 'UninstallString')[0]
+    expected = Path(install).resolve()
+    if (Path(location).resolve() != expected or installed_version != version
+            or uninstaller != '"'+str(expected/'Uninstall Bolha.exe')+'"'):
+        raise ValueError('O registro não pertence à instalação isolada esperada.')
+    return dict(guid=guid, install=str(expected), version=version)
+
+
+def legacy_registration_absent():
+    import winreg
+    for path in ('Software\\efdda9e4-adbf-5481-bf79-1ee5a33cbceb',
+                 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\efdda9e4-adbf-5481-bf79-1ee5a33cbceb'):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0,
+                               winreg.KEY_READ | winreg.KEY_WOW64_64KEY):
+                return False
+        except FileNotFoundError:
+            pass
+    return True
+
+
+def cleanup_legacy_runner(data, install, token, version, output, report):
+    if not legacy_allowed():
+        raise PermissionError('Limpeza legada somente no runner GitHub hospedado e descartável.')
+    data, install, output = Path(data), Path(install), Path(output)
+    verify_legacy_owner(data, install, token)
+    health = report.get('health') or {}
+    validate_metrics(report.get('metrics') or {}, health)
+    assert health['version'] == version
+    # O relatório é gravado no início do quit: esperar só o JSON é insuficiente.
+    wait_for('Processo Qt ainda está ativo; perfil preservado.',
+             lambda: not process_alive(health['pid'], install/'Bolha.exe'), 30)
+    inventory = read_json(install/'installed-files.json') or {}
+    if (inventory.get('appId') != 'solutions.kuky.bolha' or inventory.get('version') != version
+            or (install/'bolha-native-installation.flag').read_text(encoding='utf-8') != 'bolha-native:solutions.kuky.bolha'
+            or digest(install/'Bolha.exe').hex() != inventory.get('files', {}).get('Bolha.exe')):
+        raise ValueError('Inventário nativo não confere; instalação e perfil preservados.')
+    uninstaller = install/'Uninstall Bolha.exe'
+    if not uninstaller.is_file() or uninstaller.is_symlink():
+        raise ValueError('Desinstalador próprio não encontrado.')
+    registration = legacy_registration(install, version)
+    evidence = output/('evidence-'+token[:8])
+    evidence.mkdir(parents=True)
+    shutil.copytree(data, evidence/'profile')
+    shutil.copy2(install/'installed-files.json', evidence/'installed-files.json')
+    write_json(evidence/'ownership.json', dict(token=token, registration=registration,
+               nativePid=health['pid'], nativeProcessExited=True))
+    # Executa somente o desinstalador da pasta nova cuja identidade foi provada.
+    subprocess.run([str(uninstaller), '/S'], check=True, timeout=90)
+    wait_for('Desinstalação própria não concluiu; perfil preservado.',
+             lambda: legacy_registration_absent() and not (install/'Bolha.exe').exists(), 60)
+    verify_legacy_owner(data, install, token)
+    shutil.rmtree(data)
+    assert read_json(install.parent/'validation-owner.json') == dict(token=token)
+    shutil.rmtree(install.parent)
+    return dict(nativeProcessExited=True, profileRemoved=True, installationUninstalled=True,
+                registrationRemoved=True, evidence=str(evidence))
+
+
 def run_legacy(args):
     if not legacy_allowed():
         raise PermissionError('Transição legada exige runner Windows GitHub hospedado e descartável; proibida no kukybook26.')
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=True)
+    (output/'report.json').unlink(missing_ok=True)
     data = Path(os.environ['APPDATA'])/'bolha'
     if data.exists():
         raise FileExistsError('O runner legado já tem um perfil Bolha. Use um runner descartável novo.')
+    if not legacy_registration_absent():
+        raise FileExistsError('O runner legado já tem uma instalação Bolha registrada.')
     root = Path(tempfile.mkdtemp(prefix='bolha-legacy-validation-')).resolve()
+    token = uuid.uuid4().hex
+    write_json(root/'validation-owner.json', dict(token=token))
     with Feed(args.installer) as feed:
         request = dict(installer=str(Path(args.legacy_installer).resolve()), targetVersion=installer_version(args.installer),
                        install=str(root/'app'), data=str(data), feed=feed.url, output=str(output),
-                       playwrightRoot=str(Path(args.playwright_root).resolve()))
+                       playwrightRoot=str(Path(args.playwright_root).resolve()), ownerToken=token)
         write_json(output/'legacy-request.json', request)
         try:
             subprocess.run(['node', str(Path(__file__).with_name('test_windows_legacy.mjs')),
                             str(output/'legacy-request.json')], check=True, timeout=300)
-        except (OSError, subprocess.SubprocessError) as error:
-            if not (output/'report.json').exists():
-                write_json(output/'report.json', dict(passed=False, mode='disposable-legacy', error=str(error)))
+            report = read_json(output/'report.json') or {}
+            assert report.get('passed') is True, 'Migração não confirmou sucesso.'
+            report['cleanup'] = cleanup_legacy_runner(data, root/'app', token, request['targetVersion'], output, report)
+            write_json(output/'report.json', report)
+        except (OSError, ValueError, AssertionError, subprocess.SubprocessError) as error:
+            report = read_json(output/'report.json') or {}
+            report.update(passed=False, mode='disposable-legacy', error=str(error), workspaceRetained=str(root))
+            write_json(output/'report.json', report)
             raise
 
 

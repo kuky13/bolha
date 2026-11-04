@@ -21,7 +21,8 @@ def test_migration_preserves_memory_optouts_and_backup(tmp_path):
     marker = read_json(tmp_path/'native-migration.json')
     backup = Path(marker['backup'])
     assert read_json(backup/'config.json') == old
-    assert (backup/'brain/drippy/seed.json').read_bytes() == (tmp_path/'brain/bolha/seed.json').read_bytes()
+    assert (backup/'brain/drippy/seed.json').read_bytes() == (memory/'seed.json').read_bytes()
+    assert not (tmp_path/'brain/bolha').exists()
     prepare_data(tmp_path)
     assert len(list((tmp_path/'backups').iterdir())) == 1
 
@@ -139,3 +140,35 @@ def test_health_before_installer_commit_never_removes_recovery(tmp_path):
     transaction.write_text(f'[recovery]\nbackup={backup}\nversion=0.3.0\nstate=committed\n',encoding='utf-16')
     assert cleanup_recovery(tmp_path/'data',tmp_path/'Bolha','0.3.0') is True
     assert (backup/'keep').exists() and not transaction.exists()
+
+
+def test_failed_native_startup_preserves_legacy_path_and_retry_reads_new_learning(tmp_path):
+    """A versão recuperada 0.1 pode continuar gravando antes de outra tentativa nativa."""
+    import numpy as np
+    from game import Game
+    content=Path(__file__).resolve().parents[2]/'assets/bolha/content'
+    brain=tmp_path/'brain'
+    original=Game(brain,content)
+    original.brain.learned[0,0]=.06
+    original.save()
+    legacy=brain/'drippy'
+    (brain/'bolha').rename(legacy)  # Simula o perfil real 0.1; não é conversão do aplicativo.
+    before={path.name:path.read_bytes() for path in legacy.iterdir() if path.is_file()}
+    prepare_data(tmp_path)
+    # Falha depois de ler a rede, antes de o aplicativo conseguir confirmar saúde.
+    with patch('game.Drives',side_effect=RuntimeError('inicialização interrompida')):
+        with pytest.raises(RuntimeError,match='inicialização interrompida'):Game(brain,content)
+    assert legacy.is_dir() and not (brain/'bolha').exists()
+    assert {path.name:path.read_bytes() for path in legacy.iterdir() if path.is_file()}==before
+    # A versão antiga recuperada atualiza os mesmos pesos no caminho que sempre usou.
+    original.brain.learned[0,0]=.07
+    original.brain.save(legacy/'nervous.json')
+    updated=(legacy/'nervous.json').read_bytes()
+    prepare_data(tmp_path)  # Retry é idempotente e não restaura uma cópia de pesos obsoleta.
+    resumed=Game(brain,content)
+    assert resumed.pet_paths.base==legacy
+    assert np.isclose(resumed.brain.learned[0,0],.07)
+    assert (legacy/'nervous.json').read_bytes()==updated
+    assert not (brain/'bolha').exists()
+    backups=list((tmp_path/'backups').glob('*/brain/drippy/nervous.json'))
+    assert len(backups)==1 and backups[0].read_bytes()==before['nervous.json']

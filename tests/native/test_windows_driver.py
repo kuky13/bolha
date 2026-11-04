@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 from urllib.error import HTTPError
 from http.client import IncompleteRead
 from urllib.request import urlopen
@@ -108,3 +109,97 @@ def test_stop_rejects_base_report_when_target_never_wrote_metrics(tmp_path, monk
     validation.current_report.unlink()
     with pytest.raises(AssertionError):
         validation.stop(target_health)
+
+
+def legacy_fixture(tmp_path):
+    data, install = tmp_path/'bolha', tmp_path/'bolha-legacy-validation-test'/'app'
+    data.mkdir();install.mkdir(parents=True)
+    token = 'a'*32
+    write_json(install.parent/'validation-owner.json', dict(token=token))
+    write_json(data/'.bolha-legacy-validation.json', dict(token=token, createdBy='bolha-legacy-validation',
+               data=str(data), install=str(install)))
+    (data/'learning.json').write_text('preserve learned state', encoding='utf-8')
+    (install/'Bolha.exe').write_bytes(b'MZnative')
+    (install/'Uninstall Bolha.exe').write_bytes(b'MZuninstall')
+    (install/'bolha-native-installation.flag').write_text('bolha-native:solutions.kuky.bolha', encoding='utf-8')
+    write_json(install/'installed-files.json', dict(appId='solutions.kuky.bolha', version='0.3.0',
+               files={'Bolha.exe': hashlib.sha256(b'MZnative').hexdigest()}))
+    report = dict(health=dict(version='0.3.0',pid=123,ready=True,neurons=470),
+                  metrics=dict(version='0.3.0',pid=123,healthy=True,neurons=470,frameCount=10,thinkCount=2))
+    return data, install, token, report
+
+
+def test_legacy_owner_rejects_wrong_nonce_foreign_path_and_accepts_own_uninstall(tmp_path):
+    data, install, token, _ = legacy_fixture(tmp_path)
+    assert driver.verify_legacy_owner(data,install,token)['token'] == token
+    with pytest.raises(ValueError,match='ownership'):
+        driver.verify_legacy_owner(data,install,'b'*32)
+    with pytest.raises(ValueError,match='Caminhos'):
+        driver.verify_legacy_owner(data,tmp_path/'foreign'/'app',token)
+    shutil.rmtree(install)
+    assert driver.verify_legacy_owner(data,install,token)['token'] == token
+
+
+def test_legacy_owner_rejects_links_in_profile_or_workspace(tmp_path):
+    data, install, token, _ = legacy_fixture(tmp_path)
+    sentinel = tmp_path/'foreign-document.txt';sentinel.write_text('keep')
+    for base in (data, install.parent):
+        link = base/'linked-document'
+        try:link.symlink_to(sentinel)
+        except OSError:pytest.skip('symlinks indisponíveis')
+        try:
+            with pytest.raises(ValueError,match='Atalho'):
+                driver.verify_legacy_owner(data,install,token)
+        finally:link.unlink()
+    assert sentinel.read_text() == 'keep'
+
+
+def test_legacy_refuses_existing_profile_or_registration_before_install(tmp_path,monkeypatch):
+    monkeypatch.setattr(driver,'legacy_allowed',lambda:True)
+    monkeypatch.setenv('APPDATA',str(tmp_path))
+    args = SimpleNamespace(output=tmp_path/'output')
+    (tmp_path/'bolha').mkdir()
+    with pytest.raises(FileExistsError,match='perfil'):
+        driver.run_legacy(args)
+    (tmp_path/'bolha').rmdir()
+    monkeypatch.setattr(driver,'legacy_registration_absent',lambda:False)
+    with pytest.raises(FileExistsError,match='registrada'):
+        driver.run_legacy(args)
+    assert not list(tmp_path.glob('bolha-legacy-validation-*'))
+
+
+@pytest.mark.parametrize('failure',['not_hosted','active_process','wrong_registration'])
+def test_legacy_cleanup_failure_preserves_profile_and_never_runs_uninstaller(tmp_path,monkeypatch,failure):
+    data,install,token,report = legacy_fixture(tmp_path)
+    monkeypatch.setattr(driver,'legacy_allowed',lambda:failure!='not_hosted')
+    monkeypatch.setattr(driver,'process_alive',lambda *_:failure=='active_process')
+    def immediate_wait(description,predicate,timeout):
+        if not predicate():raise TimeoutError(description)
+    monkeypatch.setattr(driver,'wait_for',immediate_wait)
+    def wrong_registration(*_):raise ValueError('registro diferente')
+    monkeypatch.setattr(driver,'legacy_registration',wrong_registration)
+    monkeypatch.setattr(driver.subprocess,'run',lambda *_args,**_kwargs:pytest.fail('uninstaller não deveria executar'))
+    with pytest.raises((PermissionError,TimeoutError,ValueError)):
+        driver.cleanup_legacy_runner(data,install,token,'0.3.0',tmp_path/'output',report)
+    assert (data/'learning.json').read_text() == 'preserve learned state'
+    assert (install/'Bolha.exe').exists()
+
+
+def test_legacy_cleanup_waits_for_exit_archives_then_uninstalls_only_owned_install(tmp_path,monkeypatch):
+    data,install,token,report = legacy_fixture(tmp_path)
+    monkeypatch.setattr(driver,'legacy_allowed',lambda:True)
+    monkeypatch.setattr(driver,'process_alive',lambda *_:False)
+    monkeypatch.setattr(driver,'legacy_registration',lambda *_:dict(guid='expected',install=str(install),version='0.3.0'))
+    monkeypatch.setattr(driver,'legacy_registration_absent',lambda:True)
+    calls=[]
+    def uninstall(args,**kwargs):
+        assert args == [str(install/'Uninstall Bolha.exe'),'/S']
+        assert kwargs == dict(check=True,timeout=90)
+        assert (tmp_path/'output'/('evidence-'+token[:8])/'profile'/'learning.json').read_text() == 'preserve learned state'
+        calls.append(args)
+        shutil.rmtree(install)
+    monkeypatch.setattr(driver.subprocess,'run',uninstall)
+    result=driver.cleanup_legacy_runner(data,install,token,'0.3.0',tmp_path/'output',report)
+    assert len(calls)==1 and result['nativeProcessExited'] and result['registrationRemoved']
+    assert not data.exists() and not install.parent.exists()
+    assert Path(result['evidence']).is_dir()

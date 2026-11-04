@@ -151,7 +151,7 @@ class NativeApp:
             try:path,error=self.writer.errors.get_nowait()
             except queue.Empty:break
             self.warn('Não foi possível gravar '+Path(path).name+': '+error)
-        if self.first_paint and self.first_think and not self.healthy and not self.initial_errors and not self.store.error and not self.writer.failure:
+        if self.first_paint and self.first_think and self.frame.isActive() and not self.healthy and not self.initial_errors and not self.store.error and not self.writer.failure:
             try:self._health(True)
             except OSError as error:self.warn('Confirmação local falhou: '+str(error));return
             self.healthy=True

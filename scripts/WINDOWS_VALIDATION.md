@@ -63,7 +63,7 @@ métricas da versão base ou de uma execução anterior não validam o alvo.
 ## Migração Electron para Qt
 
 **Proibido no kukybook26 e em máquinas pessoais.** Execute somente em um
-runner Windows GitHub hospedado e descartável, novo para cada versão antiga.
+runner Windows GitHub hospedado e descartável, sem instalação ou perfil prévio.
 As proteções exigem `GITHUB_ACTIONS=true`, `RUNNER_ENVIRONMENT=github-hosted`
 e `RUNNER_OS=Windows`, além de recusar explicitamente o nome `kukybook26`.
 
@@ -76,7 +76,8 @@ python scripts/test_windows_native.py `
   --output validation/legacy-0.2.1
 ```
 
-Repita em outro job com 0.1.0. Os hashes SHA 256 dos dois instaladores antigos
+Repita com 0.1.0 depois da limpeza própria comprovada, ou em outro job novo.
+Os hashes SHA 256 dos dois instaladores antigos
 estão fixados no helper e precisam conferir antes de sua execução. O perfil
 `%APPDATA%/bolha` precisa estar ausente no runner. Esse fluxo reproduz a
 instalação antiga real e seu registro no ambiente descartável; nunca usa
@@ -89,6 +90,17 @@ e arquivos locais: 470 neurônios, backup de migração, semente, aprendizado,
 sensores desligados, tamanho e retirada da camada web da instalação ativa.
 O cache legado é explicitamente `LOCALAPPDATA/bolha-updater`. Nenhuma dependência
 Node/npm/Playwright entra no instalador nativo.
+
+Após sucesso, o driver espera o PID Qt realmente encerrar: o relatório é
+gravado antes do fim do processo. Confere o nonce do perfil e do workspace,
+recusa links/junctions, verifica o inventário nativo e o GUID/caminho exatos
+no registro. Arquiva o perfil sintético como evidência, executa somente o
+desinstalador nativo daquela instalação e aguarda a remoção do registro.
+Só então remove o perfil criado por esse teste, permitindo executar a outra
+versão antiga no mesmo runner. Qualquer falha preserva os arquivos e interrompe
+o fluxo; um perfil ou registro já existente é recusado antes da instalação.
+O aprendizado da versão 0.1 permanece na sua pasta original, sem renomeação,
+para continuar acessível caso a instalação precise recuperar a versão antiga.
 
 ## Verificação sem Windows
 

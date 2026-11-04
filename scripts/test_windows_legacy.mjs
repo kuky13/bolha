@@ -15,7 +15,8 @@ assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted');
 assert.equal(process.env.RUNNER_OS, 'Windows');
 assert.notEqual(hostname().toLowerCase(), 'kukybook26');
 const request = JSON.parse(await readFile(process.argv[2], 'utf8'));
-const { installer, install, data, feed, targetVersion, output, playwrightRoot } = request;
+const { installer, install, data, feed, targetVersion, output, playwrightRoot, ownerToken } = request;
+assert.match(ownerToken, /^[a-f0-9]{32}$/);
 assert.equal(resolve(data).toLowerCase(), resolve(process.env.APPDATA, 'bolha').toLowerCase());
 assert.match(feed, /^http:\/\/127\.0\.0\.1:\d+\/$/);
 assert.equal(await access(data).then(() => true, () => false), false, 'Runner já contém dados da Bolha.');
@@ -37,6 +38,9 @@ assert.equal(setup.status, 0, 'Instalação legada falhou.');
 const executablePath = join(install, 'Bolha.exe');
 await access(executablePath);
 await mkdir(data, { recursive: true });
+await writeFile(join(data, '.bolha-legacy-validation.json'), JSON.stringify({
+  token: ownerToken, install: resolve(install), data: resolve(data), createdBy: 'bolha-legacy-validation',
+}), { flag: 'wx' });
 const deferral = join(data, 'update-deferred.json');
 await writeFile(deferral, JSON.stringify({ version: targetVersion, until: Date.now() + 3600000 }));
 const environment = { ...process.env, BOLHA_TEST: '1', BOLHA_TEST_STATUS: '1', BOLHA_TEST_ALLOW_STOP: '1',
@@ -104,7 +108,8 @@ try {
   const saved = await readJSON(join(data, 'config.json'));
   assert.equal(saved.preferences.avatarSize, 152);
   for (const key of ['senseApp', 'senseIdle', 'senseCursor', 'senseWindows']) assert.equal(saved.preferences[key], false);
-  const learned = await readJSON(join(data, 'brain', 'bolha', 'nervous.json'));
+  // O nome original é mantido para permitir recuperar a versão Electron antiga.
+  const learned = await readJSON(memoryPath);
   assert.equal(learned.seed, 1313);
   assert(learned.learned.PRESO.CALM > .04);
   const migration = await readJSON(join(data, 'native-migration.json'));
@@ -121,6 +126,7 @@ try {
   }, 25000);
   await writeFile(join(output, 'report.json'), JSON.stringify({ passed: true, mode: 'disposable-legacy',
     legacy: basename(installer), target: targetVersion, health, metrics,
+    memoryDirectory: basename(dirname(memoryPath)),
     preferencesPreserved: true, learningPreserved: true, migrationBackupVerified: true,
     installerCleaned: true }, null, 2));
   console.log('PASS Electron → Qt:', basename(installer), '→', targetVersion);

@@ -75,10 +75,8 @@ def prepare_data(data_dir):
                 raise OSError('A validação do backup falhou: '+str(relative))
             manifest[str(relative)] = digest
         atomic_json(backup / 'manifest.json', manifest)
-    # Compatibilidade com instalações anteriores ao nome Bolha, sem sobrescrever memória nova.
-    legacy = brain / 'drippy'
-    if legacy.is_dir() and not (brain / 'bolha').exists():
-        legacy.rename(brain / 'bolha')
+    # Mantém o caminho do aprendizado: uma recuperação pode reabrir a versão 0.1.
+    # O Game lê a pasta original sem converter ou copiar uma memória que possa ficar obsoleta.
     brain.mkdir(exist_ok=True)
     atomic_json(marker, {'schemaVersion':SCHEMA,'backup':str(backup) if backup else None,
                          'files':manifest,'completedAt':time.time()})

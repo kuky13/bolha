@@ -44,6 +44,9 @@ processo iniciado pelo instalador pode ser encerrado na recuperação.
 Depois do primeiro desenho e ciclo do cérebro saudáveis, arquivos nativos do
 backup com hashes conhecidos são removidos. Arquivos alterados/desconhecidos e
 a instalação Electron anterior são preservados e registrados localmente.
+A pasta original de aprendizado não é renomeada na atualização: perfis da 0.1
+continuam no caminho legado, e perfis novos/0.2 usam `brain/bolha`. Assim uma
+recuperação da 0.1 lê os mesmos arquivos, incluindo aprendizado salvo depois.
 APPDATA nunca é apagado pelo instalador/desinstalador. A desinstalação também
 preserva arquivos não inventariados dentro da pasta do aplicativo.
 

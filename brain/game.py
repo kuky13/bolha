@@ -37,13 +37,6 @@ class Game:
     def __init__(self, data_dir, content_dir):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        # Única referência ao nome anterior: migração atômica preserva toda a memória.
-        legacy = self.data_dir / 'drippy'
-        if legacy.is_dir() and not (self.data_dir / 'bolha').exists():
-            import shutil
-            backup=self.data_dir/'backups'/('legacy-'+str(time.time_ns()))
-            shutil.copytree(legacy,backup)
-            legacy.rename(self.data_dir / 'bolha')
         self.objects = {}
         self.next_id = 1
         set_scene(self)
@@ -68,7 +61,12 @@ class Game:
         self.activity = 'IDLE'
         self.idle = 0.
         self.last_native = self.last_save = self.last_think = 0.
-        self.pet_paths = PetPaths(self.data_dir / 'bolha')
+        memory = self.data_dir / 'bolha'
+        legacy = self.data_dir / 'drippy'
+        # Conserva o caminho original para a versão anterior continuar lendo após recuperação.
+        if not memory.exists() and legacy.is_dir():
+            memory = legacy
+        self.pet_paths = PetPaths(memory)
         self.conteudo = ConteudoPaths(Path(content_dir), Path(content_dir))
         self.prof = dict(config.PROFILES['normal'])
         self.brain = LIFBrain(seed=1313, temperament={'CURIOUS': 1.3, 'PLAYFUL': 1.2, 'DRAG->FRUSTRATION': 0.45})
@@ -294,6 +292,8 @@ class Game:
             backup.parent.mkdir(parents=True,exist_ok=True)
             os.replace(self.pet_paths.base,backup)
             clear_protection_after_backup(self.pet_paths.base)
+        # Reinicia a memória escolhida, sem cair numa pasta legada antiga após o backup.
+        self.pet_paths.base.mkdir(parents=True,exist_ok=True)
         self.__init__(self.data_dir, self.conteudo.proprio)
         self.panicked = panicked
         self.configure(preferences)

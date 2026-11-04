@@ -61,3 +61,27 @@ def test_aviso_automatico_de_update_preserva_foco_e_adia(qt_application):
     assert deferred==['deferred']
     dialog.close()
     assert deferred==['deferred','deferred']  # fechar o aviso também adia
+
+
+def test_falha_apos_primeiro_ciclo_nao_confirma_atualizacao(qt_application,tmp_path):
+    from collections import deque
+    import queue
+    import time
+    from PySide6.QtCore import QTimer
+    from bolha.app import NativeApp
+    confirmed=[]
+    frame=QTimer();frame.start(1000)
+    controller=SimpleNamespace(quitting=False,updating=False,last_tick=time.monotonic(),
+        frame_times=deque(),frame=frame,first_paint=True,first_think=False,healthy=False,
+        initial_errors=[],data_dir=tmp_path,update_dialog=None,updater=None,
+        store=SimpleNamespace(preferences={'senseCursor':False},error=''),
+        writer=SimpleNamespace(errors=queue.SimpleQueue(),failure=None),warn=lambda *_:None,
+        _health=confirmed.append)
+    controller.game=SimpleNamespace(body=SimpleNamespace(x=0,y=0),
+        tick=lambda *_:setattr(controller,'first_think',True))
+    def broken_sync():raise RuntimeError('falha de desenho')
+    controller.pet=SimpleNamespace(sync=broken_sync)
+    NativeApp.tick(controller)
+    assert controller.first_think and controller.first_paint and not frame.isActive()
+    NativeApp.poll(controller)
+    assert not controller.healthy and not confirmed
