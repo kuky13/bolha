@@ -11,8 +11,10 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-O instalador da 0.3.1 ainda aguarda compilação e validação Windows. Veja
-[o estado desta versão](docs/VALIDATION-EXPRESSIONS.md).
+A 0.3.1 tem instalador de teste compilado no CI Windows. A atualização real
+0.3.0 → 0.3.1 e os ensaios dirigidos passaram; a revisão manual prolongada
+continua pendente, sem release publicada. Resultados e limites estão em
+[validação da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
