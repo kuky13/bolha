@@ -1,58 +1,150 @@
-# Candidata de teste 0.3.2: correção da pega
+# Validação da pega e impulso 0.3.2
 
-A fonte **0.3.2** prepara a correção da pega no
-[PR #2](https://github.com/kuky13/bolha/pull/2). A versão pública permanece
-**0.3.0**. Esta nota registra a intenção da candidata e as evidências ainda
-necessárias para avaliá-la no Windows.
+A fonte **0.3.2** (`ddcfa901f5be5e0fda5c92c9af1aff39d8eb944c`) corrige a perda
+de pega no arrasto e restaura o arremesso com impulso do mouse na personagem e
+nos brinquedos no [PR #2](https://github.com/kuky13/bolha/pull/2). A versão
+pública permanece **0.3.0**; esta etapa produz e valida artefatos candidatos de
+teste, sem criar tag ou publicar release.
 
-## Comportamento pretendido
+## Comportamento implementado
 
-- Manter a Bolha presa ao ponteiro enquanto o botão da pega estiver pressionado,
-  inclusive ao mover o mouse rapidamente ou para fora da janela do pet.
-- Encerrar a pega quando o botão for solto. Parado, liberar a gravidade;
-  em movimento, conservar o impulso recente para arremessar a Bolha e o
-  amendoim/bolinha, com força semelhante ao Pestinha e velocidade limitada.
-  Perda de captura com o botão físico pressionado conserva a pega;
-  cancelamentos explícitos devem limpar a interação sem arremesso.
-- Reduzir a oscilação visual durante a pega para até **3% de deformação** e
-  **1,5° de rotação extra**, sem deslocar o centro visual. Olhos, orelhas e
-  risquinhos continuam mostrando irritação gradual modulada pelo cérebro.
+- **Pega firme até a soltura física**: a Bolha e o brinquedo permanecem presos
+  no deslocamento exato do clique (`grab_offset`) enquanto o botão primário
+  físico do mouse estiver pressionado, mesmo quando o cursor sai rapidamente da
+  janela ou ocorre perda da captura nativa Win32. O estado físico do botão é
+  verificado no ciclo existente de 16 ms antes da física, sem hooks globais,
+  temporizador extra ou ativação da janela.
+- **Arremesso em movimento e queda parada**: soltar em movimento arremessa
+  tanto a **Bolha** quanto o **amendoim/bolinha** com base nas amostras dos
+  últimos **120 ms**, ignorando tremores abaixo de **4 DIP**, limitando a
+  velocidade em **±2500 DIP/s** e aplicando giro proporcional (`vx * 0,35`),
+  como no Pestinha. Soltar parado — ou após pausa superior à janela de 120 ms —
+  libera apenas a gravidade com velocidade zero.
+- **Autoridade física e cancelamento limpo**: o `Game` continua sendo a única
+  autoridade para a física e aciona o estímulo neural `THROW` nos arremessos. A
+  inércia aérea prossegue mesmo com o passeio automático (`roaming`) desligado.
+  Cancelamento explícito, ocultação, menu de contexto ou falha ao consultar o
+  dispositivo descartam qualquer impulso acumulado e limpam o estado de hover.
+- **Pose segura e expressões preservadas**: enquanto a Bolha é segurada, a
+  oscilação visual fica limitada a **3% de deformação** e **1,5° de rotação
+  extra**, sem deslocar o centro visual. O desenho sem boca aprovado e todas as
+  expressões da 0.3.1 permanecem ativos.
 
-Sono, manias e reações após soltar mantêm o comportamento existente. A correção
-usa o ciclo atual do aplicativo; não acrescenta um temporizador de animação.
+## Fonte, testes automatizados e prévias Qt offscreen
 
-## Versão e histórico
+No commit `ddcfa901f5be5e0fda5c92c9af1aff39d8eb944c`:
 
-`bolha/__init__.py` e `pyproject.toml` identificam a fonte como **0.3.2**.
-O empacotamento existente grava a versão em `bolha-version.json`; o executável
-instalado lê esse recurso. O workflow existente calcula **0.3.3** como próxima
-fixture de atualização para uma compilação desta candidata.
+- **Suíte local (Linux, Qt offscreen)**: **329 testes passaram** e **11 foram
+  pulados** por dependerem de Windows/PowerShell.
+- **Suíte completa no CI Windows
+  ([execução 41819941659](https://github.com/kuky13/bolha/actions/runs/41819941659))**:
+  **340 testes passaram** em 57,75 s (incluindo os 11 testes específicos de
+  Windows/PowerShell).
+- **Prévias Qt offscreen da fonte `ddcfa90`**: três GIFs de 252 quadros a 30 fps
+  (8,4 s cada) verificaram **9 trajetórias** calculadas pelo `Game.tick` a 60 Hz
+  para a Bolha, o amendoim e a bolinha original (soltura parada, arremesso
+  rápido e movimento com parada antes de soltar).
 
-A **fixture 0.3.2** descrita no
-[histórico da 0.3.1](VALIDATION-EXPRESSIONS.md) reutilizou o bundle daquela
-versão, alterando a identificação para testar a atualização. Seus resultados
-continuam vinculados à fonte e aos artefatos da 0.3.1. Esta candidata 0.3.2
-contém código novo e exige resultados próprios.
+Os testes automatizados cobrem preservação do ponto de clique, continuidade da
+pega após perda de captura, janela de 120 ms de amostras, filtro de tremor de
+4 DIP, teto de ±2500 DIP/s, giro `vx * 0,35`, queda sem impulso após pausa ou
+cancelamento, inércia aérea com passeio desligado, estímulo neural `THROW` e
+limites da pose enquanto segurada.
 
-## Evidência atual e pendências
+## Instalador 0.3.2 e CI Windows
 
-Os testes locais de pose usam Qt offscreen e verificam limites durante pegadas
-longas, progressão da irritação, ausência de offsets de posição e geometria
-da personagem sem boca. Eles não comprovam captura nativa, instalação ou uso
-real no Windows.
+A [execução manual 41819941659](https://github.com/kuky13/bolha/actions/runs/41819941659)
+(job `126540233995`) compilou e auditou a fonte `ddcfa901f5be5e0fda5c92c9af1aff39d8eb944c`
+com `publish_release=false` e `legacy_validation=false` (as migrações Electron
+0.1.0 e 0.2.1 foram validadas na 0.3.1 e não foram repetidas para este ajuste
+de física; nenhuma release foi publicada). A execução anterior `41815614806`,
+anterior ao ajuste final de impulso, foi cancelada e descartada.
 
-Permanecem pendentes para esta candidata:
+| Artefato 0.3.2 | Tamanho | SHA-256 |
+|---|---:|---|
+| `Bolha-Setup-0.3.2-x64.exe` | 34.776.704 bytes | `51386c64f8d2f03298a285af607a94cc7848cae11e9d91a3c9529443b5f096d6` |
+| `latest.yml` | 362 bytes | `6a995d66b810cf65ccffa613c55aa4d5259aff4dfb7f814020f565c8f92088b6` |
+| `THIRD-PARTY-NOTICES.txt` | 1.661 bytes | `7925a0bb5df9b59347a4c753af020f037465854ff474659f181c36cfb69de166` |
+| `SHA256SUMS.txt` | 262 bytes | `40c367c6a0fb80814c1b7bb90c649bf64d1cc65b6dd48009886ec552b1965578` |
 
-- Compilar e auditar o instalador 0.3.2 no Windows, vinculando os artefatos ao
-  commit exato testado e conferindo os checksums.
-- Validar instalação e atualização com perfis isolados, preservando
-  preferências, semente e aprendizado.
-- Conferir a pega pela entrada real no Windows: movimento rápido, saída da
-  janela, soltura fora dela, cancelamento, perda de captura e botão primário
-  invertido. Conferir também foco e passagem de cliques na área transparente.
-- Avaliar manualmente a firmeza do gesto, as expressões e as reações ao soltar,
-  além dos cenários prolongados e com múltiplos monitores já pendentes.
+O SHA-512 em `latest.yml`
+(`AK8oEe/WxT7fNTFPLxnUf6SKgEI6B0Sz7e63DKeSYrdJheYB4GF9ykltGjY1BOBxNAw6IRo4HEnW++RN1ocxZg==`),
+o tamanho (`34776704`) e a versão (`0.3.2`) foram conferidos contra o binário.
+O workflow reempacotou a fixture **0.3.3** sem recompilar o aplicativo apenas
+para exercitar o atualizador no runner; essa fixture não é entregue como versão.
+A fixture homônima `0.3.2` usada anteriormente no
+[histórico da 0.3.1](VALIDATION-EXPRESSIONS.md) continha o código `1dd7277` e
+permanece separada desta candidata.
 
-Não há validação Windows atual registrada para a fonte 0.3.2 nesta nota.
-Compilação e publicação dependem de etapas posteriores; esta preparação não
-cria tag nem release.
+No runner Windows descartável (`Windows-10-10.0.26100-SP0`), passaram os **dez
+cenários** de instalação e atualização nativa **0.3.2 → fixture 0.3.3** em
+ambiente isolado (`registryUnchanged: true`):
+
+| Cenário no CI Windows | Resultado |
+|---|---|
+| Preservação de diretório com arquivos de terceiros | PASS |
+| Instalação limpa em diretório vazio existente (470 neurônios, RSS 77,95 MiB, quadro p95 16,0 ms, cérebro p95 5,94 ms) | PASS |
+| Checksum inválido rejeitado, aplicativo continua aberto | PASS |
+| Download interrompido rejeitado, aplicativo continua aberto | PASS |
+| Adiamento de uma hora persistido | PASS |
+| Reinício offline usa atualização pendente verificada | PASS |
+| Instalador em cache adulterado rejeitado | PASS |
+| Falha ao iniciar a versão nova restaura a instalação anterior | PASS |
+| Atualização automática após 30 segundos e limpeza (470 neurônios, RSS 80,12 MiB, quadro p95 16,0 ms, cérebro p95 5,54 ms) | PASS |
+| Preferências, semente, aprendizado e registro preservados | PASS |
+
+## Fonte `ddcfa90` no Windows real (`SendInput`)
+
+Em hardware Windows real (um único monitor **1920×1080 a 125%**, equivalente a
+**1536×864 DIP** no Qt), a fonte `ddcfa901f5be5e0fda5c92c9af1aff39d8eb944c` foi
+validada com injeção nativa `SendInput` do Windows direcionada somente às
+janelas Qt temporárias do próprio ensaio, mantendo `NativeApp.tick` real e seu
+`QTimer` de 16 ms ativos. **5/5 casos passaram**:
+
+| Caso (`SendInput` real na fonte `ddcfa90`) | Amostras seguradas | Eventos `QtRelease` | Velocidade na soltura (`vx, vy, spin`) | Resultado |
+|---|---:|---:|---|---|
+| `rapid` — flick rápido na Bolha | 19 | 1 | `1930,275`, `-1431,193`, `675,596` | PASS |
+| `quiet-release` — movimento e pausa > 200 ms | 32 | 1 | `0,0`, `0,0`, `0,0` | PASS |
+| `hold` — segurar imóvel por 5 s | 324 | 1 | `0,0`, `0,0`, `0,0` | PASS |
+| `peanut` — flick rápido no amendoim | 17 | 1 | `1930,275`, `-1431,193`, `675,596` | PASS |
+| `outside-release` — perda de captura + subida sem `QtRelease` | 92 | 0 | `0,0`, `0,0`, `0,0` | PASS |
+
+Notas de escopo e integridade desse ensaio:
+
+- **Fault injection declarada**: o caso `outside-release` força `ReleaseCapture`
+  de forma controlada e retém `WM_LBUTTONUP` no filtro da fixture enquanto o
+  botão físico sobe via `SendInput`; o aplicativo mantém a pega enquanto o botão
+  está pressionado e encerra a interação por polling quando o botão sobe, sem
+  depender do evento Qt de soltura. Isso comprova o mecanismo de recuperação,
+  não uma reprodução espontânea da falha relatada.
+- **Fixture da fonte vs. executável instalado**: o ensaio acima executa o código
+  real de `Game`, `PetWindow`, cena e `NativeApp.tick` a partir da árvore de
+  código, com controlador mínimo (sem `NativeApp.__init__`, atualizador ou
+  atalho global) e sensores opcionais desligados. Ele não substitui o teste do
+  executável empacotado `Bolha.exe`.
+- **Preservação verificada**: o perfil real do usuário, o arquivo de saúde, o
+  fingerprint das chaves Bolha no registro, os arquivos versionados e a janela
+  em foco permaneceram inalterados; todos os processos de teste encerraram ao
+  final e as capturas usaram apenas `QWidget.grab()` dos widgets próprios.
+- **Separação histórica**: um ensaio anterior no commit `c1e0f80` testou a
+  continuidade após perda de captura ainda sob a regra antiga de velocidade
+  zero; seus resultados são mantidos separados e não representam a física final
+  de `ddcfa90`.
+
+## Limites e pendências
+
+- **Executável empacotado e atualização `0.3.1 → 0.3.2` no notebook físico**:
+  o instalador `Bolha-Setup-0.3.2-x64.exe` passou pela auditoria e pelos 10
+  cenários de instalação/atualização no CI Windows, mas os probes locais no
+  notebook físico contra o entrypoint empacotado (`Bolha.exe` instalado com
+  `/TEST`) e a regressão `0.3.1 → 0.3.2` em máquina física ainda não foram
+  executados nesta entrega (o canal de execução remota ao dispositivo não estava
+  disponível na sessão de fechamento). Portanto, o binário instalado 0.3.2 não é
+  declarado como validado por `SendInput` fora do CI.
+- **Hardware e múltiplos monitores**: os testes em Windows físico ocorreram em
+  **um único monitor 1920×1080 a 125% de escala**; **dois monitores físicos**,
+  escalas diferentes entre telas e transição de monitor durante o arrasto
+  continuam pendentes.
+- **Uso manual prolongado**: permanecem pendentes a avaliação manual prolongada
+  da sensação do arremesso, botão primário invertido no Windows e medição de
+  desempenho de longa duração.

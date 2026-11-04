@@ -11,12 +11,15 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A 0.3.2 prepara a correção da pega e uma animação mais firme enquanto a Bolha
-é segurada, como candidata de teste do [PR #2](https://github.com/kuky13/bolha/pull/2).
-A versão pública continua **0.3.0**. Compilação, instalação e entrada reais no
-Windows desta candidata aguardam evidência própria; veja a
-[validação da pega 0.3.2](docs/VALIDATION-GRAB.md). Os resultados anteriores
-permanecem no [histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
+A 0.3.2 traz a correção da pega, uma pose mais firme enquanto a Bolha é segurada
+e o arremesso com impulso recente do mouse na personagem e no brinquedo, como
+candidata de teste do [PR #2](https://github.com/kuky13/bolha/pull/2). A versão
+pública continua **0.3.0**. O instalador de teste foi compilado e validado no CI
+Windows e a fonte `ddcfa90` passou nos cinco casos reais de `SendInput` no
+Windows; o ensaio do executável empacotado em máquina física, o uso manual
+prolongado e dois monitores físicos permanecem pendentes. Veja a
+[validação da pega 0.3.2](docs/VALIDATION-GRAB.md) e o
+[histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
