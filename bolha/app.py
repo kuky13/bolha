@@ -252,7 +252,9 @@ class NativeApp:
         if phase=='error':self.warn('Atualização: '+str(state.get('error',state.get('message','não foi possível concluir'))))
     def show_update_countdown(self,remaining):
         if self.update_dialog is None:
-            dialog=QDialog();dialog.setWindowTitle('Atualização da Bolha');layout=QVBoxLayout(dialog)
+            dialog=QDialog(None,Qt.Tool|Qt.WindowStaysOnTopHint)
+            dialog.setAttribute(Qt.WA_ShowWithoutActivating)
+            dialog.setWindowTitle('Atualização da Bolha');layout=QVBoxLayout(dialog)
             self.update_label=QLabel();layout.addWidget(self.update_label)
             button=QPushButton('Adiar por uma hora');button.clicked.connect(lambda:self.updater.defer());layout.addWidget(button)
             dialog.rejected.connect(lambda:self.updater.defer());self.update_dialog=dialog

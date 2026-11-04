@@ -164,13 +164,20 @@ class Fireworks(Item):
 
 class Ball(Item):
     def __init__(self, x, y, kind='ball', sprite=None):
-        super().__init__('paper' if kind == 'papel' else 'ball', 34, 34)
+        # Margem do desenho original, sem alterar o raio da física existente.
+        super().__init__('paper' if kind == 'papel' else 'ball', 42, 42)
         self.body = Body(x, y, 17, 17)
+        self.roll_angle = 0.0  # fase visual original em radianos, não é outro corpo
         self.dragging = False
         self.last_handled = -1e9
         self.place()
     def kick(self, vx, vy): self.body.jump(vx, vy)
     def handled_by_user(self, now): return self.dragging or now - self.last_handled < 1
     def step(self, dt, bounds, areas=None, monitors=None, displays=None):
-        if not self.dragging: self.body.step(dt, bounds, [], areas, monitors, displays)
+        if not self.dragging:
+            self.roll_angle += self.body.vx*dt*.8  # mesma rolagem do fallback GPL
+            self.body.step(dt, bounds, [], areas, monitors, displays)
         self.place()
+    def snapshot(self):
+        data=super().snapshot();data['angle']=math.degrees(self.roll_angle)
+        return data

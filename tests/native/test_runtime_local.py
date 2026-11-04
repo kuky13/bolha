@@ -41,3 +41,23 @@ def test_log_erro_de_leitura_vira_aviso(tmp_path,monkeypatch):
     def unavailable(*_args,**_kwargs):raise PermissionError('acesso negado')
     monkeypatch.setattr(Path,'open',unavailable)
     assert local_log_excerpt(tmp_path)=='[aviso] Log local indisponível: acesso negado'
+
+
+def test_aviso_automatico_de_update_preserva_foco_e_adia(qt_application):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QPushButton
+    from bolha.app import NativeApp
+    deferred=[]
+    controller=SimpleNamespace(update_dialog=None,updater=SimpleNamespace(defer=lambda:deferred.append('deferred')))
+    NativeApp.show_update_countdown(controller,30)
+    dialog=controller.update_dialog
+    assert dialog.windowFlags()&Qt.WindowType_Mask==Qt.Tool
+    assert dialog.windowFlags()&Qt.WindowStaysOnTopHint
+    assert dialog.testAttribute(Qt.WA_ShowWithoutActivating)
+    assert '30 segundos' in controller.update_label.text()
+    NativeApp.show_update_countdown(controller,17)
+    assert controller.update_dialog is dialog and '17 segundos' in controller.update_label.text()
+    dialog.findChild(QPushButton).click()
+    assert deferred==['deferred']
+    dialog.close()
+    assert deferred==['deferred','deferred']  # fechar o aviso também adia

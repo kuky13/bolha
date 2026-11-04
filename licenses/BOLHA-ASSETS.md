@@ -15,3 +15,9 @@ Essa condição é das artes e não acrescenta uma restrição não comercial ao
 código GPLv3. O código pode ser reutilizado sob a GPLv3 com artes substitutas.
 Os arquivos de renderização e a lógica do aplicativo em `bolha/` estão sob GPLv3;
 eles carregam os recursos visuais separados dessa pasta.
+
+Os desenhos Qt do notebook, da bolinha e da variante de papel em
+`bolha/objects.py` são derivados do código de Pestinha, de mille-okws e
+contribuidores, sob GPL-3.0-or-later. Eles não são artes próprias de André
+Ribeiro Lima e não estão sob a licença CC BY-NC descrita acima. Nenhuma
+fotografia PNG dos objetos de Pestinha integra esta distribuição.

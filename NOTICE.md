@@ -11,6 +11,11 @@ Fonte: https://github.com/mille-okws/pestinha
 Foram preservados o cérebro LIF, aprendizado, memória, necessidades, física
 e controladores. A versão 0.3 usa janelas Qt nativas e um único processo;
 acrescenta objetivos persistentes, rotina, desenho circular e controles locais.
+Os dois renderizadores de objetos em `bolha/objects.py` derivam dos desenhos
+Qt de reserva de `pestinha/world/notebook.py:_paint_desenho` e
+`pestinha/body/bolinha.py:paintEvent`: notebook, bolinha e variante de papel.
+Esses desenhos em código mantêm autoria de mille-okws e contribuidores e a
+licença GPL-3.0-or-later; não integram a licença CC BY-NC das artes próprias.
 Imagens, memes e pacotes de conteúdo do Pestinha não foram copiados.
 
 O avatar animado foi extraído do aplicativo desktop original, com autorização do

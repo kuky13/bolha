@@ -67,3 +67,30 @@ O build remove esse plugin e retira Qt6Network.dll somente depois de varrer os
 imports PE, inclusive os carregados com atraso, e confirmar que nenhum componente
 restante precisa dela. A auditoria recusa ambos no pacote final. O atualizador
 usa HTTPS da biblioteca padrão Python.
+
+### Validar e publicar em uma única execução
+
+A opção manual `publish_release` vem desligada. Para compilar, executar todos os
+testes (incluindo as duas migrações Electron) e publicar os mesmos arquivos ao
+final, use o branch que contém o código a publicar:
+
+```powershell
+gh workflow run windows.yml --repo kuky13/bolha --ref native/qt-0.3 -f legacy_validation=true -f publish_release=true
+```
+
+Não crie uma tag antecipadamente nesse fluxo. Somente o último passo, depois de
+todos os testes passarem, cria `v<versão>` e a release no SHA exato compilado.
+Se algum teste falhar, nenhuma tag ou release será criada. A opção de publicar
+força os testes legados mesmo se `legacy_validation` for desmarcada. Para apenas
+validar, omita `publish_release` ou use `false`.
+
+A publicação manual recusa uma tag existente; a criação de uma release existente
+falha sem sobrescrever arquivos. Não há `--clobber`, retag ou promoção de arquivos
+de outro commit. Um erro durante a própria publicação deve ser inspecionado antes
+de repetir, pois a API pode ter criado parte do resultado antes de uma falha de rede.
+A execução por tag permanece disponível e confere a identidade do commit remoto.
+
+O passo usa somente `github.token` como `GH_TOKEN`. Segundo a [documentação do
+GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow),
+um evento de push produzido por `GITHUB_TOKEN` não dispara outra execução do
+workflow de tags. Assim a publicação manual não recompila o mesmo aplicativo.

@@ -12,8 +12,11 @@ próprio notebook e aprende com suas interações.
 [Créditos](NOTICE.md)
 
 *Execução Qt capturada em Linux offscreen, com fundo composto para apresentar
-janelas transparentes. A validação em Windows é separada. Artes de André Ribeiro
-Lima (KukySolutions), sob [CC BY-NC 4.0](licenses/BOLHA-ASSETS.md).*
+janelas transparentes. A validação em Windows é separada. A personagem Bolha
+é arte própria de André Ribeiro Lima (KukySolutions), sob
+[CC BY-NC 4.0](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
+Qt de Pestinha, de mille-okws e contribuidores, sob
+[GPL-3.0-or-later](NOTICE.md).*
 
 ## O que acompanha
 

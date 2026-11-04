@@ -3,10 +3,11 @@
 import math
 import time
 from PySide6.QtCore import Qt,QRect,QRectF,QPointF
-from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath,QPolygonF
+from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath
 from PySide6.QtWidgets import QWidget,QMenu
 from .pet import FLAGS
 from .character import draw_character
+from .objects import paint_notebook,paint_ball,notebook_shape
 
 class ObjectWindow(QWidget):
     def __init__(self, scene, item):
@@ -18,15 +19,23 @@ class ObjectWindow(QWidget):
         self.setMouseTracking(True)
         self.offset=None;self.samples=[];self.press_position=None;self.dragged=False
         self.resize(round(item.width()),round(item.height()))
-        if item.kind in ('ball','paper'):self.setMask(QRegion(self.rect(),QRegion.Ellipse))
-        elif item.kind!='fireworks':
-            path=QPainterPath()
-            if item.kind=='notebook':
-                w,h=self.width(),self.height();path.addRoundedRect(QRectF(10,1,w-20,h-16),8,8)
-                path.addPolygon(QPolygonF([QPointF(12,h-20),QPointF(w-12,h-20),QPointF(w,h-2),QPointF(0,h-2)]))
-            else:path.addRoundedRect(QRectF(self.rect()),8,8)
-            self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+        self._sync_mask()
+    def _sync_mask(self):
+        item=self.item
+        if item.kind=='fireworks':return
+        key=(self.width(),self.height(),self.devicePixelRatioF(),item.kind,item.working)
+        if key==getattr(self,'_mask_key',None):return
+        if item.kind in ('ball','paper'):
+            radius=item.body.half_w+1
+            mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
+        else:
+            if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()),item.working)
+            else:
+                path=QPainterPath();path.addRoundedRect(QRectF(self.rect()),8,8)
+            mask=QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(mask);self._mask_key=key
     def sync(self):
+        self._sync_mask()
         item=self.item;data=item.snapshot()
         self.move(round(data['x']-self.width()/2),round(data['y']-self.height()/2))
         visible=item.isVisible() and self.scene.game.visible()
@@ -71,13 +80,10 @@ class ObjectWindow(QWidget):
         p=QPainter(self);p.setRenderHint(QPainter.Antialiasing)
         w,h=self.width(),self.height();kind=self.item.kind
         if kind in ('ball','paper'):
-            p.setPen(QPen(QColor('#b89aff'),2));p.setBrush(QColor('#6958a8' if kind=='ball' else '#eee4d6'));p.drawEllipse(QRectF(2,2,w-4,h-4))
-            p.setPen(QPen(QColor('#c9b9ff'),2));p.drawArc(QRectF(8,2,w-12,h-4),90*16,180*16)
+            paint_ball(p,w/2,h/2,radius=self.item.body.half_w,
+                       angle=self.item.roll_angle,paper=kind=='paper')
         elif kind=='notebook':
-            p.setPen(QPen(QColor('#6b657e'),4));p.setBrush(QColor('#26232f'));p.drawRoundedRect(QRectF(12,3,w-24,h-20),7,7)
-            p.setPen(QColor('#ffcf60'));p.setFont(QFont('Segoe UI',18));p.drawText(QRectF(15,20,w-30,35),Qt.AlignCenter,'♡')
-            p.setFont(QFont('Segoe UI',8));p.setPen(QColor('#b9acd9'));p.drawText(QRectF(15,63,w-30,20),Qt.AlignCenter,'meu cantinho' if not self.item.working else 'bolha trabalhando')
-            p.setPen(Qt.NoPen);p.setBrush(QColor('#777184'));p.drawPolygon(QPolygonF([QPointF(12,h-18),QPointF(w-12,h-18),QPointF(w,h-4),QPointF(0,h-4)]))
+            paint_notebook(p,QRectF(self.rect()),self.item.working)
         elif kind=='fireworks':
             age=max(0,3.2-(self.item.until-time.monotonic()))
             for burst in range(4):

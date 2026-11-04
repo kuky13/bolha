@@ -3,6 +3,7 @@
 Os drivers **não compilam, baixam ou publicam** instaladores. A execução real
 exige Windows e os artefatos previamente compilados. Os testes dos helpers
 podem rodar em Linux sem executar arquivos `.exe`.
+Use Python 3.11 x64 para reproduzir o ambiente de validação do projeto.
 
 ## Fluxo nativo isolado
 
