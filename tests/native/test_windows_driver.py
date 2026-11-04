@@ -3,12 +3,14 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 from urllib.error import HTTPError
 from http.client import IncompleteRead
 from urllib.request import urlopen
 
 import pytest
-from scripts.test_windows_native import Feed, installer_version, legacy_allowed, read_json, test_environment as environment, write_json
+from scripts.test_windows_native import (Feed, NativeValidation, installer_version,
+    legacy_allowed, read_json, test_environment as environment, validate_metrics, write_json)
 
 
 def test_legacy_never_runs_on_notebook_and_needs_hosted_runner():
@@ -61,3 +63,31 @@ def test_names_and_atomic_report(tmp_path):
     write_json(path, {'local':'memória ♡'})
     assert read_json(path) == {'local':'memória ♡'}
     assert not path.with_name(path.name+'.tmp').exists()
+
+
+def test_stale_or_base_metrics_never_validate_new_target_health():
+    health = dict(version='0.3.1', pid=222, ready=True, neurons=470)
+    current = dict(version='0.3.1', pid=222, healthy=True, neurons=470, frameCount=10, thinkCount=3)
+    assert validate_metrics(current, health) is current
+    for invalid in ({}, dict(current, version='0.3.0'), dict(current, pid=111),
+                    dict(current, healthy=False), dict(current, frameCount=0)):
+        with pytest.raises(AssertionError):
+            validate_metrics(invalid, health)
+
+
+def test_reused_output_removes_previous_runtime_report_before_launch(tmp_path):
+    base = tmp_path/'Bolha-Setup-0.3.0-x64.exe'
+    target = tmp_path/'Bolha-Setup-0.3.1-x64.exe'
+    base.write_bytes(b'MZbase')
+    target.write_bytes(b'MZtarget')
+    output = tmp_path/'reused-output'
+    write_json(output/'automatic-update-runtime.json', dict(version='0.3.1', pid=111, healthy=True))
+    validation = NativeValidation(base, target, output)
+    try:
+        env = validation.environment('automatic-update')
+        assert not Path(env['BOLHA_TEST_REPORT']).exists()
+        assert read_json(env['BOLHA_TEST_REPORT']) is None
+        with pytest.raises(AssertionError):
+            validate_metrics(read_json(env['BOLHA_TEST_REPORT']) or {}, dict(version='0.3.1',pid=222,ready=True,neurons=470))
+    finally:
+        shutil.rmtree(validation.root)

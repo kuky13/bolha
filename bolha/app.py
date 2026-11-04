@@ -261,7 +261,7 @@ class NativeApp:
     def metrics(self):
         import psutil
         def p95(values):return round(sorted(values)[max(0,int(len(values)*.95)-1)],2) if values else 0
-        return dict(version=VERSION,healthy=self.healthy,neurons=self.game.brain.N,frameP95Ms=p95(self.frame_times),
+        return dict(version=VERSION,pid=os.getpid(),healthy=self.healthy,neurons=self.game.brain.N,frameP95Ms=p95(self.frame_times),
                     thinkP95Ms=p95(self.think_times),frameMaxMs=max(self.frame_times,default=0),thinkMaxMs=max(self.think_times,default=0),
                     appRssMiB=round(psutil.Process().memory_info().rss/1048576,2),brainArrayMiB=round(self.game.brain_array_mib,3),
                     frameCount=len(self.frame_times),thinkCount=len(self.think_times),uptimeSeconds=round(time.monotonic()-self.started,2),errors=list(self.errors))

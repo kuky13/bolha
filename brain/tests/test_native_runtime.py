@@ -183,6 +183,7 @@ def test_app_health_dialogo_reaberto_e_cursor_desligado(qapp,tmp_path,monkeypatc
     deadline=time.monotonic()+1
     while time.monotonic()<deadline:qapp.processEvents();time.sleep(.002)
     assert controller.healthy and not controller.errors
+    assert controller.metrics()['pid']==os.getpid()>0
     controller.show_settings();qapp.processEvents();controller.dialogs[0].close();qapp.processEvents()
     assert not controller.game.panel
     controller.show_settings();assert controller.game.panel

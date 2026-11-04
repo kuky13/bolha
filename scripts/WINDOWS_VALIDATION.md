@@ -55,6 +55,10 @@ JSON, métricas e dados sintéticos de verificação ficam em `--output`. Por
 padrão, o workspace temporário é removido após sucesso; em erro ele é retido.
 `--keep-workspace` preserva uma execução bem sucedida para inspeção.
 
+Cada lançamento remove seu relatório anterior. O relatório de encerramento só
+é aceito quando versão e PID coincidem com a abertura saudável observada;
+métricas da versão base ou de uma execução anterior não validam o alvo.
+
 ## Migração Electron para Qt
 
 **Proibido no kukybook26 e em máquinas pessoais.** Execute somente em um

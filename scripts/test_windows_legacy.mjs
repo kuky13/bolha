@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { readFile, writeFile, access, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, access, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
 import { join, basename, dirname, resolve } from 'node:path';
@@ -57,6 +57,7 @@ async function waitFor(description, predicate, timeout = 120000) {
   throw new Error(description);
 }
 async function launch() {
+  await rm(environment.BOLHA_TEST_REPORT, { force: true });
   const app = await electron.launch({ executablePath, env: environment, timeout: 60000 });
   opened.push(app);
   const page = await app.firstWindow();
@@ -116,7 +117,7 @@ try {
   await writeFile(join(data, 'test-stop.request'), 'isolated migration validated');
   const metrics = await waitFor('A versão Qt não encerrou com relatório.', async () => {
     const report = await readJSON(environment.BOLHA_TEST_REPORT);
-    return report.version === targetVersion && report.healthy && report;
+    return report.version === targetVersion && report.pid === health.pid && report.healthy && report;
   }, 25000);
   await writeFile(join(output, 'report.json'), JSON.stringify({ passed: true, mode: 'disposable-legacy',
     legacy: basename(installer), target: targetVersion, health, metrics,

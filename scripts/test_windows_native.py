@@ -239,6 +239,15 @@ def process_cpu_seconds(pid):
         kernel.CloseHandle(handle)
 
 
+def validate_metrics(metrics, health):
+    assert health.get('ready') is True and health.get('neurons') == 470
+    assert metrics.get('version') == health.get('version'), 'Relatório pertence a outra versão.'
+    assert type(metrics.get('pid')) is int and metrics['pid'] == health.get('pid'), 'Relatório pertence a outra execução.'
+    assert metrics.get('healthy') is True and metrics.get('neurons') == 470, 'Relatório saudável ausente.'
+    assert metrics.get('frameCount', 0) > 0 and metrics.get('thinkCount', 0) > 0
+    return metrics
+
+
 class NativeValidation:
     def __init__(self, installer, target, output, keep=False):
         self.installer, self.target = Path(installer).resolve(), Path(target).resolve()
@@ -266,6 +275,7 @@ class NativeValidation:
 
     def environment(self, scenario, feed=None):
         self.current_report = self.output/(scenario+'-runtime.json')
+        self.current_report.unlink(missing_ok=True)
         return test_environment(self.data, self.install, self.current_report, feed)
 
     def install_package(self, package, environment, force=False, success=True):
@@ -310,9 +320,7 @@ class NativeValidation:
             if process.poll() is not None:
                 process.wait()
         metrics = read_json(self.current_report) or {}
-        assert metrics.get('healthy') is True and metrics.get('neurons') == 470, 'Relatório de execução saudável ausente.'
-        assert metrics.get('frameCount', 0) > 0 and metrics.get('thinkCount', 0) > 0
-        return metrics
+        return validate_metrics(metrics, health)
 
     def preserved(self):
         preferences = read_json(self.data/'config.json')['preferences']
