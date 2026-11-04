@@ -133,18 +133,26 @@ Notas de escopo e integridade desse ensaio:
 
 ## Limites e pendências
 
-- **Executável empacotado e atualização `0.3.1 → 0.3.2` no notebook físico**:
-  o instalador `Bolha-Setup-0.3.2-x64.exe` passou pela auditoria e pelos 10
-  cenários de instalação/atualização no CI Windows, mas os probes locais no
-  notebook físico contra o entrypoint empacotado (`Bolha.exe` instalado com
-  `/TEST`) e a regressão `0.3.1 → 0.3.2` em máquina física ainda não foram
-  executados nesta entrega (o canal de execução remota ao dispositivo não estava
-  disponível na sessão de fechamento). Portanto, o binário instalado 0.3.2 não é
-  declarado como validado por `SendInput` fora do CI.
-- **Hardware e múltiplos monitores**: os testes em Windows físico ocorreram em
-  **um único monitor 1920×1080 a 125% de escala**; **dois monitores físicos**,
-  escalas diferentes entre telas e transição de monitor durante o arrasto
-  continuam pendentes.
+- **Divergência na instalação `/TEST` e runtime empacotado pendente no notebook físico**:
+  após transferir e conferir o arquivo de artefato (`34.780.137` bytes, SHA-256
+  `64735d98...`) e o instalador `Bolha-Setup-0.3.2-x64.exe` (`34.776.704` bytes,
+  SHA-256 `51386c64f8d2f03298a285af607a94cc7848cae11e9d91a3c9529443b5f096d6`) no
+  notebook Windows físico, a tentativa de instalação isolada em modo `/TEST`
+  retornou código `2` antes de criar o diretório de destino, sem saída em
+  `stdout`/`stderr` e sem executar nenhum probe ou injeção de mouse. Uma segunda
+  tentativa isolada via `subprocess` em Python (lista `argv`, `BOLHA_TEST=1` e
+  novos diretórios de dados e instalação) também retornou código `2`, embora os
+  diretórios ancestrais do caminho de teste tenham sido verificados sem
+  `ReparsePoint`. A causa do código `2` no notebook permanece indeterminada e a
+  sessão remota foi encerrada porque o usuário precisou sair e desligar o
+  equipamento (com a instalação, o perfil e o registro reais preservados). A
+  aprovação dos 10 cenários no runner do CI Windows não elimina essa divergência
+  local; portanto, **nenhum teste do executável empacotado 0.3.2 (`Bolha.exe`)
+  nem da atualização `0.3.1 → 0.3.2` no notebook físico é alegado**.
+- **Hardware e múltiplos monitores**: os testes da fonte em Windows físico
+  ocorreram em **um único monitor 1920×1080 a 125% de escala**; **dois monitores
+  físicos**, escalas diferentes entre telas e transição de monitor durante o
+  arrasto continuam pendentes.
 - **Uso manual prolongado**: permanecem pendentes a avaliação manual prolongada
   da sensação do arremesso, botão primário invertido no Windows e medição de
   desempenho de longa duração.

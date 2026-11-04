@@ -14,10 +14,13 @@ próprio notebook e aprende com suas interações.
 A 0.3.2 traz a correção da pega, uma pose mais firme enquanto a Bolha é segurada
 e o arremesso com impulso recente do mouse na personagem e no brinquedo, como
 candidata de teste do [PR #2](https://github.com/kuky13/bolha/pull/2). A versão
-pública continua **0.3.0**. O instalador de teste foi compilado e validado no CI
-Windows e a fonte `ddcfa90` passou nos cinco casos reais de `SendInput` no
-Windows; o ensaio do executável empacotado em máquina física, o uso manual
-prolongado e dois monitores físicos permanecem pendentes. Veja a
+pública continua **0.3.0**. O instalador de teste foi compilado e aprovado nos
+10 cenários do CI Windows e a fonte `ddcfa90` passou nos cinco casos reais de
+`SendInput` no Windows; no notebook físico, a instalação isolada em modo `/TEST`
+retornou código `2` antes de criar a pasta (causa ainda indeterminada, sessão
+interrompida ao desligar o equipamento), de modo que o runtime empacotado e a
+atualização `0.3.1 → 0.3.2` fora do CI, o uso manual prolongado e dois monitores
+físicos permanecem pendentes. Veja a
 [validação da pega 0.3.2](docs/VALIDATION-GRAB.md) e o
 [histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
 

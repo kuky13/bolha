@@ -37,8 +37,11 @@ controlada de captura sem evento Qt de soltura. No CI Windows
 ([execução 41819941659](https://github.com/kuky13/bolha/actions/runs/41819941659)),
 passaram os 340 testes automatizados, a auditoria do instalador
 `Bolha-Setup-0.3.2-x64.exe` e os dez cenários de instalação, atualização nativa
-(`0.3.2 → fixture 0.3.3`) e recuperação. O teste de `SendInput` no executável
-empacotado e a regressão `0.3.1 → 0.3.2` fora do CI, a avaliação manual
+(`0.3.2 → fixture 0.3.3`) e recuperação. No notebook físico, a tentativa de
+instalar a candidata em modo isolado `/TEST` retornou código `2` antes de criar
+a pasta (sem `ReparsePoint` nos diretórios ancestrais e com causa ainda
+indeterminada antes de o equipamento ser desligado); por isso, o runtime
+empacotado 0.3.2 e a regressão `0.3.1 → 0.3.2` fora do CI, a avaliação manual
 prolongada e a validação em dois monitores físicos continuam pendentes. Consulte
 [a validação da pega 0.3.2](VALIDATION-GRAB.md).
 
