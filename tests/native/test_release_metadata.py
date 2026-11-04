@@ -25,8 +25,15 @@ def test_metadata_preserves_electron_and_native_integrity_contracts(tmp_path):
 def test_package_audit_rejects_removed_runtime(tmp_path):
     (tmp_path/'Bolha.exe').write_bytes(b'app')
     internal=tmp_path/'_internal';internal.mkdir()
-    for name in ('bolha-version.json','THIRD-PARTY-NOTICES.txt','licenses/LICENSE','licenses/PYTHON-LICENSE.txt'):
+    for name in ('bolha-version.json','THIRD-PARTY-NOTICES.txt','licenses/LICENSE','licenses/PYTHON-LICENSE.txt',
+                 'PySide6/plugins/imageformats/qgif.dll'):
         path=internal/name;path.parent.mkdir(exist_ok=True,parents=True);path.write_text('fixture')
-    audit(tmp_path)
+    audit_json=tmp_path/'audit.json'
+    report=audit(tmp_path,audit_json)
+    assert report['gifDecoder']=='PySide6/plugins/imageformats/qgif.dll' and report['gifDecoderPresent'] is True
+    assert '"gifDecoderPresent": true' in audit_json.read_text(encoding='utf-8')
+    (internal/'PySide6/plugins/imageformats/qgif.dll').unlink()
+    with pytest.raises(ValueError,match='qgif.dll'):audit(tmp_path)
+    (internal/'PySide6/plugins/imageformats/qgif.dll').write_text('fixture')
     (internal/'Qt6WebEngineCore.dll').write_bytes(b'bad')
     with pytest.raises(ValueError,match='Componente removido'):audit(tmp_path)

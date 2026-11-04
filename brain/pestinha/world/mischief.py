@@ -33,6 +33,7 @@ class MischiefEngine:
         self.last_act = -1e9
         self.interval = 300.0
         self.max_objects = 3
+        self.online_reactions = True
         self.paths = conteudo                                 # ConteudoPaths: só o conteúdo deste pet e o comum
         self.notes = config.Notes(conteudo.notes)
         self.notes_sad = config.Notes(conteudo.notes_sad)       # bilhetes de quando ele está triste
@@ -55,10 +56,11 @@ class MischiefEngine:
             return []                                   # dormindo, nem pensar
         if emotion == "triste":                         # triste só cola bilhetes tristes
             return ["bilhete_triste", "nada"] if perms["bilhetes"] and self.notes_sad.has_lines() else []
+        online = perms.get("online_reactions", self.online_reactions)
         if working:                                     # programando sem estar sentado: meme de trabalho
-            trabalho = perms["memes"] and bool(config.list_images(self.paths.memes_trabalho))
+            trabalho = perms["memes"] and online and bool(config.list_images(self.paths.memes_trabalho) or self.paths.memes.exists())
             return ["meme_trabalho", "nada"] if trabalho else []
-        memes = perms["memes"] and config.meme_for(self.paths.memes, emotion) is not None
+        memes = perms["memes"] and online and config.meme_for(self.paths.memes, emotion) is not None
         notes = perms["bilhetes"] and bool(self.notes.lines or self.notes.pick())
         if emotion == "bravo":
             options = ((["meme_canto", "meme"] if memes else []) + (["bilhete_canto"] if notes else []))
@@ -87,15 +89,18 @@ class MischiefEngine:
 
     def _make(self, kind, emotion, small):
         """Monta o objeto da travessura: imagem, bilhete ou foto, conforme o tipo e a emoção."""
+        if kind in ("meme", "meme_trabalho") and not self.online_reactions:
+            return None
         if kind == "meme":
             path = config.meme_for(self.paths.memes, emotion)
-            thing = ImageThing(path, CORNER_MAX if small else MEME_MAX) if path else None
+            thing = ImageThing(path, CORNER_MAX if small else MEME_MAX, emotion=emotion, reaction_kind=kind) if path else None
         elif kind == "meme_trabalho":
             options = config.list_images(self.paths.memes_trabalho)
-            thing = ImageThing(random.choice(options), MEME_MAX) if options else None
+            path = random.choice(options) if options else config.meme_for(self.paths.memes, emotion)
+            thing = ImageThing(path, MEME_MAX, emotion=emotion, reaction_kind=kind) if path else None
         elif kind == "foto":
             path = config.random_photo(self.paths.fotos)
-            thing = ImageThing(path, MEME_MAX) if path else None
+            thing = ImageThing(path, MEME_MAX, emotion=emotion, reaction_kind=kind) if path else None
         else:
             notes = self.notes_sad if kind == "bilhete_triste" else self.notes
             text = notes.pick()
@@ -185,3 +190,9 @@ class MischiefEngine:
         """Tira todos os objetos da tela."""
         for thing in list(self.things):
             self._remove(thing)
+
+    def clear_memes(self):
+        """Remove apenas reações online de meme quando o recurso é desligado."""
+        for thing in list(self.things):
+            if getattr(thing, "kind", None) == "meme":
+                self._remove(thing)

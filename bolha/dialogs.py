@@ -16,7 +16,7 @@ import time
 from PySide6.QtCore import Qt, QTimer, QRectF, QPointF
 from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
     QScrollArea, QSpinBox, QTabWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QVBoxLayout, QWidget,
@@ -146,7 +146,17 @@ class SettingsDialog(QDialog):
 
     def _behavior_tab(self):
         layout = self._tab('Comportamento')
+        toy_form=QFormLayout()
+        self.toy_appearance=QComboBox()
+        self.toy_appearance.setAccessibleName('Aparência do brinquedo')
+        self.toy_appearance.addItem('Amendoim','peanut')
+        self.toy_appearance.addItem('Bolinha original','ball')
+        self.toy_appearance.currentIndexChanged.connect(self._dirty)
+        toy_form.addRow('&Brinquedo:',self.toy_appearance)
+        layout.addLayout(toy_form)
         self._check('mischiefEnabled', 'Trazer memes e bilhetes', layout)
+        self._check('onlineReactions', 'Buscar reações online (memes e GIFs sem salvar em disco)', layout,
+                    'Consulta ReactionGIFs e Nekos.best apenas com termos genéricos de humor; mídia fica só em memória.')
         form = QFormLayout()
         self.interval = self._spin(1, 30, ' min', 'Intervalo mínimo entre travessuras')
         self.object_limit = self._spin(1, 5, '', 'Máximo de objetos na tela')
@@ -155,6 +165,7 @@ class SettingsDialog(QDialog):
         layout.addLayout(form)
         self.checks['mischiefEnabled'].toggled.connect(self.interval.setEnabled)
         self.checks['mischiefEnabled'].toggled.connect(self.object_limit.setEnabled)
+        self.checks['mischiefEnabled'].toggled.connect(self.checks['onlineReactions'].setEnabled)
         self._check('adaptiveBehavior', 'Usar objetivos e aprendizado adaptativo', layout)
         self._check('learnRoutine', 'Aprender hábitos por horário', layout)
         layout.addWidget(_label('O aprendizado permanece neste computador. Desativar uma função preserva o que já foi aprendido.'))
@@ -172,6 +183,7 @@ class SettingsDialog(QDialog):
         ):
             self._check(key, text, layout, description)
             layout.addWidget(_label(description))
+        layout.addWidget(_label('Quando a busca de reações online está ativa em Comportamento, a Bolha envia apenas termos genéricos de humor em inglês para ReactionGIFs/Nekos.best e mantém imagens/GIFs somente em memória RAM.'))
         layout.addStretch()
 
     def _app_tab(self):
@@ -200,6 +212,7 @@ class SettingsDialog(QDialog):
     def _values(self):
         return dict({key: control.isChecked() for key, control in self.checks.items()},
                     avatarSize=self.avatar_size.value(), opacity=self.opacity.value()/100,
+                    toyAppearance=self.toy_appearance.currentData(),
                     mischiefInterval=self.interval.value()*60, maxObjects=self.object_limit.value())
 
     def _load(self, preferences, appearance_only=False):
@@ -209,12 +222,14 @@ class SettingsDialog(QDialog):
         self.avatar_size.setValue(int(values['avatarSize']))
         self.opacity.setValue(round(values['opacity']*100))
         if not appearance_only:
+            self.toy_appearance.setCurrentIndex(self.toy_appearance.findData(values['toyAppearance']))
             self.interval.setValue(max(1, round(values['mischiefInterval']/60)))
             self.object_limit.setValue(int(values['maxObjects']))
             for key, control in self.checks.items():
                 control.setChecked(values[key])
             self.interval.setEnabled(values['mischiefEnabled'])
             self.object_limit.setEnabled(values['mischiefEnabled'])
+            self.checks['onlineReactions'].setEnabled(values['mischiefEnabled'])
         rendered = self._values()
         for key in ('avatarSize', 'opacity') if appearance_only else rendered:
             self.baseline[key] = rendered[key]

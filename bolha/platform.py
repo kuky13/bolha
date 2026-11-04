@@ -3,6 +3,25 @@
 import ctypes
 import sys
 from PySide6.QtCore import QAbstractNativeEventFilter
+from PySide6.QtGui import QCursor,QGuiApplication
+
+
+class WindowsDragPointer:
+    """Só existe durante uma pega; posição em coordenadas lógicas do Qt."""
+    def __init__(self):
+        user32=ctypes.windll.user32
+        metrics=user32.GetSystemMetrics;metrics.argtypes=[ctypes.c_int];metrics.restype=ctypes.c_int
+        self.key=2 if metrics(23) else 1  # SM_SWAPBUTTON fixa o primário físico neste gesto.
+        self.state=user32.GetAsyncKeyState
+        self.state.argtypes=[ctypes.c_int];self.state.restype=ctypes.c_short
+
+    def sample(self):
+        return QCursor.pos(),bool(self.state(self.key)&0x8000)
+
+
+def drag_pointer():
+    if sys.platform=='win32' and QGuiApplication.platformName()=='windows':return WindowsDragPointer()
+    return None
 
 
 def set_app_id():

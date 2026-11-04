@@ -16,7 +16,7 @@ from pestinha.core.physics import Body
 from pestinha.body.behavior import Behavior
 from pestinha.body.pet_state import PetState
 from pestinha.body.brincadeira import Play
-from pestinha.body.toy import ToyTracker, bounce_off
+from pestinha.body.toy import ToyTracker, bounce_off, push_from_cursor
 from pestinha.mind.sleep import SleepController
 from pestinha.mind.mesa import MesaController, pull
 from pestinha.mind.protest_ctl import ProtestController
@@ -115,6 +115,16 @@ class Game:
         self.ball_stored = False
         self.request_refused = 0.
         self.prev_distance = None
+        self.cursor_toy_near = False
+        self.cursor_sample = None
+        self.cursor_velocity = (0., 0.)
+        self.last_toy_push = -1e9
+        self.next_toy_attention = 0.
+        self.held_since = None
+        self.release_reaction = {}
+        self.play_reaction = {}
+        self.last_play_attempt = None
+        self.next_play_scene = 0.
         self.senses_app = None
         self.native_error = None
         self.quiet_until = 0.
@@ -148,6 +158,10 @@ class Game:
 
     def configure(self, prefs):
         self.prefs.update(prefs)
+        if not self.prefs.get('senseCursor', True):
+            self._reset_cursor_motion()
+        if self.prefs.get('toyAppearance','peanut') in ('peanut','ball'):
+            self.ball.appearance=self.prefs.get('toyAppearance','peanut')
         self.intelligence.enabled = self.prefs.get('adaptiveBehavior', True)
         self.intelligence.learn_routine = self.prefs.get('learnRoutine', True)
         if not self.intelligence.enabled:
@@ -157,6 +171,8 @@ class Game:
         self.body.half_w = self.body.half_h = max(40., min(100., size))
         self.mischief.interval = self.prefs.get('mischiefInterval', 300)
         self.mischief.max_objects = self.prefs.get('maxObjects', 3)
+        self.mischief.online_reactions = self.prefs.get('onlineReactions', True)
+        if not self.prefs.get('onlineReactions', True): self.mischief_ctl.clear_memes()
         if not self.prefs.get('mischiefEnabled', True): self.mischief_ctl.clear()
         self.fit(self.body)
 
@@ -223,21 +239,39 @@ class Game:
     def interact(self, event):
         now = time.monotonic()
         kind = event.get('type')
-        if kind == 'panic': self.panicked = not self.panicked; self.save(); return
-        if kind == 'hide': self.hidden = bool(event.get('value')); return
+        if kind == 'panic':
+            self.panicked = not self.panicked
+            if self.panicked:self._cancel_holds(now)
+            self.save();return
+        if kind == 'hide':
+            self.hidden = bool(event.get('value'))
+            if self.hidden:self._cancel_holds(now)
+            return
         if kind == 'monitor':
             self.monitor_open = bool(event.get('value'))
             self.last_monitor_snapshot = -1.
             return
-        if kind == 'panel': self.panel = bool(event.get('value')); return
+        if kind == 'panel':
+            self.panel = bool(event.get('value'))
+            if self.panel: self._reset_cursor_motion()
+            return
         if kind == 'hover': self.hover = bool(event.get('value')); return
         if kind == 'reset-memory': self.reset_learning(); return
         if kind == 'cursor':
-            if self.prefs.get('senseCursor', True): self.cursor = (event['x'], event['y'])
+            if self.prefs.get('senseCursor', True):
+                self.cursor = (event['x'], event['y'])
+                self._track_cursor(now)
+            else:
+                self._reset_cursor_motion()
+            return
+        if kind == 'hold-end':
+            self._release_hold(now,event.get('cancelled',False) or self.panicked or self.hidden)
             return
         if self.panicked or self.hidden: return
         self.last_input = now
-        if kind in ('drag-start', 'drag', 'drag-end'):
+        if kind == 'hold-start':
+            self._start_hold(now)
+        elif kind in ('drag-start', 'drag', 'drag-end'):
             target = self.objects.get(str(event.get('id'))) if event.get('id') else None
             body = target.body if target and hasattr(target, 'body') else self.body
             if target and not hasattr(target, 'body'):
@@ -245,28 +279,39 @@ class Game:
                 target.place(event['x'], event['y'])
                 return
             body.held = kind != 'drag-end'
+            body.vx=body.vy=body.omega=0.
             body.x, body.y = event['x'], event['y']
             if target: target.dragging = body.held; target.last_handled = now
             else:
+                if kind!='drag-end':self._start_hold(now)
                 self.senses.set_dragging(body.held)
                 self.state.pressing = body.held
                 self.drives.touched('drag')
                 self.conditioning.outcome(now)
             self.fit(body)
             if kind == 'drag-end':
-                vx = max(-1800., min(1800., event.get('vx', 0)))
-                vy = max(-1800., min(1800., event.get('vy', 0)))
-                body.jump(vx, vy, vx * .12)
+                body.grounded=False;body.platform=None
                 if target is None:
-                    speed = math.hypot(vx, vy)
-                    self.senses.thrown(min(1., speed / 1800))
-                    self.drives.stimulate('throw')
+                    self._release_hold(now,event.get('cancelled',False))
+                if not event.get('cancelled') and (target is None or target.kind=='ball'):
+                    for axis in ('vx','vy'):
+                        value=event.get(axis,0.)
+                        setattr(body,axis,max(-2500.,min(2500.,value)) if type(value) in (int,float) and -math.inf<value<math.inf else 0.)
+                    body.omega=body.vx*.35
+                    speed=math.hypot(body.vx,body.vy)
+                    if target is None and speed>=700:
+                        self.senses.thrown(min(1.,speed/2000.))
+                        self.drives.stimulate('throw');self.drives.touched('throw')
+                        self.in_flight=True
         elif kind == 'poke':
             self.senses.poke(); self.drives.touched('poke'); self.drives.stimulate('poke'); self.memory.on_interaction(); self.conditioning.outcome(now)
             if self.sleep.asleep: self.sleep.wake(True)
         elif kind == 'caress':
             if self.intelligence.enabled: self.intelligence.feedback(.8, now)
             self.state.mark_caress(now); self.drives.touched('caress'); self.memory.on_interaction()
+            if self.release_reaction.get('until',0)>now:
+                self.release_reaction['until']=now+(self.release_reaction['until']-now)*.35
+                self.release_reaction['intensity']*=.5
         elif kind == 'quiet':
             self.intelligence.feedback(-.8, now)
             self.quiet_until = now+30
@@ -282,6 +327,122 @@ class Game:
         elif kind == 'dismiss':
             obj = self.objects.get(str(event.get('id')))
             if obj and obj.kind in ('meme','note','sign'): obj.clicked.emit(obj)
+
+    def _start_hold(self,now):
+        self.in_flight=False
+        if self.held_since is None:
+            self.held_since=now
+            self.release_reaction={}
+            self.drives.touched('drag')
+            if self.mesa.sentado:
+                self.mesa.levantar_arrancado(now)
+                self.mesa.caderno.set_working(False)
+                self.state.at_desk=False;self.state.desk_top=None
+        self.body.held=True;self.state.pressing=True;self.senses.set_dragging(True)
+        self.body.grounded=False;self.body.platform=None
+        self.body.vx=self.body.vy=self.body.omega=0.
+        self.conditioning.set_cue('PRESS',True,now)
+
+    def _cancel_holds(self,now):
+        self._release_hold(now,True)
+        self.scene_dragging=False
+        for item in self.objects.values():
+            if hasattr(item,'body') and (item.body.held or item.dragging):
+                item.body.held=item.dragging=False
+                item.body.vx=item.body.vy=item.body.omega=0.
+                item.body.grounded=False;item.body.platform=None
+
+    def _release_hold(self,now,cancelled=False):
+        started=self.held_since
+        if self.body.held or started is not None:
+            self.body.vx=self.body.vy=self.body.omega=0.
+            self.body.grounded=False;self.body.platform=None
+        self.body.held=False;self.state.pressing=False;self.senses.set_dragging(False)
+        self.held_since=None
+        if cancelled:self.in_flight=False
+        if started is None:return
+        elapsed=max(0.,now-started)
+        if cancelled:
+            self.release_reaction={}
+        elif elapsed>=1.2:
+            # O mesmo gesto muda com os motores e a associação aprendida de PRESS.
+            motors=self.state.tone.r
+            anger=motors.get('ANGRY',0)
+            anticipation=self.conditioning.V.get('PRESS',0)
+            intensity=min(1.,.45*anger+.35*min(1.,elapsed/5)+.2*anticipation)
+            if anticipation>.55 or motors.get('SAD',0)>anger+.3:kind='timido'
+            elif anger>.55 and elapsed>=4:kind='birra'
+            elif motors.get('SETTLE',0)>.5 and anger<.4:kind='sacudir'
+            else:kind='bravo'
+            self.release_reaction=dict(kind=kind,started=now,until=now+2+3*intensity,intensity=intensity)
+            self.conditioning.outcome(now)
+        self.conditioning.set_cue('PRESS',False,now)
+
+    def _reset_cursor_motion(self):
+        self.cursor_sample = None
+        self.cursor_velocity = (0., 0.)
+        self.mouse_moved_at = -1e9
+        self.cursor_toy_near = False
+
+    def _track_cursor(self, now):
+        if self.cursor_sample is None:
+            self.cursor_sample = (self.cursor, now)
+            self.cursor_velocity = (0., 0.)
+            return False
+        prev_cursor, prev_now = self.cursor_sample
+        dt = now - prev_now
+        if math.dist(self.cursor, prev_cursor) > 1.:
+            self.cursor_velocity = (((self.cursor[0] - prev_cursor[0]) / dt,
+                                     (self.cursor[1] - prev_cursor[1]) / dt)
+                                    if .001 <= dt <= .15 else (0., 0.))
+            self.cursor_sample = (self.cursor, now)
+            self.mouse_moved_at = now
+            return True
+        if dt > .05 or dt < 0:
+            self.cursor_velocity = (0., 0.)
+            self.cursor_sample = (self.cursor, now)
+        return 0 <= now - self.mouse_moved_at <= .02
+
+    def _sense_toy_cursor(self,now):
+        if (not self.prefs.get('senseCursor',True) or not self.visible() or self.panel
+                or self.ball_stored or not self.ball.isVisible()
+                or self.ball.dragging or self.ball.body.held
+                or self.body.held or self.held_since is not None
+                or self.state.pressing or self.scene_dragging):
+            self._reset_cursor_motion()
+            return
+        moved=self._track_cursor(now)
+        radius=self.ball.body.half_w+24
+        near=math.dist(self.cursor,(self.ball.body.x,self.ball.body.y))<radius
+        if near and not self.cursor_toy_near and now>=self.next_toy_attention:
+            self.senses.kick('NOVELTY',.35)
+            self.behavior.look_at(self.ball.body.x,self.ball.body.y,now)
+            self.next_toy_attention=now+2.5
+        if near and (not self.cursor_toy_near or moved):
+            self.last_toy_push=push_from_cursor(
+                self.ball,self.cursor,self.cursor_velocity,now,self.last_toy_push,radius=radius)
+        self.cursor_toy_near=near
+
+    def _play_expression(self,now):
+        attempt=self.behavior.last_play
+        kind=None;duration=1.6
+        if attempt and attempt['started']!=self.last_play_attempt:
+            self.last_play_attempt=attempt['started']
+            kind='comemorando' if attempt['action'] else 'bote_erro'
+        elif (now>=self.next_play_scene and not self.body.held and self.body.grounded
+                and not self.panel and not self.sleep.asleep and not self.state.caressing(now)):
+            near=not self.ball_stored and self.ball.isVisible() and math.dist(
+                (self.body.x,self.body.y),(self.ball.body.x,self.ball.body.y))<190
+            if near and self.state.tone.r.get('STARTLE',0)>.35:
+                kind='brinquedo_susto';duration=1.3
+            elif self.mesa.sentado and self.behavior.play_pull>.5:
+                kind='fingir_trabalho';duration=2.2
+            elif near and self.behavior.adaptive_goal=='play' and self.behavior.play_pull>.3:
+                kind='preparar_bote';duration=.8
+        if kind:
+            intensity=max(.35,min(1.,self.behavior.play_pull+self.state.tone.r.get('CHEER',0)*.3))
+            self.play_reaction=dict(kind=kind,started=now,until=now+duration,intensity=intensity)
+            self.next_play_scene=now+12
 
     def reset_learning(self):
         preferences, displays = dict(self.prefs), list(self.displays)
@@ -385,8 +546,8 @@ class Game:
         if not self.panicked and not self.hidden: self.read_context(now)
         frozen = self.panicked or self.hidden or not self.available_areas()
         if frozen:
-            self.scene_dragging = False
-            self.body.held = False; self.ball.body.held = False; self.ball.dragging = False; self.senses.set_dragging(False)
+            self._cancel_holds(now)
+            self._reset_cursor_motion()
             if self.paused_at is None: self.paused_at = now
             return
         if self.paused_at is not None:
@@ -395,6 +556,7 @@ class Game:
             self.memory.deslocar(elapsed)
             self.intelligence.until += elapsed
             self.paused_at = None; self.last_think = now
+        self._sense_toy_cursor(now)
         if now - self.last_think >= .1:
             self.think(min(.1,now-self.last_think),now); self.last_think = now
         area = self.bounds()
@@ -406,7 +568,17 @@ class Game:
         self.castigo.act(now,self.body,area,self.cursor if self.prefs.get('senseCursor',True) else (1e9,1e9),self.state,self.rates,self.sleep.asleep)
         resting = self.hover or self.panel or now < self.quiet_until or not self.prefs.get('roaming',True)
         self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting)
+        self._play_expression(now)
+        reaction=self.release_reaction
+        if (reaction.get('until',0)>now and reaction.get('kind') in ('bravo','birra')
+                and self.prefs.get('senseCursor',True) and not self.state.caressing(now)):
+            dx,dy=self.cursor[0]-self.body.x,self.cursor[1]-self.body.y
+            distance=math.hypot(dx,dy) or 1.
+            angle=math.radians(self.body.angle)
+            self.state.gaze=((dx*math.cos(angle)+dy*math.sin(angle))/distance,
+                             (-dx*math.sin(angle)+dy*math.cos(angle))/distance)
         self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
+        if self.body.grounded:self.in_flight=False
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
@@ -418,7 +590,7 @@ class Game:
         self.mesa.set_visible(not self.mesa.escondido)
         self.protest_ctl.carry(now,self.sleep.asleep); self.sad_ctl.carry(now,self.sleep.asleep)
         self.mischief.tick(dt,area[3])
-        perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), fotos=False)
+        perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
         if not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.tick(now,self.rates,self.state.emotion,self.body,self.visible() and not self.sleep.asleep,dt)

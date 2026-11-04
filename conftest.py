@@ -10,3 +10,15 @@ from PySide6.QtWidgets import QApplication
 def qt_application():
     app=QApplication.instance() or QApplication([])
     yield app
+
+
+@pytest.fixture(autouse=True)
+def _block_live_reaction_network(monkeypatch):
+    """Impede chamadas reais de rede para ReactionGIFs/Nekos.best na suíte de testes."""
+    try:
+        from bolha.reactions import ReactionTransport
+    except ImportError:
+        return
+    def _blocked(*_args, **_kwargs):
+        raise OSError('Rede bloqueada nos testes automatizados por padrão.')
+    monkeypatch.setattr(ReactionTransport, 'get_bytes', _blocked)

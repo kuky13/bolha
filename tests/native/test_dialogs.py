@@ -138,6 +138,33 @@ def test_aplicar_preserva_sensores_desligados_e_valores_nao_editados(app):
     assert not dialog.apply_button.isEnabled()
 
 
+def test_seletor_real_salva_reabre_e_preserva_privacidade(app,tmp_path,monkeypatch):
+    from bolha.app import NativeApp
+    from bolha.preferences import PreferencesStore
+    monkeypatch.setenv('BOLHA_TEST','1')
+    controller=NativeApp(app,tmp_path)
+    try:
+        sensors=dict(senseApp=False,senseIdle=False,senseCursor=False,senseWindows=False)
+        controller.save_preferences(sensors)
+        controller.show_settings();dialog=controller.dialogs[0]
+        assert dialog.toy_appearance.currentData()=='peanut'
+        body=controller.game.ball.body
+        controller.game.brain.learned[0,0]=.04
+        dialog.toy_appearance.setCurrentIndex(dialog.toy_appearance.findData('ball'))
+        dialog.apply_button.click()
+        assert controller.game.ball.appearance=='ball' and controller.game.ball.body is body
+        assert controller.game.brain.learned[0,0]==pytest.approx(.04)
+        persisted=PreferencesStore(tmp_path).preferences
+        assert persisted['toyAppearance']=='ball' and all(persisted[key] is value for key,value in sensors.items())
+        dialog.close();controller.show_settings()
+        assert dialog.toy_appearance.currentData()=='ball' and not dialog.apply_button.isEnabled()
+        assert all(not dialog.checks[key].isChecked() for key in sensors)
+        reloaded=type(controller.game)(tmp_path/'reload-brain',controller.game.conteudo.proprio)
+        reloaded.configure(persisted)
+        assert reloaded.ball.appearance=='ball' and all(reloaded.prefs[key] is False for key in sensors)
+    finally:controller.quit()
+
+
 def test_falha_de_gravacao_preserva_dados_e_permite_tentar_novamente(app):
     controller = ControllerStub()
     before = dict(controller.store.preferences)

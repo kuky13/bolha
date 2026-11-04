@@ -71,7 +71,7 @@ def test_falha_apos_primeiro_ciclo_nao_confirma_atualizacao(qt_application,tmp_p
     from bolha.app import NativeApp
     confirmed=[]
     frame=QTimer();frame.start(1000)
-    controller=SimpleNamespace(quitting=False,updating=False,last_tick=time.monotonic(),
+    controller=SimpleNamespace(quitting=False,updating=False,suspended=False,last_tick=time.monotonic(),
         frame_times=deque(),frame=frame,first_paint=True,first_think=False,healthy=False,
         initial_errors=[],data_dir=tmp_path,update_dialog=None,updater=None,
         store=SimpleNamespace(preferences={'senseCursor':False},error=''),
@@ -80,7 +80,9 @@ def test_falha_apos_primeiro_ciclo_nao_confirma_atualizacao(qt_application,tmp_p
     controller.game=SimpleNamespace(body=SimpleNamespace(x=0,y=0),
         tick=lambda *_:setattr(controller,'first_think',True))
     def broken_sync():raise RuntimeError('falha de desenho')
-    controller.pet=SimpleNamespace(sync=broken_sync)
+    controller.pet=SimpleNamespace(sync=broken_sync,poll_interaction=lambda:None)
+    controller.scene=SimpleNamespace(poll_interactions=lambda:None)
+    controller.cancel_interactions=lambda:None
     NativeApp.tick(controller)
     assert controller.first_think and controller.first_paint and not frame.isActive()
     NativeApp.poll(controller)

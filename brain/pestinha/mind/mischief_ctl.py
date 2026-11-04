@@ -116,3 +116,16 @@ class MischiefController:
         self.behavior.drop_carried()
         self.memory.drop_open_things()
         self.engine.clear()
+
+    def abort_thing(self, thing):
+        """Remove uma reação online que falhou sem penalizar a memória nem ocupar limite."""
+        if self.behavior.mission and self.behavior.mission[0] == "deliver" and self.behavior.mission[1] is thing:
+            self.behavior.mission = None
+        self.memory.cancel_thing(thing)
+        self.engine._remove(thing)
+
+    def clear_memes(self):
+        """Remove reações online quando o usuário desativa a opção."""
+        for thing in list(self.engine.things):
+            if getattr(thing, "kind", None) == "meme":
+                self.abort_thing(thing)

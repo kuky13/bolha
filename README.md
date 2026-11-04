@@ -2,32 +2,56 @@
 
 ![Bolha Qt sem boca, com olhos e orelhinhas](docs/images/bolha-qt.png)
 
-A Bolha passeia, pula e quica pela sua tela, brinca com uma bolinha, senta no
+A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Experimental · Windows x64.**
+**Bolha 0.3.3 · Windows x64.**
 
-[Baixar o instalador](https://github.com/kuky13/bolha/releases/latest) ·
+[Versões no GitHub](https://github.com/kuky13/bolha/releases) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-*Execução Qt capturada em Linux offscreen, com fundo composto para apresentar
-janelas transparentes. A validação em Windows é separada. A personagem Bolha
+A versão **0.3.3** traz irritação vermelha com efeitos ancorados ao corpo,
+brinquedos que reagem à aproximação do cursor, pega firme e arremesso pela
+velocidade recente do mouse, além de GIFs e imagens online opcionais mantidos
+em RAM.
+
+O [CI Windows](https://github.com/kuky13/bolha/actions/runs/41872434530) aprovou
+**363 testes e 10 cenários nativos**. No notebook físico, passaram a instalação
+isolada e os **10 cenários** de instalação/atualização real 0.3.2 → 0.3.3. Quatro
+ensaios de gesto passaram; a perda forçada de captura ficou inconclusiva. Uso
+prolongado, GIFs com rede real no notebook e dois monitores físicos continuam
+pendentes. Veja [a validação da 0.3.3](docs/VALIDATION-0.3.3.md); os históricos
+da [0.3.2](docs/VALIDATION-GRAB.md) e da
+[0.3.1](docs/VALIDATION-EXPRESSIONS.md) permanecem separados. O instalador não
+possui assinatura digital.
+
+*Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
+composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
 [CC BY-NC 4.0](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
 Qt de Pestinha, de mille-okws e contribuidores, sob
 [GPL-3.0-or-later](NOTICE.md).*
 
+
 ## O que acompanha
 
-- Carinho, cutucada, arrasto direto, arremesso, giro e pouso sobre janelas.
+- Carinho, segurar, arrasto direto, soltura por gravidade, giro e pouso sobre janelas.
 - Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
   olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
-- Bolinha, notebook de brincadeira, fogos, cartazes, protestos e castigo.
-- Oito memes novos da Bolha e bilhetes: no máximo uma travessura a cada cinco
-  minutos, até três objetos na tela; tudo configurável.
+- Irritação gradual ao segurar com rubor vermelho forte, reações ao soltar, sono
+  com olhos fechando, respiração e “zzz”, corações no carinho e efeitos de
+  tontura e irritação que giram e se achatam junto com o corpo.
+- Espreguiçada, espirro, soluço, cochilo, piscadela e movimentos de orelhas
+  ocasionais. As manias cedem às interações, ao sono e aos painéis.
+- Amendoim como brinquedo padrão, bolinha original opcional nas configurações,
+  notebook de brincadeira, fogos, cartazes, protestos e castigo.
+- Reações online de memes e GIFs (ReactionGIFs e fallback Nekos.best) carregadas
+  apenas em memória conforme o que a Bolha quer expressar, além de bilhetes: no
+  máximo uma travessura a cada cinco minutos, até três objetos na tela; tudo
+  configurável e podendo desligar as reações online.
 - Painel com atividade neural, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
   contexto. Carinho reforça preferências; ausência de resposta é neutra.
@@ -47,15 +71,22 @@ não é necessário instalar Python separadamente.
 
 | Ação | Resultado |
 |---|---|
-| Clicar | Cutuca a Bolha |
+| Pressionar e manter | Segura a Bolha; ela fica irritada aos poucos |
 | Passar o mouse de um lado para o outro sobre ela | Faz carinho |
-| Arrastar e soltar | Leva junto ou arremessa |
+| Arrastar | Leva a Bolha ou o brinquedo junto |
+| Soltar | Parado, cai; em movimento, arremessa na direção do mouse e quica |
 | Rodinha | Gira |
-| Dormir um pouco | A esfera inteira tomba e descansa |
+| Menu → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
+| Menu → Brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |
+| Configurações → Comportamento → Brinquedo | Escolhe amendoim ou bolinha original |
 | Botão direito | Abre configurações e atividades |
 | Menu → Cérebro e emoções | Abre o painel do cérebro |
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
 | Ctrl + Alt + Shift + B | Pausa ou retoma tudo |
+
+Soltar obedece à mesma regra na personagem e no brinquedo. Quando o sensor de
+cursor está ligado, aproximar o ponteiro do amendoim ou da bolinha empurra o
+brinquedo para o lado e alimenta a atenção do cérebro.
 
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
@@ -74,9 +105,15 @@ Você pode desligar separadamente a leitura do nome do programa ativo, do
 tempo ocioso, da posição do cursor e da geometria das janelas. Não há captura
 de tela, leitura de títulos/conteúdo, chat, conta, créditos ou provedor de IA.
 
-A única comunicação de rede do aplicativo é a busca/download de atualizações
-no GitHub. O cérebro e a interface usam o mesmo processo Python, sem
-abrir portas locais ou enviar sua memória para servidores.
+A comunicação de rede do aplicativo limita-se à busca/download de atualizações
+no GitHub e, quando a opção de reações online está ativa nas configurações, à
+busca sem chave de memes/GIFs públicos (ReactionGIFs e Nekos.best) usando
+somente palavras-chave genéricas de humor em inglês; os bytes de mídia ficam
+apenas em memória RAM (nunca em disco), têm a animação pausada quando a janela
+fica oculta e são descartados ao fechar/remover a janela ou ao desativar a
+opção.
+O cérebro e a interface usam o mesmo processo Python, sem abrir portas locais
+ou enviar sua memória, programas ativos, coordenadas ou arquivos para servidores.
 
 ## Atualizações
 
@@ -111,7 +148,10 @@ py -3.11 -m venv .venv
 
 O resultado fica em `release/`. O script usa PyInstaller e NSIS portátil fixado
 por checksum, sem instalar o compilador globalmente. Veja
-[compilação e testes Windows](docs/BUILD.md) e [estado da validação](docs/VALIDATION-NATIVE.md).
+[compilação e testes Windows](docs/BUILD.md), [validação da 0.3.3](docs/VALIDATION-0.3.3.md),
+[validação da pega 0.3.2](docs/VALIDATION-GRAB.md),
+[histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md)
+e [histórico da migração Qt 0.3.0](docs/VALIDATION-NATIVE.md).
 O pipeline da Bolha só roda manualmente ou por tag; salvar commits e abrir
 PRs não dispara compilações de instalador. Tags só publicam após os testes.
 
