@@ -91,18 +91,32 @@ def test_cena_comedia_vem_da_brincadeira_real_e_nao_escolhe_politica_na_view(tmp
     assert motion.update(game, 104)['emotion'] == game.state.emotion
 
 
-def test_segurada_imovel_perde_grab_sem_deixar_corpo_preso(qt_application,tmp_path):
+@pytest.mark.parametrize('reason',['ungrab','hidden'])
+def test_cancelar_segurada_imovel_libera_corpo_e_hover(qt_application,tmp_path,reason):
     from PySide6.QtCore import QEvent, QPointF, Qt
-    from types import SimpleNamespace
+    from PySide6.QtGui import QEnterEvent, QMouseEvent
     from bolha.pet import PetWindow
-    game = game_at_rest(tmp_path);pet = PetWindow(game)
-    event = SimpleNamespace(button=lambda:Qt.LeftButton,
-                            globalPosition=lambda:QPointF(game.body.x,game.body.y))
+    game = game_at_rest(tmp_path)
+    game.configure({'senseCursor':False,'toyAppearance':'ball'})
+    preferences = dict(game.prefs);pet = PetWindow(game)
+    local = QPointF(pet.width()/2,pet.height()/2)
+    position = QPointF(game.body.x,game.body.y)
     try:
-        pet.mousePressEvent(event)
-        assert game.body.held and not pet.dragging
-        pet.event(QEvent(QEvent.UngrabMouse))
-        assert not game.body.held and pet.press is None and not game.state.pressing
+        qt_application.sendEvent(pet,QEnterEvent(local,local,position))
+        qt_application.sendEvent(pet,QMouseEvent(QEvent.MouseButtonPress,local,position,
+                                                Qt.LeftButton,Qt.LeftButton,Qt.NoModifier))
+        assert game.body.held and game.senses.dragging and not pet.dragging and game.hover
+        qt_application.sendEvent(pet,QEvent(QEvent.Leave))
+        assert game.hover
+        if reason=='ungrab':
+            qt_application.sendEvent(pet,QEvent(QEvent.UngrabMouse))
+        else:
+            game.interact({'type':'hide','value':True});pet.sync()
+            game.interact({'type':'hide','value':False});pet.sync()
+            assert pet.isVisible()
+        assert not game.body.held and game.held_since is None and pet.press is None
+        assert not game.hover and not game.state.pressing and not game.senses.dragging
+        assert game.prefs == preferences
     finally:pet.close()
 
 

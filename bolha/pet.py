@@ -138,6 +138,7 @@ class PetWindow(QWidget):
         if self.dragging:
             self.body.held=False;self.body.vx=self.body.vy=0;self.body.grounded=False
         self.press=None;self.dragging=False;self.game.state.pressing=False;self.game.senses.set_dragging(False)
+        self.game.hover=False
     def event(self,event):
         if event.type()==QEvent.UngrabMouse and (getattr(self,'press',None) is not None or getattr(self,'dragging',False)):self.cancel_interaction()
         return super().event(event)

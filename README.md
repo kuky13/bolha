@@ -2,17 +2,20 @@
 
 ![Bolha Qt sem boca, com olhos e orelhinhas](docs/images/bolha-qt.png)
 
-A Bolha passeia, pula e quica pela sua tela, brinca com uma bolinha, senta no
+A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Experimental · Windows x64.**
+**Experimental · Windows x64 · Fonte 0.3.1 em validação.**
 
-[Baixar o instalador](https://github.com/kuky13/bolha/releases/latest) ·
+[Instalador publicado](https://github.com/kuky13/bolha/releases/latest) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-*Execução Qt capturada em Linux offscreen, com fundo composto para apresentar
-janelas transparentes. A validação em Windows é separada. A personagem Bolha
+O instalador da 0.3.1 ainda aguarda compilação e validação Windows. Veja
+[o estado desta versão](docs/VALIDATION-EXPRESSIONS.md).
+
+*Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
+composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
 [CC BY-NC 4.0](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
 Qt de Pestinha, de mille-okws e contribuidores, sob
@@ -20,12 +23,17 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 
 ## O que acompanha
 
-- Carinho, cutucada, arrasto direto, arremesso, giro e pouso sobre janelas.
+- Carinho, segurar, arrasto direto, soltura por gravidade, giro e pouso sobre janelas.
 - Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
   olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
-- Bolinha, notebook de brincadeira, fogos, cartazes, protestos e castigo.
+- Irritação gradual ao segurar, reações ao soltar, sono com olhos fechando,
+  respiração e “zzz”, corações no carinho e efeitos de tontura e irritação.
+- Espreguiçada, espirro, soluço, cochilo, piscadela e movimentos de orelhas
+  ocasionais. As manias cedem às interações, ao sono e aos painéis.
+- Amendoim como brinquedo padrão, bolinha original opcional nas configurações,
+  notebook de brincadeira, fogos, cartazes, protestos e castigo.
 - Oito memes novos da Bolha e bilhetes: no máximo uma travessura a cada cinco
   minutos, até três objetos na tela; tudo configurável.
 - Painel com atividade neural, humor, necessidades e associações aprendidas.
@@ -47,15 +55,22 @@ não é necessário instalar Python separadamente.
 
 | Ação | Resultado |
 |---|---|
-| Clicar | Cutuca a Bolha |
+| Pressionar e manter | Segura a Bolha; ela fica irritada aos poucos |
 | Passar o mouse de um lado para o outro sobre ela | Faz carinho |
-| Arrastar e soltar | Leva junto ou arremessa |
+| Arrastar | Leva a Bolha ou o brinquedo junto |
+| Soltar | Libera a gravidade, sem impulso do mouse, mesmo após arrasto rápido |
 | Rodinha | Gira |
-| Dormir um pouco | A esfera inteira tomba e descansa |
+| Menu → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
+| Menu → Brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |
+| Configurações → Comportamento → Brinquedo | Escolhe amendoim ou bolinha original |
 | Botão direito | Abre configurações e atividades |
 | Menu → Cérebro e emoções | Abre o painel do cérebro |
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
 | Ctrl + Alt + Shift + B | Pausa ou retoma tudo |
+
+Soltar obedece à mesma regra na personagem e no brinquedo. A proximidade do
+ponteiro pode chamar a atenção do cérebro quando o sensor está ligado; as
+brincadeiras são decididas pelo pet, sem chute automático do mouse.
 
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
@@ -111,7 +126,8 @@ py -3.11 -m venv .venv
 
 O resultado fica em `release/`. O script usa PyInstaller e NSIS portátil fixado
 por checksum, sem instalar o compilador globalmente. Veja
-[compilação e testes Windows](docs/BUILD.md) e [estado da validação](docs/VALIDATION-NATIVE.md).
+[compilação e testes Windows](docs/BUILD.md), [validação da 0.3.1](docs/VALIDATION-EXPRESSIONS.md)
+e [histórico da migração Qt 0.3.0](docs/VALIDATION-NATIVE.md).
 O pipeline da Bolha só roda manualmente ou por tag; salvar commits e abrir
 PRs não dispara compilações de instalador. Tags só publicam após os testes.
 
