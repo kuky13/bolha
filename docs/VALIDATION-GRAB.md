@@ -65,7 +65,7 @@ anterior ao ajuste final de impulso, foi cancelada e descartada.
 | `Bolha-Setup-0.3.2-x64.exe` | 34.776.704 bytes | `51386c64f8d2f03298a285af607a94cc7848cae11e9d91a3c9529443b5f096d6` |
 | `latest.yml` | 362 bytes | `6a995d66b810cf65ccffa613c55aa4d5259aff4dfb7f814020f565c8f92088b6` |
 | `THIRD-PARTY-NOTICES.txt` | 1.661 bytes | `7925a0bb5df9b59347a4c753af020f037465854ff474659f181c36cfb69de166` |
-| `SHA256SUMS.txt` | 262 bytes | `40c367c6a0fb80814c1b7bb90c649bf64d1cc65b6dd48009886ec552b1965578` |
+| `SHA256SUMS.txt` | 262 bytes | `f6d4b35d723445bc88ed9e2cfdd40747be3cc8a9270546f53ed882ca008ccebf` |
 
 O SHA-512 em `latest.yml`
 (`AK8oEe/WxT7fNTFPLxnUf6SKgEI6B0Sz7e63DKeSYrdJheYB4GF9ykltGjY1BOBxNAw6IRo4HEnW++RN1ocxZg==`),
