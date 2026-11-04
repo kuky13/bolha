@@ -5,24 +5,26 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Experimental · Windows x64 · Fonte 0.3.3 candidata de teste.**
+**Bolha 0.3.3 · Windows x64.**
 
-[Instalador publicado](https://github.com/kuky13/bolha/releases/latest) ·
+[Versões no GitHub](https://github.com/kuky13/bolha/releases) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A candidata **0.3.3** do [PR #2](https://github.com/kuky13/bolha/pull/2)
-traz raiva vermelha, efeitos que acompanham o corpo, brinquedos que reagem ao
-cursor e GIFs/imagens online mantidos em RAM. A pega firme e o arremesso por
-impulso recente continuam. A versão pública permanece **0.3.0**.
+A versão **0.3.3** traz irritação vermelha com efeitos ancorados ao corpo,
+brinquedos que reagem à aproximação do cursor, pega firme e arremesso pela
+velocidade recente do mouse, além de GIFs e imagens online opcionais mantidos
+em RAM.
 
 O [CI Windows](https://github.com/kuky13/bolha/actions/runs/41872434530) aprovou
-**363 testes e 10 cenários do instalador**. No notebook físico, uma cópia
-isolada passou nos dez cenários do controlador nativo, incluindo a
-atualização **0.3.2 → 0.3.3**. Veja os resultados e limites na
-[validação da 0.3.3](docs/VALIDATION-0.3.3.md); os históricos da
-[0.3.2](docs/VALIDATION-GRAB.md) e da
-[0.3.1](docs/VALIDATION-EXPRESSIONS.md) permanecem separados.
+**363 testes e 10 cenários nativos**. No notebook físico, passaram a instalação
+isolada e os **10 cenários** de instalação/atualização real 0.3.2 → 0.3.3. Quatro
+ensaios de gesto passaram; a perda forçada de captura ficou inconclusiva. Uso
+prolongado, GIFs com rede real no notebook e dois monitores físicos continuam
+pendentes. Veja [a validação da 0.3.3](docs/VALIDATION-0.3.3.md); os históricos
+da [0.3.2](docs/VALIDATION-GRAB.md) e da
+[0.3.1](docs/VALIDATION-EXPRESSIONS.md) permanecem separados. O instalador não
+possui assinatura digital.
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha

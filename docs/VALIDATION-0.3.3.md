@@ -1,14 +1,12 @@
-# Validação da candidata 0.3.3
+# Validação 0.3.3
 
-A fonte **0.3.3** (`37a8fcabb98919314e1259c9720493d261dff238`) no branch
-`expressive/qt-animations` ([PR #2](https://github.com/kuky13/bolha/pull/2),
-mantido como rascunho) reúne todas as funcionalidades aprovadas após a base
-`37db6e5dd2233378e199e934e8481e2a47af3fac`: raiva neural vermelha legível,
-efeitos de expressão que giram e se achatam junto com o corpo, reação física do
-amendoim e da bolinha à aproximação do cursor, pega firme com arremesso por
-impulso recente do mouse e reações online reais de GIFs/imagens em memória RAM.
-A versão pública permanece **v0.3.0**; esta candidata foi compilada e validada
-no CI Windows sem criar tag ou publicar release.
+Este relatório reúne evidências de validação **pré-publicação** do instalador
+Windows da Bolha 0.3.3, compilado no CI run `41872434530` a partir da fonte
+`37a8fcabb98919314e1259c9720493d261dff238`. O binário conferido é
+`Bolha-Setup-0.3.3-x64.exe` (34.821.370 bytes, SHA-256
+`4d79acc0542ae92ce8a29fd1cf0449a76d978a5e24fbbe53004a3606ef7bb94d`).
+Os ensaios abaixo foram feitos antes da publicação. O instalador não possui
+assinatura digital.
 
 Uma fixture homônima `0.3.3` existiu anteriormente apenas como pacote reempacotado
 de metadados para exercitar a atualização `0.3.2 → fixture 0.3.3` no CI da fonte
