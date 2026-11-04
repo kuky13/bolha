@@ -32,23 +32,33 @@ API no **ReactionGIFs** (fonte principal, com verificação de relevância do te
 de humor) e usa o **Nekos.best** (categoria de anime correspondente à emoção)
 como alternativa. Apenas palavras genéricas de humor em inglês são consultadas;
 os bytes baixados ficam exclusivamente em memória RAM (`QBuffer`/`QMovie`/`QImage`
-com cache desativado), são descartados ao fechar ou ocultar a janela e nunca são
-gravados em disco. A opção pode ser desligada nas configurações e falhas de rede
-descartam a reação sem penalizar o cérebro.
+com cache desativado), nunca são gravados em disco, têm a animação pausada
+quando a janela fica oculta e são liberados ao fechar/remover a janela ou ao
+desativar as reações online nas configurações. Falhas de rede descartam a reação
+sem penalizar o cérebro.
 
 O cérebro local continua com 470 neurônios. Memória, condicionamento, semente,
 preferências e sensores desligados são preservados. Não há novas dependências.
 
-Na árvore de código congelada da 0.3.3, passaram **352 testes locais** em Qt
-offscreen (com **11 testes específicos de Windows pulados** no Linux), as
-prévias Qt offscreen de raiva vermelha e reação dos brinquedos ao cursor, os
-testes reais sem chave dos dois provedores e o ensaio em `ObjectWindow` real
-observando 14 quadros animados em RAM com zero arquivos de mídia em disco. A
-compilação do instalador `Bolha-Setup-0.3.3-x64.exe` (com auditoria de
-`PySide6/plugins/imageformats/qgif.dll`), a suíte completa de 363 testes no CI
-Windows e a validação em Windows físico correspondem à próxima etapa de
-execução. Consulte [a validação da 0.3.3](VALIDATION-0.3.3.md),
+Na fonte congelada da 0.3.3 (`37a8fcabb98919314e1259c9720493d261dff238`),
+passaram **352 testes locais** em Qt offscreen (11 específicos de Windows
+pulados no Linux), a validação em RAM da `ObjectWindow` real (14 quadros
+animados observados, zero arquivos de mídia em disco) e a execução completa no
+[CI Windows (`41872434530`)](https://github.com/kuky13/bolha/actions/runs/41872434530):
+**363 testes** em 67,19 s, compilação única do instalador
+`Bolha-Setup-0.3.3-x64.exe` (`34.821.370` bytes, SHA-256
+`4d79acc0542ae92ce8a29fd1cf0449a76d978a5e24fbbe53004a3606ef7bb94d`) com
+presença confirmada de `PySide6/plugins/imageformats/qgif.dll` e aprovação nos
+**10 cenários nativos** de instalação, atualização (`0.3.3 → fixture 0.3.4`,
+sendo a fixture exclusiva de teste e nunca entregue) e recuperação, preservando
+registro, preferências, semente e aprendizado do cérebro de 470 neurônios. No notebook Windows físico, a instalação limpa e os dez cenários do
+controlador nativo passaram, incluindo a atualização isolada `0.3.2 → 0.3.3`.
+Quatro ensaios de entrada nativa aprovaram a pega e a soltura na personagem e
+no amendoim; a perda forçada de captura ficou inconclusiva. Uso prolongado,
+GIFs com rede real no notebook e dois monitores físicos continuam pendentes. Consulte
+[a validação da 0.3.3](VALIDATION-0.3.3.md),
 [a validação da pega 0.3.2](VALIDATION-GRAB.md) e o
 [histórico da 0.3.1](VALIDATION-EXPRESSIONS.md). Esta candidata é preparada para
-teste, sem publicação de tag ou release. A distribuição experimental continua
-sem assinatura digital.
+teste (com o [PR #2](https://github.com/kuky13/bolha/pull/2) em rascunho), sem
+publicação de tag ou release. A distribuição experimental continua sem
+assinatura digital.
