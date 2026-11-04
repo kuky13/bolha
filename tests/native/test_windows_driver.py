@@ -11,6 +11,7 @@ from urllib.request import urlopen
 import pytest
 from scripts.test_windows_native import (Feed, NativeValidation, installer_version,
     legacy_allowed, read_json, test_environment as environment, validate_metrics, write_json)
+import scripts.test_windows_native as driver
 
 
 def test_legacy_never_runs_on_notebook_and_needs_hosted_runner():
@@ -91,3 +92,19 @@ def test_reused_output_removes_previous_runtime_report_before_launch(tmp_path):
             validate_metrics(read_json(env['BOLHA_TEST_REPORT']) or {}, dict(version='0.3.1',pid=222,ready=True,neurons=470))
     finally:
         shutil.rmtree(validation.root)
+
+
+def test_stop_rejects_base_report_when_target_never_wrote_metrics(tmp_path, monkeypatch):
+    validation = object.__new__(NativeValidation)
+    validation.data, validation.exe = tmp_path/'data', tmp_path/'app/Bolha.exe'
+    validation.current_report = tmp_path/'automatic-update-runtime.json'
+    validation.processes = []
+    monkeypatch.setattr(driver, 'process_alive', lambda *_: False)
+    write_json(validation.current_report, dict(version='0.3.0', pid=111, healthy=True,
+               neurons=470, frameCount=90, thinkCount=20))
+    target_health = dict(version='0.3.1', pid=222, ready=True, neurons=470)
+    with pytest.raises(AssertionError, match='outra versão'):
+        validation.stop(target_health)
+    validation.current_report.unlink()
+    with pytest.raises(AssertionError):
+        validation.stop(target_health)
