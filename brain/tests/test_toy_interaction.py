@@ -140,35 +140,99 @@ def test_pegar_no_notebook_desprende_e_cai_sem_esperar_pensamento(tmp_path,monke
     assert not game.mesa.sentado
 
 
-def test_proximidade_atencao_sem_impulso_e_sem_repetir_todo_quadro(tmp_path):
+def test_proximidade_atencao_e_impulso_com_cooldown_sem_repetir_todo_quadro(tmp_path):
     game=Game(tmp_path,CONTENT)
     game.configure({'senseCursor':True})
-    game.cursor=(game.ball.body.x+10,game.ball.body.y)
-    before=vars(game.ball.body).copy()
+    x0,y0=game.ball.body.x,game.ball.body.y
+    game.cursor=(x0+10,y0)
     game._sense_toy_cursor(100)
     assert game.cursor_toy_near and game.senses.pulse['NOVELTY']==pytest.approx(.35)
-    assert vars(game.ball.body)==before
-    assert game.behavior.look[:2]==(game.ball.body.x,game.ball.body.y)
+    assert game.ball.body.vx<0 and game.ball.body.vy<0 and not game.ball.body.grounded
+    assert (game.ball.body.x,game.ball.body.y)==(x0,y0)
+    assert game.behavior.look[:2]==(x0,y0)
+    first_vx,first_vy=game.ball.body.vx,game.ball.body.vy
+    game.ball.body.vx=game.ball.body.vy=0.
     game._sense_toy_cursor(100.016)
     assert game.senses.pulse['NOVELTY']==pytest.approx(.35)
+    assert game.ball.body.vx==game.ball.body.vy==0.
+    # Ainda em cooldown de cursor (0.25s) e atenção (2.5s).
     game.cursor=(0,0);game._sense_toy_cursor(100.1)
-    game.cursor=(game.ball.body.x,game.ball.body.y);game._sense_toy_cursor(100.2)
+    game.cursor=(x0-10,y0);game._sense_toy_cursor(100.2)
     assert game.senses.pulse['NOVELTY']==pytest.approx(.35)
+    assert game.ball.body.vx==game.ball.body.vy==0.
+    # Após o cooldown, aproximar do lado esquerdo chuta para a direita.
     game.cursor=(0,0);game._sense_toy_cursor(103)
-    game.cursor=(game.ball.body.x,game.ball.body.y);game._sense_toy_cursor(103.1)
+    game.cursor=(x0-10,y0);game._sense_toy_cursor(103.1)
     assert game.senses.pulse['NOVELTY']==pytest.approx(.7)
+    assert game.ball.body.vx>abs(first_vx) and game.ball.body.vy<0
 
 
-@pytest.mark.parametrize('disabled',['sensor','hidden','dragging','panel'])
-def test_proximidade_nao_observa_brinquedo_quando_desativado(tmp_path,disabled):
+@pytest.mark.parametrize('disabled',['sensor','hidden','dragging','held','pet-held','panel','app-hidden','panic','blocked'])
+def test_proximidade_nao_observa_nem_move_brinquedo_quando_desativado(tmp_path,disabled):
     game=Game(tmp_path,CONTENT)
-    game.cursor=(game.ball.body.x,game.ball.body.y)
+    game.cursor=(game.ball.body.x-10,game.ball.body.y)
     if disabled=='sensor':game.configure({'senseCursor':False})
     elif disabled=='hidden':game.interact({'type':'ball'})
     elif disabled=='dragging':game.ball.dragging=True
-    else:game.panel=True
+    elif disabled=='held':game.ball.body.held=True
+    elif disabled=='pet-held':game.body.held=True
+    elif disabled=='panel':game.panel=True
+    elif disabled=='app-hidden':game.hidden=True
+    elif disabled=='panic':game.panicked=True
+    else:game.blocked={0}
+    before=vars(game.ball.body).copy()
     game._sense_toy_cursor(100)
     assert not game.cursor_toy_near and game.senses.pulse['NOVELTY']==0
+    assert vars(game.ball.body)==before
+
+
+@pytest.mark.parametrize('appearance',['peanut','ball'])
+@pytest.mark.parametrize('side,expected_sign',[('left',1),('right',-1)])
+def test_passagem_do_mouse_move_amendoim_e_bolinha_para_o_lado_oposto(tmp_path,monkeypatch,appearance,side,expected_sign):
+    clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=Game(tmp_path,CONTENT)
+    game.configure(dict(senseCursor=True,senseWindows=False,senseIdle=False,senseApp=False,
+                        roaming=False,mischiefEnabled=False,adaptiveBehavior=False,
+                        toyAppearance=appearance))
+    game.ball.body.x,game.ball.body.y=640.,743.;game.ball.body.grounded=True;game.ball.place()
+    notebook_before=game.mesa.caderno.x(),game.mesa.caderno.y()
+    start_x=585. if side=='left' else 695.
+    end_x=618. if side=='left' else 662.
+    game.interact(dict(type='cursor',x=start_x,y=738.))
+    game.tick(.016,clock[0])
+    clock[0]+=.016
+    game.interact(dict(type='cursor',x=end_x,y=738.))
+    game.tick(.016,clock[0])
+    assert game.ball.appearance==appearance
+    assert game.ball.body.vx*expected_sign>200
+    for _ in range(18):
+        clock[0]+=.016;game.tick(.016,clock[0])
+    assert (game.ball.body.x-640.)*expected_sign>35
+    assert game.ball.roll_angle*expected_sign>0
+    assert 0<game.ball.body.x<1280 and 0<game.ball.body.y<760
+    assert (game.mesa.caderno.x(),game.mesa.caderno.y())==notebook_before
+
+
+def test_distancia_zero_e_pausa_ou_toggle_nao_usam_velocidade_antiga(tmp_path,monkeypatch):
+    clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=Game(tmp_path,CONTENT);game.configure({'senseCursor':True})
+    # Movimento rápido longe do brinquedo seguido de desativação do sensor não guarda velocidade velha.
+    game.interact(dict(type='cursor',x=100.,y=200.));game._sense_toy_cursor(clock[0])
+    clock[0]+=.016
+    game.interact(dict(type='cursor',x=300.,y=200.));game._sense_toy_cursor(clock[0])
+    assert game.cursor_velocity[0]>1000
+    game.configure({'senseCursor':False})
+    assert game.cursor_velocity==(0.,0.) and game.cursor_sample is None
+    game.configure({'senseCursor':True})
+    clock[0]+=1.
+    x0,y0=game.ball.body.x,game.ball.body.y
+    game.interact(dict(type='cursor',x=x0,y=y0));game._sense_toy_cursor(clock[0])
+    assert game.cursor_velocity==(0.,0.)
+    assert game.ball.body.vx==pytest.approx(260.) and game.ball.body.vy==pytest.approx(-120.)
+    # Mesmo parado exatamente em cima após o cooldown, não re-chuta sem novo movimento do cursor.
+    game.ball.body.vx=game.ball.body.vy=0.
+    clock[0]+=.4;game._sense_toy_cursor(clock[0])
+    assert game.ball.body.vx==game.ball.body.vy==0.
 
 
 def test_cenas_de_brincadeira_vem_do_resultado_e_dos_motores(tmp_path):
@@ -196,17 +260,16 @@ def test_cenas_de_brincadeira_vem_do_resultado_e_dos_motores(tmp_path):
     assert game.play_reaction['kind']=='preparar_bote'
 
 
-def test_sinais_de_proximidade_chegam_a_rede_sem_chutar_brinquedo(tmp_path,monkeypatch):
+def test_sinais_de_proximidade_chegam_a_rede_e_impulsionam_brinquedo(tmp_path,monkeypatch):
     clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
-    game=Game(tmp_path,CONTENT);kicks=[]
-    monkeypatch.setattr(game.ball,'kick',lambda *args:kicks.append(args))
+    game=Game(tmp_path,CONTENT)
     game.ball.body.x,game.ball.body.y=game.body.x+30,game.body.y
-    game.cursor=(game.ball.body.x,game.ball.body.y)
-    before=vars(game.ball.body).copy();game._sense_toy_cursor(clock[0])
+    game.cursor=(game.ball.body.x-12,game.ball.body.y)
+    game._sense_toy_cursor(clock[0])
     clock[0]+=.1;game.think(.1,clock[0])
     assert game.inputs['NOVELTY']>0 and game.inputs['TOY_NEAR']>0
-    assert game.brain.time_ms>0 and not kicks
-    assert vars(game.ball.body)==before
+    assert game.brain.time_ms>0
+    assert game.ball.body.vx>0 and game.ball.body.vy<0
 
 
 @pytest.mark.parametrize('random_value,expected',[(0.,'comemorando'),(1.,'bote_erro')])

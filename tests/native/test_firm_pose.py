@@ -29,3 +29,7 @@ def test_segurada_firme_preserva_progressao_dos_olhos_orelhas_e_risquinhos():
     assert early['ear_tilt'] < middle['ear_tilt'] < late['ear_tilt']
     assert all(pose['effect'] == 'bravo' for pose in (early, middle, late))
     assert early['effect_strength'] < middle['effect_strength'] < late['effect_strength']
+    assert 0 == early['anger'] < middle['anger'] < late['anger']
+    assert late['anger'] > .75
+    assert animation_pose('birra', .1, .9)['anger'] > animation_pose('birra', 1.8, .9)['anger']
+    assert animation_pose('observando', 1.)['anger'] == 0

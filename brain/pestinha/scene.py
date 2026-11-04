@@ -101,11 +101,15 @@ class FloatingThing(Item):
 
 
 class ImageThing(ObjectThing):
-    def __init__(self, path, max_side):
+    def __init__(self, path, max_side, emotion=None, reaction_kind='meme'):
         super().__init__('meme', min(240, max_side), min(240, max_side))
         self.valida = bool(path and Path(path).is_file())
         self.image = Path(path).stem if path else None
-        self.emotion=Path(path).parent.name if path else 'observando'
+        self.emotion = str(emotion or (Path(path).parent.name if path else 'observando'))
+        self.reaction_kind = str(reaction_kind or 'meme')
+        self.source_url = None
+        self.attribution = ''
+        self.provider = ''
         self.title='';self.subtitle=''
         if self.valida and Path(path).suffix.lower()=='.svg':
             import xml.etree.ElementTree as ET

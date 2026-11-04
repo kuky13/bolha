@@ -210,6 +210,14 @@ class EpisodicMemory:
         if self.ultima_acao is not None and not any(ep is self.ultima_acao for ep in self.open):
             self.ultima_acao["inicio"] += segundos        # a janela do castigo também não corre na pausa
 
+    def cancel_thing(self, thing):
+        """Remove episódio pendente sem penalizar quando um recurso externo falha."""
+        for ep in list(self.open):
+            if ep["thing"] is thing:
+                self.open.remove(ep)
+                if self.ultima_acao is ep:
+                    self.ultima_acao = None
+
     def drop_open_things(self):
         """Objetos limpos pela bandeja: leve negativo (você quis a tela limpa)."""
         for ep in list(self.open):

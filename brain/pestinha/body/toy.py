@@ -83,27 +83,38 @@ def kick(ball, vx, vy):
 
 
 
-def push_from_cursor(ball, cursor, cursor_vel, now, last_push):
+def push_from_cursor(ball, cursor, cursor_vel, now, last_push, radius=RADIUS + 6):
     """
     O cursor também bate na bolinha: se o ponteiro encosta nela, ela sai na direção
     em que o ponteiro vinha (ou para longe do ponteiro, se ele estava parado).
     Devolve o instante do último empurrão (ou o mesmo, se não empurrou).
     """
-    if ball.dragging or not ball.isVisible() or now - last_push < CURSOR_COOLDOWN:
+    if (ball.dragging or getattr(ball.body, "held", False)
+            or not ball.isVisible() or now - last_push < CURSOR_COOLDOWN):
         return last_push
     b = ball.body
     dx, dy = b.x - cursor[0], b.y - cursor[1]
     d = math.hypot(dx, dy)
-    if d >= RADIUS + 6:
+    if d >= radius:
         return last_push
-    nx, ny = (dx / d, dy / d) if d > 1e-6 else (0.0, -1.0)
-    b.x = cursor[0] + nx * (RADIUS + 6)               # sai da colisão, sem atravessar o ponteiro
-    b.y = cursor[1] + ny * (RADIUS + 6)
     speed_in = math.hypot(cursor_vel[0], cursor_vel[1])
+    if d > 1e-6:
+        nx, ny = dx / d, dy / d
+    elif speed_in > 1e-6:
+        nx, ny = cursor_vel[0] / speed_in, cursor_vel[1] / speed_in
+    else:
+        nx, ny = 1.0, 0.0
     if speed_in > 50:                                 # o ponteiro estava se movendo: leva a bolinha junto
-        ux, uy = cursor_vel[0] / speed_in, cursor_vel[1] / speed_in
+        vx_dir, vy_dir = cursor_vel[0] / speed_in, cursor_vel[1] / speed_in
+        ux = nx + (vx_dir if nx * vx_dir >= -1e-6 else 0.0)
+        uy = ny + (vy_dir if ny * vy_dir >= -1e-6 else 0.0)
     else:                                             # ponteiro parado: a bolinha só se afasta
         ux, uy = nx, ny
+    if abs(ux) < 0.5:
+        sign = -1.0 if (ux < -1e-6 or (abs(ux) <= 1e-6 and cursor_vel[0] < -1e-6)) else 1.0
+        ux = sign * 0.6
+    norm = math.hypot(ux, uy) or 1.0
+    ux, uy = ux / norm, uy / norm
     speed = max(260.0, min(1200.0, speed_in * 0.8))
-    ball.kick(ux * speed, uy * speed - 120.0)
+    ball.kick(ux * speed, min(-120.0, uy * speed - 120.0))
     return now

@@ -20,21 +20,25 @@ def _ease(value):
 def animation_pose(mode, seconds, strength=1.):
     """Quadro determinístico compartilhado pelo aplicativo e pelas prévias Qt.
 
-    Os campos de desenho mantêm a API do personagem. Os offsets giram a esfera
-    inteira; os efeitos externos têm sua própria fase, sem receber essa rotação.
+    Os campos de desenho mantêm a API do personagem. Os offsets e efeitos
+    giram e deformam com a esfera, sem deslocar o centro físico.
     """
     t = max(0., float(seconds));strength = _unit(strength)
     pose = dict(emotion=mode, eye_open=1., ear_tilt=0., ear_raise=0., squash=0.,
                 gaze=None, blink=0., blink_left=None, blink_right=None,
                 angle_offset=0., zzz_strength=0., zzz_phase=t,
-                effect=None, effect_strength=0., effect_phase=t)
+                effect=None, effect_strength=0., effect_phase=t, anger=0.)
     if mode == 'held':
         irritation = _ease((t - .7) / 3.)
+        rage = _ease((t - 1.1) / 2.6) * (.55 + .45 * strength)
+        pulse = .88 + .12 * math.sin(t * 14)
         pose.update(emotion='curioso' if t < .7 else 'entediado' if irritation < .3 else 'bravo',
-                    eye_open=1.12 - .7 * irritation, ear_raise=1. - 5. * irritation,
-                    ear_tilt=14. * irritation, squash=.03 * irritation * math.sin(t * 6),
+                    eye_open=1.12 - .76 * irritation, ear_raise=1. - 5.4 * irritation,
+                    ear_tilt=(16. + 2. * math.sin(t * 18) * rage) * irritation,
+                    squash=.03 * irritation * math.sin(t * 6),
                     angle_offset=irritation * (math.sin(t * 5) + .5 * math.sin(t * 8)),
-                    effect='bravo', effect_strength=irritation * strength)
+                    effect='bravo', effect_strength=irritation * strength,
+                    anger=_unit((.22 * irritation + .78 * rage) * pulse))
     elif mode == 'sleeping':
         closing = _ease(t / 1.8);breath = math.sin(t * math.tau / 4.2)
         pose.update(emotion='sonolento' if t < 1.8 else 'dormindo',
@@ -62,13 +66,17 @@ def animation_pose(mode, seconds, strength=1.):
                     effect='tonto', effect_strength=.8)
     elif mode in ('birra', 'sacudir'):
         envelope = math.exp(-t * (1.1 if mode == 'birra' else 2.))
+        pulse = .9 + .1 * math.sin(t * 18)
         pose.update(emotion='bravo' if mode == 'birra' else 'contente',
-                    eye_open=.55 if mode == 'birra' else 1.,
+                    eye_open=.48 if mode == 'birra' else 1.,
                     blink=.95 if mode == 'sacudir' and t < .3 else 0.,
                     ear_tilt=18 * math.sin(t * 17) * envelope,
-                    ear_raise=-2 * envelope, squash=.2 * math.sin(t * 15) * envelope * strength,
+                    ear_raise=-2.6 * envelope if mode == 'birra' else -2 * envelope,
+                    squash=.2 * math.sin(t * 15) * envelope * strength,
                     angle_offset=12 * math.sin(t * 16) * envelope * strength,
-                    effect='bravo' if mode == 'birra' else None, effect_strength=strength)
+                    effect='bravo' if mode == 'birra' else None,
+                    effect_strength=strength if mode == 'birra' else 0.,
+                    anger=_unit((.45 + .55 * strength) * envelope * pulse) if mode == 'birra' else 0.)
     elif mode == 'preparar_bote':
         crouch = _ease(t / .8)
         pose.update(emotion='atento', eye_open=1.15 - .4 * crouch,
@@ -127,9 +135,13 @@ def animation_pose(mode, seconds, strength=1.):
         pose.update(emotion='contente', **{key: value for key, value in wink.items() if key != 'tilt'})
         pose['angle_offset'] = wink['tilt']
     elif mode == 'bravo':
-        pose.update(eye_open=.6, ear_raise=-1.5, squash=.06 * math.sin(t * 12) * strength,
+        pulse = .88 + .12 * math.sin(t * 14)
+        pose.update(eye_open=.54, ear_raise=-2.1,
+                    ear_tilt=6. * strength + 3. * math.sin(t * 16) * strength,
+                    squash=.06 * math.sin(t * 12) * strength,
                     angle_offset=2.5 * math.sin(t * 13) * strength,
-                    effect='bravo', effect_strength=strength)
+                    effect='bravo', effect_strength=strength,
+                    anger=_unit((.45 + .55 * strength) * pulse))
     elif mode == 'triste':
         pose.update(ear_raise=-1.2 + .35 * math.sin(t * 2), eye_open=.8,
                     gaze=(0., .8), squash=.045 * math.sin(t * 2), angle_offset=2. * math.sin(t * 1.5))

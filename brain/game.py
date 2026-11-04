@@ -16,7 +16,7 @@ from pestinha.core.physics import Body
 from pestinha.body.behavior import Behavior
 from pestinha.body.pet_state import PetState
 from pestinha.body.brincadeira import Play
-from pestinha.body.toy import ToyTracker, bounce_off
+from pestinha.body.toy import ToyTracker, bounce_off, push_from_cursor
 from pestinha.mind.sleep import SleepController
 from pestinha.mind.mesa import MesaController, pull
 from pestinha.mind.protest_ctl import ProtestController
@@ -116,6 +116,9 @@ class Game:
         self.request_refused = 0.
         self.prev_distance = None
         self.cursor_toy_near = False
+        self.cursor_sample = None
+        self.cursor_velocity = (0., 0.)
+        self.last_toy_push = -1e9
         self.next_toy_attention = 0.
         self.held_since = None
         self.release_reaction = {}
@@ -155,6 +158,8 @@ class Game:
 
     def configure(self, prefs):
         self.prefs.update(prefs)
+        if not self.prefs.get('senseCursor', True):
+            self._reset_cursor_motion()
         if self.prefs.get('toyAppearance','peanut') in ('peanut','ball'):
             self.ball.appearance=self.prefs.get('toyAppearance','peanut')
         self.intelligence.enabled = self.prefs.get('adaptiveBehavior', True)
@@ -166,6 +171,8 @@ class Game:
         self.body.half_w = self.body.half_h = max(40., min(100., size))
         self.mischief.interval = self.prefs.get('mischiefInterval', 300)
         self.mischief.max_objects = self.prefs.get('maxObjects', 3)
+        self.mischief.online_reactions = self.prefs.get('onlineReactions', True)
+        if not self.prefs.get('onlineReactions', True): self.mischief_ctl.clear_memes()
         if not self.prefs.get('mischiefEnabled', True): self.mischief_ctl.clear()
         self.fit(self.body)
 
@@ -244,11 +251,18 @@ class Game:
             self.monitor_open = bool(event.get('value'))
             self.last_monitor_snapshot = -1.
             return
-        if kind == 'panel': self.panel = bool(event.get('value')); return
+        if kind == 'panel':
+            self.panel = bool(event.get('value'))
+            if self.panel: self._reset_cursor_motion()
+            return
         if kind == 'hover': self.hover = bool(event.get('value')); return
         if kind == 'reset-memory': self.reset_learning(); return
         if kind == 'cursor':
-            if self.prefs.get('senseCursor', True): self.cursor = (event['x'], event['y'])
+            if self.prefs.get('senseCursor', True):
+                self.cursor = (event['x'], event['y'])
+                self._track_cursor(now)
+            else:
+                self._reset_cursor_motion()
             return
         if kind == 'hold-end':
             self._release_hold(now,event.get('cancelled',False) or self.panicked or self.hidden)
@@ -364,14 +378,49 @@ class Game:
             self.conditioning.outcome(now)
         self.conditioning.set_cue('PRESS',False,now)
 
+    def _reset_cursor_motion(self):
+        self.cursor_sample = None
+        self.cursor_velocity = (0., 0.)
+        self.mouse_moved_at = -1e9
+        self.cursor_toy_near = False
+
+    def _track_cursor(self, now):
+        if self.cursor_sample is None:
+            self.cursor_sample = (self.cursor, now)
+            self.cursor_velocity = (0., 0.)
+            return False
+        prev_cursor, prev_now = self.cursor_sample
+        dt = now - prev_now
+        if math.dist(self.cursor, prev_cursor) > 1.:
+            self.cursor_velocity = (((self.cursor[0] - prev_cursor[0]) / dt,
+                                     (self.cursor[1] - prev_cursor[1]) / dt)
+                                    if .001 <= dt <= .15 else (0., 0.))
+            self.cursor_sample = (self.cursor, now)
+            self.mouse_moved_at = now
+            return True
+        if dt > .05 or dt < 0:
+            self.cursor_velocity = (0., 0.)
+            self.cursor_sample = (self.cursor, now)
+        return 0 <= now - self.mouse_moved_at <= .02
+
     def _sense_toy_cursor(self,now):
-        near=(self.prefs.get('senseCursor',True) and not self.ball_stored and self.ball.isVisible()
-              and not self.ball.dragging and not self.panel
-              and math.dist(self.cursor,(self.ball.body.x,self.ball.body.y))<self.ball.body.half_w+24)
+        if (not self.prefs.get('senseCursor',True) or not self.visible() or self.panel
+                or self.ball_stored or not self.ball.isVisible()
+                or self.ball.dragging or self.ball.body.held
+                or self.body.held or self.held_since is not None
+                or self.state.pressing or self.scene_dragging):
+            self._reset_cursor_motion()
+            return
+        moved=self._track_cursor(now)
+        radius=self.ball.body.half_w+24
+        near=math.dist(self.cursor,(self.ball.body.x,self.ball.body.y))<radius
         if near and not self.cursor_toy_near and now>=self.next_toy_attention:
             self.senses.kick('NOVELTY',.35)
             self.behavior.look_at(self.ball.body.x,self.ball.body.y,now)
             self.next_toy_attention=now+2.5
+        if near and (not self.cursor_toy_near or moved):
+            self.last_toy_push=push_from_cursor(
+                self.ball,self.cursor,self.cursor_velocity,now,self.last_toy_push,radius=radius)
         self.cursor_toy_near=near
 
     def _play_expression(self,now):
@@ -498,7 +547,7 @@ class Game:
         frozen = self.panicked or self.hidden or not self.available_areas()
         if frozen:
             self._cancel_holds(now)
-            self.cursor_toy_near=False
+            self._reset_cursor_motion()
             if self.paused_at is None: self.paused_at = now
             return
         if self.paused_at is not None:
@@ -541,7 +590,7 @@ class Game:
         self.mesa.set_visible(not self.mesa.escondido)
         self.protest_ctl.carry(now,self.sleep.asleep); self.sad_ctl.carry(now,self.sleep.asleep)
         self.mischief.tick(dt,area[3])
-        perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), fotos=False)
+        perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
         if not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.tick(now,self.rates,self.state.emotion,self.body,self.visible() and not self.sleep.asleep,dt)

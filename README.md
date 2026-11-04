@@ -5,22 +5,27 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Experimental · Windows x64 · Fonte 0.3.2 candidata de teste.**
+**Experimental · Windows x64 · Fonte 0.3.3 candidata de teste.**
 
 [Instalador publicado](https://github.com/kuky13/bolha/releases/latest) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A 0.3.2 traz a correção da pega, uma pose mais firme enquanto a Bolha é segurada
-e o arremesso com impulso recente do mouse na personagem e no brinquedo, como
-candidata de teste do [PR #2](https://github.com/kuky13/bolha/pull/2). A versão
-pública continua **0.3.0**. O instalador de teste foi compilado e aprovado nos
-10 cenários do CI Windows e a fonte `ddcfa90` passou nos cinco casos reais de
-`SendInput` no Windows; no notebook físico, a instalação isolada em modo `/TEST`
-retornou código `2` antes de criar a pasta (causa ainda indeterminada, sessão
-interrompida ao desligar o equipamento), de modo que o runtime empacotado e a
-atualização `0.3.1 → 0.3.2` fora do CI, o uso manual prolongado e dois monitores
-físicos permanecem pendentes. Veja a
+A 0.3.3 reúne a irritação vermelha legível, efeitos de expressão que giram e se
+achatam junto com o corpo, reação física do amendoim e da bolinha à aproximação
+do cursor, pega firme com arremesso por impulso recente do mouse e reações
+online reais de GIFs/imagens em memória RAM (ReactionGIFs com fallback anime
+Nekos.best, sem chave e desligáveis nas configurações), como candidata de teste
+do [PR #2](https://github.com/kuky13/bolha/pull/2). A versão pública continua
+**0.3.0**. Na fonte 0.3.3 congelada, passaram **352 testes locais** em Qt
+offscreen (11 específicos de Windows pulados no Linux) e a validação em RAM da
+`ObjectWindow` real (14 quadros animados observados, zero arquivos de mídia em
+disco); a compilação e validação do novo instalador `Bolha-Setup-0.3.3-x64.exe`
+no CI Windows e no equipamento físico ocorrem na etapa seguinte. Os resultados
+anteriores da candidata 0.3.2 (`ddcfa90`, aprovada nos 10 cenários do CI Windows
+e nos 5 casos reais de `SendInput`, com código `2` pendente na instalação `/TEST`
+isolada no notebook físico) permanecem documentados separadamente. Veja a
+[validação da 0.3.3](docs/VALIDATION-0.3.3.md), a
 [validação da pega 0.3.2](docs/VALIDATION-GRAB.md) e o
 [histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md).
 
@@ -38,14 +43,17 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
   olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
-- Irritação gradual ao segurar, reações ao soltar, sono com olhos fechando,
-  respiração e “zzz”, corações no carinho e efeitos de tontura e irritação.
+- Irritação gradual ao segurar com rubor vermelho forte, reações ao soltar, sono
+  com olhos fechando, respiração e “zzz”, corações no carinho e efeitos de
+  tontura e irritação que giram e se achatam junto com o corpo.
 - Espreguiçada, espirro, soluço, cochilo, piscadela e movimentos de orelhas
   ocasionais. As manias cedem às interações, ao sono e aos painéis.
 - Amendoim como brinquedo padrão, bolinha original opcional nas configurações,
   notebook de brincadeira, fogos, cartazes, protestos e castigo.
-- Oito memes novos da Bolha e bilhetes: no máximo uma travessura a cada cinco
-  minutos, até três objetos na tela; tudo configurável.
+- Reações online de memes e GIFs (ReactionGIFs e fallback Nekos.best) carregadas
+  apenas em memória conforme o que a Bolha quer expressar, além de bilhetes: no
+  máximo uma travessura a cada cinco minutos, até três objetos na tela; tudo
+  configurável e podendo desligar as reações online.
 - Painel com atividade neural, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
   contexto. Carinho reforça preferências; ausência de resposta é neutra.
@@ -78,9 +86,9 @@ não é necessário instalar Python separadamente.
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
 | Ctrl + Alt + Shift + B | Pausa ou retoma tudo |
 
-Soltar obedece à mesma regra na personagem e no brinquedo. A proximidade do
-ponteiro pode chamar a atenção do cérebro quando o sensor está ligado; as
-brincadeiras são decididas pelo pet, sem chute automático do mouse.
+Soltar obedece à mesma regra na personagem e no brinquedo. Quando o sensor de
+cursor está ligado, aproximar o ponteiro do amendoim ou da bolinha empurra o
+brinquedo para o lado e alimenta a atenção do cérebro.
 
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
@@ -99,9 +107,13 @@ Você pode desligar separadamente a leitura do nome do programa ativo, do
 tempo ocioso, da posição do cursor e da geometria das janelas. Não há captura
 de tela, leitura de títulos/conteúdo, chat, conta, créditos ou provedor de IA.
 
-A única comunicação de rede do aplicativo é a busca/download de atualizações
-no GitHub. O cérebro e a interface usam o mesmo processo Python, sem
-abrir portas locais ou enviar sua memória para servidores.
+A comunicação de rede do aplicativo limita-se à busca/download de atualizações
+no GitHub e, quando a opção de reações online está ativa nas configurações, à
+busca sem chave de memes/GIFs públicos (ReactionGIFs e Nekos.best) usando
+somente palavras-chave genéricas de humor em inglês; os bytes de mídia ficam
+apenas em memória RAM enquanto a reação está aberta e são descartados ao fechar.
+O cérebro e a interface usam o mesmo processo Python, sem abrir portas locais
+ou enviar sua memória, programas ativos, coordenadas ou arquivos para servidores.
 
 ## Atualizações
 
@@ -136,7 +148,8 @@ py -3.11 -m venv .venv
 
 O resultado fica em `release/`. O script usa PyInstaller e NSIS portátil fixado
 por checksum, sem instalar o compilador globalmente. Veja
-[compilação e testes Windows](docs/BUILD.md), [validação da pega 0.3.2](docs/VALIDATION-GRAB.md),
+[compilação e testes Windows](docs/BUILD.md), [validação da 0.3.3](docs/VALIDATION-0.3.3.md),
+[validação da pega 0.3.2](docs/VALIDATION-GRAB.md),
 [histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md)
 e [histórico da migração Qt 0.3.0](docs/VALIDATION-NATIVE.md).
 O pipeline da Bolha só roda manualmente ou por tag; salvar commits e abrir

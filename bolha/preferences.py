@@ -6,10 +6,10 @@ from .migration import atomic_json, prepare_data, read_json
 
 DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 toyAppearance='peanut',
-                mischiefEnabled=True, mischiefInterval=300, maxObjects=3,
+                mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True)
-BOOLEAN_KEYS = ('roaming','mischiefEnabled','senseApp','senseIdle','senseCursor','senseWindows',
+BOOLEAN_KEYS = ('roaming','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
                 'adaptiveBehavior','learnRoutine')
 SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 

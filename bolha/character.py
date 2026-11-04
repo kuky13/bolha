@@ -43,30 +43,64 @@ def _pen(color=GOLD, width=2.5, alpha=1.0):
     return QPen(_color(color, alpha), width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
 
 
-def _body(p):
+def _mix_color(first, second, amount, alpha=1.0):
+    amount = _clamp(amount, 0.0, 1.0)
+    a, b = QColor(first), QColor(second)
+    color = QColor.fromRgbF(
+        a.redF() + (b.redF() - a.redF()) * amount,
+        a.greenF() + (b.greenF() - a.greenF()) * amount,
+        a.blueF() + (b.blueF() - a.blueF()) * amount,
+        _clamp(alpha, 0.0, 1.0),
+    )
+    return color
+
+
+def _apply_pose_transform(painter, cx, cy, scale=1.0, angle=0.0, squash=0.0):
+    scale = _clamp(scale, .05, 20)
+    squash = _clamp(squash, -.25, .25)
+    painter.translate(cx, cy)
+    painter.rotate(_clamp(angle, -100000, 100000))
+    painter.scale(scale * (1 + squash), scale * (1 - squash))
+
+
+def _body(p, anger=0.0):
+    anger = _clamp(anger, 0.0, 1.0)
     glow = QRadialGradient(QPointF(0, 0), HALO_RADIUS)
-    for offset, color, alpha in ((0, '#6f59c8', 0), (.77, '#6f59c8', 0),
-                                 (.82, '#6f59c8', .15), (.88, '#9474ec', .32),
-                                 (.93, '#6b45ac', .14), (1, '#6b45ac', 0)):
-        glow.setColorAt(offset, _color(color, alpha))
+    for offset, calm_rgb, angry_rgb, alpha, boost in (
+        (0, '#6f59c8', '#e01b38', 0, 0),
+        (.77, '#6f59c8', '#e01b38', 0, 0),
+        (.82, '#6f59c8', '#e01b38', .15, .14),
+        (.88, '#9474ec', '#ff2a48', .32, .24),
+        (.93, '#6b45ac', '#b8122a', .14, .12),
+        (1, '#6b45ac', '#b8122a', 0, 0),
+    ):
+        glow.setColorAt(offset, _mix_color(calm_rgb, angry_rgb, anger, alpha + boost * anger))
     p.setPen(Qt.NoPen)
     p.setBrush(glow)
     p.drawEllipse(QPointF(0, 0), HALO_RADIUS, HALO_RADIUS)
     ring = QLinearGradient(-47, -47, 47, 47)
-    ring.setColorAt(0, QColor('#b45da6'))
-    ring.setColorAt(.5, QColor('#8a79c1'))
-    ring.setColorAt(1, QColor('#6c96b5'))
+    ring.setColorAt(0, _mix_color('#b45da6', '#ff2e4c', anger))
+    ring.setColorAt(.5, _mix_color('#8a79c1', '#de1d38', anger))
+    ring.setColorAt(1, _mix_color('#6c96b5', '#a81428', anger))
     p.setBrush(ring)
     p.drawEllipse(QPointF(0, 0), RADIUS, RADIUS)
     core = QRadialGradient(QPointF(-15, -19), 91)
-    core.setColorAt(0, QColor('#25252c'))
-    core.setColorAt(.55, QColor('#151519'))
-    core.setColorAt(1, QColor('#0b0b0e'))
+    core.setColorAt(0, _mix_color('#25252c', '#961e2e', anger))
+    core.setColorAt(.55, _mix_color('#151519', '#52111c', anger))
+    core.setColorAt(1, _mix_color('#0b0b0e', '#26080d', anger))
     p.setBrush(core)
     p.drawEllipse(QPointF(0, 0), 46.8, 46.8)
+    if anger > 0:
+        flush = QRadialGradient(QPointF(0, -8), 42)
+        flush.setColorAt(0, _color('#e31e39', .42 * anger))
+        flush.setColorAt(.65, _color('#9e1125', .22 * anger))
+        flush.setColorAt(1, _color('#4a0812', 0))
+        p.setBrush(flush)
+        p.drawEllipse(QPointF(0, 0), 46.8, 46.8)
 
 
-def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, blink_left=None, blink_right=None):
+def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0,
+              blink_left=None, blink_right=None, anger=0.0):
     """Desenha somente olhos e orelhas. A metade inferior do rosto fica vazia."""
     clip = QPainterPath()
     clip.addEllipse(QPointF(0, 0), FACE_RADIUS, FACE_RADIUS)
@@ -144,8 +178,8 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
             eye.addEllipse(QPointF(x, y), rx, height)
             if emotion in ('bravo', 'triste', 'entediado', 'sonolento', 'travesso'):
                 # As pálpebras fazem parte dos olhos, sem acrescentar boca ou sobrancelhas.
-                slope = side * (-.43 if emotion == 'bravo' else .26 if emotion == 'triste' else 0)
-                lid_y = y - height * (.14 if emotion == 'bravo' else .30 if emotion == 'triste' else .48)
+                slope = side * ((-.43 - .14 * anger) if emotion == 'bravo' else .26 if emotion == 'triste' else 0)
+                lid_y = y - height * ((.14 - .12 * anger) if emotion == 'bravo' else .30 if emotion == 'triste' else .48)
                 lid = QPainterPath(QPointF(x-rx-1, lid_y + slope*(-rx-1)))
                 lid.lineTo(x+rx+1, lid_y + slope*(rx+1))
                 lid.lineTo(x+rx+1, y+height+1)
@@ -168,39 +202,37 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
 
 def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
                    blink=0.0, gaze=(0.0, 0.0), squash=0.0,
-                   ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, body_opacity=1.0, blink_left=None, blink_right=None):
+                   ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, body_opacity=1.0,
+                   blink_left=None, blink_right=None, anger=None):
     """Pinta Bolha somente com olhos e orelhas: nunca desenha boca.
 
     ``blink``: 0 aberto, 1 fechado; ``eye_open``: abertura 0..1.3;
     ``ear_tilt``: graus espelhados; ``ear_raise``: elevação canônica.
     Escala, rotação e squash afetam corpo e rosto juntos.
     """
-    scale = _clamp(scale, .05, 20)
-    squash = _clamp(squash, -.25, .25)
     emotion = {'calma': 'observando', 'tímido': 'timido', 'dramático': 'dramatico'}.get(emotion, emotion)
     emotion = emotion if emotion in EMOTIONS else 'observando'
+    anger = (.75 if emotion == 'bravo' else 0.0) if anger is None else _clamp(anger, 0.0, 1.0)
     gaze = (_clamp(gaze[0], -1, 1), _clamp(gaze[1], -1, 1))
     painter.save()
-    painter.translate(cx, cy)
-    painter.rotate(_clamp(angle, -100000, 100000))
-    painter.scale(scale * (1 + squash), scale * (1 - squash))
+    _apply_pose_transform(painter, cx, cy, scale, angle, squash)
     painter.save()
     painter.setOpacity(painter.opacity() * _clamp(body_opacity, .2, 1))
-    _body(painter)
+    _body(painter, anger)
     painter.restore()
     _features(painter, emotion, _clamp(blink, 0, 1), gaze,
-              _clamp(ear_tilt, -35, 35), _clamp(ear_raise, -5, 5), _clamp(eye_open, 0, 1.3),blink_left,blink_right)
+              _clamp(ear_tilt, -35, 35), _clamp(ear_raise, -5, 5), _clamp(eye_open, 0, 1.3),
+              blink_left, blink_right, anger)
     painter.restore()
 
 
-def draw_sleep_marks(painter, cx, cy, scale=1.0, phase=0.0, strength=1.0):
-    """Três zzz vetoriais sobem em 2,4s; decoração em espaço de tela, sem entrada."""
+def draw_sleep_marks(painter, cx, cy, scale=1.0, phase=0.0, strength=1.0, angle=0.0, squash=0.0):
+    """Três zzz vetoriais sobem em 2,4s; acompanham a pose do corpo, sem entrada."""
     strength = _clamp(strength, 0, 1)
     if strength == 0: return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
-    painter.translate(cx, cy)
-    painter.scale(_clamp(scale, .05, 20), _clamp(scale, .05, 20))
+    _apply_pose_transform(painter, cx, cy, scale, angle, squash)
     painter.setBrush(Qt.NoBrush)
     for index in range(3):
         progress = (phase / 2.4 + index / 3) % 1
@@ -216,15 +248,14 @@ def draw_sleep_marks(painter, cx, cy, scale=1.0, phase=0.0, strength=1.0):
     painter.restore()
 
 
-def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0):
-    """Pequenos corações, estrelas e risquinhos; decoração vetorial sem hitbox."""
+def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
+                        angle=0.0, squash=0.0):
+    """Pequenos corações, estrelas e risquinhos; acompanham a pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
     if strength == 0 or kind not in ('carinho', 'tonto', 'bravo'): return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
-    painter.translate(cx, cy)
-    size_scale = _clamp(scale, .05, 20)
-    painter.scale(size_scale, size_scale)
+    _apply_pose_transform(painter, cx, cy, scale, angle, squash)
     if kind == 'carinho':
         for index in range(3):
             progress = (phase / 1.8 + index / 3) % 1
@@ -252,13 +283,15 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
             painter.drawPath(star)
     else:
         painter.setBrush(Qt.NoBrush)
-        painter.setPen(_pen(width=1.55, alpha=strength*.85))
         for side in (-1, 1):
             for index in range(2):
                 offset = math.sin(phase*18+index)*.8*strength
                 mark = QPainterPath(QPointF(side*(42+index*5), -19-index*4+offset))
                 mark.lineTo(side*(45+index*5), -23-index*4+offset)
                 mark.lineTo(side*(43+index*5), -27-index*4+offset)
+                painter.setPen(_pen(color='#ff3352', width=2.6, alpha=strength*.55))
+                painter.drawPath(mark)
+                painter.setPen(_pen(width=1.55, alpha=strength*.9))
                 painter.drawPath(mark)
     painter.restore()
 

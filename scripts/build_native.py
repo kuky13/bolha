@@ -104,7 +104,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
     else:
         subprocess.run(args,cwd=ROOT,check=True)
     prune_optional_qt(bundle)
-    subprocess.run([sys.executable,str(ROOT/'scripts/audit_native.py'),str(bundle)],check=True)
+    subprocess.run([sys.executable,str(ROOT/'scripts/audit_native.py'),str(bundle),'--output-json',str(ROOT/'validation/package-audit.json')],check=True)
     manifest={}
     for path in bundle.rglob('*'):
         if path.is_file() and path.name!='installed-files.json':

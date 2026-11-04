@@ -36,20 +36,25 @@ class PetVisual(QWidget):
             p.setClipRect(QRect(0,0,self.width(),max(0,int(game.state.desk_top-self.y()))))
         blink=1.0 if now < self.pet.blink_until else 0.0
         pose=self.pet.motion.pose
-        # A transformação comum gira corpo, olhos e orelhas em torno do mesmo centro.
-        draw_character(p,self.width()/2,self.height()/2,scale=game.body.half_w/49,
-                       angle=game.body.angle+pose['angle_offset'],emotion=pose['emotion'],
+        scale=game.body.half_w/49
+        angle=game.body.angle+pose['angle_offset']
+        squash=pose['squash']
+        # A transformação comum gira corpo, olhos, orelhas e marcas no mesmo centro.
+        draw_character(p,self.width()/2,self.height()/2,scale=scale,
+                       angle=angle,emotion=pose['emotion'],
                        blink=max(blink,pose['blink']),gaze=pose['gaze'] or game.state.gaze,
                        blink_left=pose['blink_left'],blink_right=pose['blink_right'],
                        ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
-                       eye_open=pose['eye_open'],squash=pose['squash'],
-                       body_opacity=game.prefs.get('opacity',1))
+                       eye_open=pose['eye_open'],squash=squash,
+                       body_opacity=game.prefs.get('opacity',1),
+                       anger=pose.get('anger',0.))
         if pose['zzz_strength']>0:
-            draw_sleep_marks(p,self.width()/2,self.height()/2,game.body.half_w/49,
-                             pose['zzz_phase'],pose['zzz_strength'])
+            draw_sleep_marks(p,self.width()/2,self.height()/2,scale,
+                             pose['zzz_phase'],pose['zzz_strength'],angle=angle,squash=squash)
         if pose['effect'] and pose['effect_strength']>0:
-            draw_reaction_marks(p,self.width()/2,self.height()/2,game.body.half_w/49,
-                                pose['effect_phase'],pose['effect'],pose['effect_strength'])
+            draw_reaction_marks(p,self.width()/2,self.height()/2,scale,
+                                pose['effect_phase'],pose['effect'],pose['effect_strength'],
+                                angle=angle,squash=squash)
         p.end();self.paint_times.append(now);self.painted.emit()
 
 

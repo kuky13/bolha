@@ -212,7 +212,7 @@ class NativeApp:
         from .dialogs import NeuralDialog
         self._show_dialog(NeuralDialog)
     def save_preferences(self,patch):
-        result=self.store.save(patch);self.game.configure(result);self.pet.sync();return result
+        result=self.store.save(patch);self.game.configure(result);self.pet.sync();self.scene.sync();return result
     def reset_appearance(self):
         result=self.store.reset_appearance();self.game.configure(result);return result
     def startup_enabled(self):
