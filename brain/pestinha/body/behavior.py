@@ -50,6 +50,7 @@ class Behavior:
         self.ball = None            # a bolinha (toy.Ball), ligada pelo app
         self.play = None            # Play: estilo de brincadeira do pet, ligado pelo app
         self.play_pull = 0.0        # 0..1, da rede: quanto ele quer brincar agora (ver mesa.pull)
+        self.last_play = None      # último resultado real, usado pela expressão da Bolha
         self.canto = False          # o neurônio CANTO está disparando: ele vai para o cantinho
         self.fuga_alvo = None       # x para onde ele está fugindo do cantinho (None: não está fugindo)
         self.march_dir = 1
@@ -247,7 +248,10 @@ class Behavior:
 
         # brincar com a bolinha (chutar ou arremessar, conforme o estilo do pet)
         if self.play is not None and self.ball is not None and self.emotion not in STILL and not st.at_desk:
-            if self.play.tick(now, body, self.ball, cursor, self.emotion, self.play_pull):
+            previous=self.play.next_at
+            action=self.play.tick(now, body, self.ball, cursor, self.emotion, self.play_pull)
+            if self.play.next_at!=previous:self.last_play=dict(started=now,action=action)
+            if action:
                 body.jump(0.0, -180.0)              # pulinho de quem acabou de chutar
 
         if self.adaptive_goal and self.emotion not in STILL:

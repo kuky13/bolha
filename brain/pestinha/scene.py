@@ -168,6 +168,7 @@ class Ball(Item):
         super().__init__('paper' if kind == 'papel' else 'ball', 42, 42)
         self.body = Body(x, y, 17, 17)
         self.roll_angle = 0.0  # fase visual original em radianos, não é outro corpo
+        self.appearance = 'ball' if kind=='papel' else 'peanut'
         self.dragging = False
         self.last_handled = -1e9
         self.place()
@@ -179,5 +180,5 @@ class Ball(Item):
             self.body.step(dt, bounds, [], areas, monitors, displays)
         self.place()
     def snapshot(self):
-        data=super().snapshot();data['angle']=math.degrees(self.roll_angle)
+        data=super().snapshot();data['angle']=math.degrees(self.roll_angle);data['appearance']=self.appearance
         return data

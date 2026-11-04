@@ -1,0 +1,212 @@
+# SPDX-License-Identifier: GPL-3.0-only
+"""Expressões visuais no relógio já existente; nunca modifica o corpo físico."""
+import math
+import random
+from .character import WINK_DURATION, wink_state
+
+QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
+                     ear_wiggle=1.5, wink=WINK_DURATION)
+
+
+def _unit(value):
+    return max(0., min(1., value))
+
+
+def _ease(value):
+    value = _unit(value)
+    return value * value * (3 - 2 * value)
+
+
+def animation_pose(mode, seconds, strength=1.):
+    """Quadro determinístico compartilhado pelo aplicativo e pelas prévias Qt.
+
+    Os campos de desenho mantêm a API do personagem. Os offsets giram a esfera
+    inteira; os efeitos externos têm sua própria fase, sem receber essa rotação.
+    """
+    t = max(0., float(seconds));strength = _unit(strength)
+    pose = dict(emotion=mode, eye_open=1., ear_tilt=0., ear_raise=0., squash=0.,
+                gaze=None, blink=0., blink_left=None, blink_right=None,
+                angle_offset=0., zzz_strength=0., zzz_phase=t,
+                effect=None, effect_strength=0., effect_phase=t)
+    if mode == 'held':
+        irritation = _ease((t - .7) / 3.)
+        pose.update(emotion='curioso' if t < .7 else 'entediado' if irritation < .3 else 'bravo',
+                    eye_open=1.12 - .7 * irritation, ear_raise=1. - 5. * irritation,
+                    ear_tilt=14. * irritation, squash=.12 * irritation * math.sin(t * 13),
+                    angle_offset=irritation * (3.5 * math.sin(t * 12) + 2. * math.sin(t * 19)),
+                    effect='bravo', effect_strength=irritation * strength)
+    elif mode == 'sleeping':
+        closing = _ease(t / 1.8);breath = math.sin(t * math.tau / 4.2)
+        pose.update(emotion='sonolento' if t < 1.8 else 'dormindo',
+                    eye_open=1. - closing, blink=closing,
+                    ear_raise=-1. - 1.5 * closing + .7 * breath, ear_tilt=5. * closing,
+                    squash=.055 * breath, angle_offset=1.4 * breath,
+                    zzz_strength=_ease((t - 1.4) / 1.2))
+    elif mode in ('caress', 'comemorando'):
+        joy = .7 + .3 * strength
+        pose.update(emotion='feliz' if mode == 'caress' else 'comemorando',
+                    ear_raise=1.8 + 1.2 * math.sin(t * 10), ear_tilt=10 * math.sin(t * 11),
+                    squash=-.13 * math.sin(t * 8) * joy, angle_offset=5. * math.sin(t * 6) * joy,
+                    effect='carinho' if mode == 'caress' else None, effect_strength=joy)
+    elif mode == 'airborne':
+        pose.update(emotion='assustado', eye_open=1.25, ear_raise=2.4,
+                    squash=-.15 * strength, angle_offset=2 * math.sin(t * 7))
+    elif mode == 'impact':
+        rebound = math.exp(-t * 7) * math.cos(t * 18)
+        pose.update(emotion='assustado', blink=max(0., 1 - t / .11),
+                    ear_raise=-2. * rebound, squash=.23 * rebound * strength,
+                    angle_offset=5. * math.exp(-t * 6) * math.sin(t * 16) * strength)
+    elif mode == 'tonto':
+        pose.update(emotion='tonto', ear_raise=-1.5, ear_tilt=9 * math.sin(t * 7),
+                    squash=.07 * math.sin(t * 9), angle_offset=7 * math.sin(t * 5),
+                    effect='tonto', effect_strength=.8)
+    elif mode in ('birra', 'sacudir'):
+        envelope = math.exp(-t * (1.1 if mode == 'birra' else 2.))
+        pose.update(emotion='bravo' if mode == 'birra' else 'contente',
+                    eye_open=.55 if mode == 'birra' else 1.,
+                    blink=.95 if mode == 'sacudir' and t < .3 else 0.,
+                    ear_tilt=18 * math.sin(t * 17) * envelope,
+                    ear_raise=-2 * envelope, squash=.2 * math.sin(t * 15) * envelope * strength,
+                    angle_offset=12 * math.sin(t * 16) * envelope * strength,
+                    effect='bravo' if mode == 'birra' else None, effect_strength=strength)
+    elif mode == 'preparar_bote':
+        crouch = _ease(t / .8)
+        pose.update(emotion='atento', eye_open=1.15 - .4 * crouch,
+                    ear_raise=-1.5 * crouch, ear_tilt=-6 * crouch,
+                    squash=.19 * crouch, angle_offset=4 * math.sin(t * 11) * crouch)
+    elif mode == 'bote_erro':
+        flump = math.exp(-((t - .25) / .16) ** 2)
+        wobble = math.sin(t * 13) * math.exp(-t * 1.8)
+        pose.update(emotion='tonto' if .3 < t < 1.15 else 'timido',
+                    blink=flump, ear_raise=-3 * flump, ear_tilt=12 * wobble,
+                    squash=.24 * flump + .10 * wobble,
+                    angle_offset=14 * wobble, effect='tonto',
+                    effect_strength=.65 * _ease(t / .4) * (1 - _ease((t - 1.) / .6)))
+    elif mode == 'brinquedo_susto':
+        shock = math.exp(-t * 3)
+        pose.update(emotion='assustado', eye_open=1.25, ear_raise=3 * shock,
+                    ear_tilt=-12 * shock, squash=-.22 * shock,
+                    angle_offset=10 * math.sin(t * 16) * shock)
+    elif mode == 'fingir_trabalho':
+        caught = _ease((t - .45) / .3)
+        pose.update(emotion='entediado' if t < .45 else 'assustado' if t < .8 else 'atento',
+                    eye_open=.5 + .7 * caught, ear_raise=-1 + 3 * caught,
+                    gaze=(.15 * math.sin(t * 8), .65),
+                    squash=.065 * math.sin(t * 15) * caught,
+                    angle_offset=2.5 * math.sin(t * 12) * caught)
+    elif mode == 'stretch':
+        envelope = math.sin(math.pi * _unit(t / QUIRK_SECONDS[mode])) ** 2
+        pose.update(emotion='contente', blink=envelope, ear_raise=4. * envelope,
+                    ear_tilt=-12 * envelope, squash=-.24 * envelope,
+                    angle_offset=9. * math.sin(t * 2.6) * envelope)
+    elif mode == 'sneeze':
+        anticipation = _ease(t / .7) * (1 - _ease((t - .85) / .25))
+        burst = math.exp(-((t - .95) / .12) ** 2)
+        recovery = math.exp(-max(0., t - 1.) * 7) * math.sin(max(0., t - 1.) * 19) if t > 1 else 0.
+        pose.update(emotion='assustado' if t < .85 else 'contente', blink=_unit(anticipation + burst),
+                    ear_raise=2.5 * anticipation - 3 * burst,
+                    squash=-.15 * anticipation + .24 * burst + .10 * recovery,
+                    angle_offset=-7 * anticipation + 13 * burst + 4 * recovery)
+    elif mode == 'hiccup':
+        pulse = math.exp(-((t - .35) / .09) ** 2) + .7 * math.exp(-((t - .95) / .09) ** 2)
+        pose.update(emotion='curioso', eye_open=1. + .25 * pulse, ear_raise=3 * pulse,
+                    squash=-.21 * pulse, angle_offset=7 * pulse)
+    elif mode == 'doze':
+        closing = _ease(t / 1.25) * (1 - _ease((t - 2.25) / .45))
+        startle = math.exp(-((t - 2.65) / .15) ** 2)
+        pose.update(emotion='sonolento' if t < 2.5 else 'assustado', blink=closing,
+                    ear_raise=-2. * closing + 3. * startle, eye_open=1. + .2 * startle,
+                    squash=.13 * closing - .18 * startle, angle_offset=12 * closing - 9 * startle)
+    elif mode == 'ear_wiggle':
+        envelope = math.sin(math.pi * _unit(t / QUIRK_SECONDS[mode])) ** 2
+        pose.update(emotion='curioso', ear_tilt=23 * math.sin(t * 17) * envelope,
+                    ear_raise=2. * math.sin(t * 11) * envelope,
+                    angle_offset=4 * math.sin(t * 8) * envelope)
+    elif mode == 'wink':
+        wink = wink_state(_unit(t / WINK_DURATION))
+        pose.update(emotion='contente', **{key: value for key, value in wink.items() if key != 'tilt'})
+        pose['angle_offset'] = wink['tilt']
+    elif mode == 'bravo':
+        pose.update(eye_open=.6, ear_raise=-1.5, squash=.06 * math.sin(t * 12) * strength,
+                    angle_offset=2.5 * math.sin(t * 13) * strength,
+                    effect='bravo', effect_strength=strength)
+    elif mode == 'triste':
+        pose.update(ear_raise=-1.2 + .35 * math.sin(t * 2), eye_open=.8,
+                    gaze=(0., .8), squash=.045 * math.sin(t * 2), angle_offset=2. * math.sin(t * 1.5))
+    elif mode in ('curioso', 'atento', 'travesso'):
+        pose.update(ear_tilt=8 * math.sin(t * 3.5), ear_raise=1.1 * math.sin(t * 4),
+                    angle_offset=4 * math.sin(t * 2.2), eye_open=1. + .08 * math.sin(t * 3))
+    elif mode in ('sonolento', 'entediado'):
+        pose.update(ear_raise=-.6, eye_open=.65 + .13 * math.sin(t * 1.8),
+                    squash=.045 * math.sin(t * 2), angle_offset=2. * math.sin(t * 1.6))
+    elif mode == 'assustado':
+        pose.update(eye_open=1.2, ear_raise=1.8, squash=-.08 * math.exp(-t * 2),
+                    angle_offset=3. * math.sin(t * 11) * math.exp(-t * 2))
+    elif mode in ('contente', 'feliz', 'timido', 'observando', 'dramatico'):
+        pose.update(ear_raise=.7 * math.sin(t * 3.2), squash=.025 * math.sin(t * 3),
+                    angle_offset=1.5 * math.sin(t * 2))
+    pose['squash'] = max(-.25, min(.25, pose['squash']))
+    return pose
+
+
+class ExpressionMotion:
+    """Seleciona a expressão a partir do cérebro e dos gestos, sem outra física."""
+    def __init__(self, now, rng=None):
+        self.random = rng or random
+        self.mode = 'observando';self.started = now;self.held_since = None;self.sleep_since = None
+        self.last_landing = 0.;self.impact_since = -1e9;self.dizzy_until = 0.
+        self.quirk = None;self.quirk_since = now;self.last_quirk = None
+        self.next_quirk = now + self.random.uniform(35, 75)
+        self.next_wink = now + self.random.uniform(90, 180)
+        self.pose = animation_pose(self.mode, 0)
+
+    def update(self, game, now, press_since=None):
+        body, state = game.body, game.state
+        tones = state.tone.r
+        held = press_since is not None or body.held
+        if held and self.held_since is None:self.held_since = press_since if press_since is not None else now
+        if not held:self.held_since = None
+        if game.sleep.asleep and not held:
+            if self.sleep_since is None:self.sleep_since = now
+        else:self.sleep_since = None
+        landing = game.landing
+        if landing > .18 and self.last_landing < .08:self.impact_since = now
+        self.last_landing = landing
+        if state.dizzy(now) or abs(body.omega) > 450:self.dizzy_until = now + .8
+        mode = state.emotion;strength = 1.;elapsed = None
+        reaction = getattr(game, 'release_reaction', None) or {}
+        play_reaction = getattr(game, 'play_reaction', None) or {}
+        if held:
+            mode = 'held';elapsed = now - self.held_since
+            # A irritação neural acelera o gesto; o relógio só interpola seus quadros.
+            strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
+        elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since
+        elif state.feliz_fechado(now):mode = 'caress';strength = .5 + .5 * tones['CHEER']
+        elif now < self.dizzy_until:mode = 'tonto'
+        elif not body.grounded and math.hypot(body.vx, body.vy) > 500:
+            mode = 'airborne';strength = _unit(math.hypot(body.vx, body.vy) / 1500)
+        elif now - self.impact_since < .5:mode = 'impact';elapsed = now - self.impact_since;strength = max(.35, landing)
+        elif now < reaction.get('until',0):
+            mode=reaction['kind'];elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
+        elif now < play_reaction.get('until',0):
+            mode=play_reaction['kind'];elapsed=now-play_reaction['started'];strength=_unit(play_reaction['intensity'])
+        elif game.festa.fogos.isVisible():mode = 'comemorando';strength = tones['CHEER']
+        elif mode == 'bravo':strength = .35 + .65 * tones['ANGRY']
+        eligible = (game.visible() and body.grounded and not held and not game.hover and not game.panel
+                    and mode in ('observando', 'contente', 'curioso', 'feliz', 'entediado'))
+        if self.quirk is not None and (not eligible or now - self.quirk_since >= QUIRK_SECONDS[self.quirk]):
+            self.quirk = None;self.next_quirk = now + self.random.uniform(35, 80)
+        if eligible and self.quirk is None:
+            if now >= self.next_wink and self.last_quirk != 'wink':
+                self.quirk = 'wink';self.next_wink = now + self.random.uniform(90, 180)
+            elif now >= self.next_quirk:
+                choices = [key for key in QUIRK_SECONDS if key not in ('wink', self.last_quirk)]
+                weights = [1 + (3 * tones['DROWSE'] if key == 'doze' else
+                                2 * tones['SETTLE'] if key == 'stretch' else
+                                2 * tones['WATCH'] if key == 'ear_wiggle' else 0) for key in choices]
+                self.quirk = self.random.choices(choices, weights=weights)[0]
+            if self.quirk is not None:self.quirk_since = now;self.last_quirk = self.quirk
+        if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
+        if mode != self.mode:self.mode = mode;self.started = now
+        self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        return self.pose

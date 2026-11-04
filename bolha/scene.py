@@ -2,12 +2,12 @@
 """Janelas Qt dos objetos; posições e física pertencem somente ao Game."""
 import math
 import time
-from PySide6.QtCore import Qt,QRect,QRectF,QPointF
+from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent
 from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath
 from PySide6.QtWidgets import QWidget,QMenu
 from .pet import FLAGS
 from .character import draw_character
-from .objects import paint_notebook,paint_ball,notebook_shape
+from .objects import paint_notebook,paint_ball,paint_peanut,peanut_shape,notebook_shape
 
 class ObjectWindow(QWidget):
     def __init__(self, scene, item):
@@ -17,15 +17,20 @@ class ObjectWindow(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True)
-        self.offset=None;self.samples=[];self.press_position=None;self.dragged=False
+        self.offset=None;self.press_position=None;self.dragged=False
         self.resize(round(item.width()),round(item.height()))
         self._sync_mask()
     def _sync_mask(self):
         item=self.item
         if item.kind=='fireworks':return
-        key=(self.width(),self.height(),self.devicePixelRatioF(),item.kind,item.working)
+        peanut=item.kind=='ball' and getattr(item,'appearance','ball')=='peanut'
+        key=(self.width(),self.height(),self.devicePixelRatioF(),item.kind,item.working,
+             getattr(item,'appearance',None),item.roll_angle if peanut else None)
         if key==getattr(self,'_mask_key',None):return
-        if item.kind in ('ball','paper'):
+        if peanut:
+            path=peanut_shape(self.width()/2,self.height()/2,item.body.half_w,item.roll_angle)
+            mask=QRegion(path.toFillPolygon().toPolygon())
+        elif item.kind in ('ball','paper'):
             radius=item.body.half_w+1
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
         else:
@@ -39,35 +44,47 @@ class ObjectWindow(QWidget):
         item=self.item;data=item.snapshot()
         self.move(round(data['x']-self.width()/2),round(data['y']-self.height()/2))
         visible=item.isVisible() and self.scene.game.visible()
+        if not visible:self.cancel_interaction()
         self.setVisible(visible)
         key=tuple(data[field] for field in ('kind','text','image','angle','working','x','y'))+(
+            getattr(item,'appearance',None),
             getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'subtitle',None),
             self.width(),self.height(),self.devicePixelRatioF(),visible)
         if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
             self._paint_key=key;self.update()
-    def enterEvent(self,event):self.scene.game.hover=True
+    def enterEvent(self,event):
+        # Apresentar o brinquedo ao ponteiro não congela a vontade neural de brincar.
+        if self.item.kind!='ball':self.scene.game.hover=True
     def leaveEvent(self,event):
         if self.offset is None:self.scene.game.hover=False
     def mousePressEvent(self,event):
         if event.button()!=Qt.LeftButton:return
         p=event.globalPosition();self.offset=(p.x()-self.item._cx,p.y()-self.item._cy)
         self.press_position=(p.x(),p.y());self.dragged=False
-        self.samples=[(time.monotonic(),p.x(),p.y())]
         self.scene.game.interact(dict(type='drag-start',id=self.item.id,x=self.item._cx,y=self.item._cy))
     def mouseMoveEvent(self,event):
         if self.offset is None:return
-        p=event.globalPosition();now=time.monotonic()
+        p=event.globalPosition()
         if math.dist(self.press_position,(p.x(),p.y()))>=4:self.dragged=True
-        self.samples.append((now,p.x(),p.y()));self.samples=[s for s in self.samples if now-s[0]<.12]
         self.scene.game.interact(dict(type='drag',id=self.item.id,x=p.x()-self.offset[0],y=p.y()-self.offset[1]));self.sync()
     def mouseReleaseEvent(self,event):
-        if self.offset is None:return
-        p=event.globalPosition();a,b=self.samples[0],self.samples[-1];dt=max(.001,b[0]-a[0])
-        vx,vy=((b[1]-a[1])/dt,(b[2]-a[2])/dt) if time.monotonic()-b[0]<.1 else (0,0)
-        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=p.x()-self.offset[0],y=p.y()-self.offset[1],vx=vx,vy=vy))
+        if event.button()!=Qt.LeftButton or self.offset is None:return
+        p=event.globalPosition()
+        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=p.x()-self.offset[0],y=p.y()-self.offset[1]))
         if not self.dragged and math.dist(self.press_position,(p.x(),p.y()))<4:
             self.scene.game.interact(dict(type='dismiss',id=self.item.id))
         self.offset=None;self.press_position=None
+        self.scene.game.hover=self.item.kind!='ball' and self.mask().contains(self.mapFromGlobal(p.toPoint()))
+    def cancel_interaction(self):
+        if self.offset is None:return
+        self.offset=None;self.press_position=None;self.dragged=False
+        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=self.item._cx,y=self.item._cy))
+        self.scene.game.hover=False
+    def event(self,event):
+        if event.type()==QEvent.UngrabMouse and getattr(self,'offset',None) is not None:self.cancel_interaction()
+        return super().event(event)
+    def closeEvent(self,event):
+        self.cancel_interaction();super().closeEvent(event)
     def contextMenuEvent(self,event):
         menu=QMenu(self);action=menu.addAction('Guardar objeto')
         if menu.exec(event.globalPos())==action:
@@ -80,8 +97,11 @@ class ObjectWindow(QWidget):
         p=QPainter(self);p.setRenderHint(QPainter.Antialiasing)
         w,h=self.width(),self.height();kind=self.item.kind
         if kind in ('ball','paper'):
-            paint_ball(p,w/2,h/2,radius=self.item.body.half_w,
-                       angle=self.item.roll_angle,paper=kind=='paper')
+            if kind=='ball' and self.item.appearance=='peanut':
+                paint_peanut(p,w/2,h/2,self.item.body.half_w,self.item.roll_angle)
+            else:
+                paint_ball(p,w/2,h/2,radius=self.item.body.half_w,
+                           angle=self.item.roll_angle,paper=kind=='paper')
         elif kind=='notebook':
             paint_notebook(p,QRectF(self.rect()),self.item.working)
         elif kind=='fireworks':

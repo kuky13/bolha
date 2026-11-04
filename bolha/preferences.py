@@ -5,6 +5,7 @@ from pathlib import Path
 from .migration import atomic_json, prepare_data, read_json
 
 DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
+                toyAppearance='peanut',
                 mischiefEnabled=True, mischiefInterval=300, maxObjects=3,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True)
@@ -24,6 +25,7 @@ def number(value):
 def sanitize(patch, previous=None):
     result = dict(previous if previous is not None else DEFAULTS)
     if not isinstance(patch,dict): return result
+    if patch.get('toyAppearance') in ('peanut','ball'):result['toyAppearance']=patch['toyAppearance']
     for key in BOOLEAN_KEYS:
         if type(patch.get(key)) is bool: result[key]=patch[key]
     for key,low,high in (('avatarSize',80,200),('mischiefInterval',60,1800),('maxObjects',1,5)):

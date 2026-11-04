@@ -172,7 +172,7 @@ class NativeApp:
         self.game.interact(dict(type=kind,**kwargs));self.pet.sync();self.scene.sync()
     def make_menu(self):
         menu=QMenu()
-        for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Bolinha','ball'),('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work'),('Uma travessura','mischief'),('Cantinho / perdão','corner'),('Sossega um pouquinho','quiet')):
+        for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Brinquedo','ball'),('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work'),('Uma travessura','mischief'),('Cantinho / perdão','corner'),('Sossega um pouquinho','quiet')):
             action=menu.addAction(label);action.triggered.connect(lambda checked=False,k=kind:self.interact(k))
         menu.addSeparator()
         action=menu.addAction('Configurações…');action.triggered.connect(self.show_settings)

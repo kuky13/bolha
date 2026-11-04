@@ -16,7 +16,7 @@ import time
 from PySide6.QtCore import Qt, QTimer, QRectF, QPointF
 from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QDialog, QDialogButtonBox, QFormLayout,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
     QScrollArea, QSpinBox, QTabWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QVBoxLayout, QWidget,
@@ -146,6 +146,14 @@ class SettingsDialog(QDialog):
 
     def _behavior_tab(self):
         layout = self._tab('Comportamento')
+        toy_form=QFormLayout()
+        self.toy_appearance=QComboBox()
+        self.toy_appearance.setAccessibleName('Aparência do brinquedo')
+        self.toy_appearance.addItem('Amendoim','peanut')
+        self.toy_appearance.addItem('Bolinha original','ball')
+        self.toy_appearance.currentIndexChanged.connect(self._dirty)
+        toy_form.addRow('&Brinquedo:',self.toy_appearance)
+        layout.addLayout(toy_form)
         self._check('mischiefEnabled', 'Trazer memes e bilhetes', layout)
         form = QFormLayout()
         self.interval = self._spin(1, 30, ' min', 'Intervalo mínimo entre travessuras')
@@ -200,6 +208,7 @@ class SettingsDialog(QDialog):
     def _values(self):
         return dict({key: control.isChecked() for key, control in self.checks.items()},
                     avatarSize=self.avatar_size.value(), opacity=self.opacity.value()/100,
+                    toyAppearance=self.toy_appearance.currentData(),
                     mischiefInterval=self.interval.value()*60, maxObjects=self.object_limit.value())
 
     def _load(self, preferences, appearance_only=False):
@@ -209,6 +218,7 @@ class SettingsDialog(QDialog):
         self.avatar_size.setValue(int(values['avatarSize']))
         self.opacity.setValue(round(values['opacity']*100))
         if not appearance_only:
+            self.toy_appearance.setCurrentIndex(self.toy_appearance.findData(values['toyAppearance']))
             self.interval.setValue(max(1, round(values['mischiefInterval']/60)))
             self.object_limit.setValue(int(values['maxObjects']))
             for key, control in self.checks.items():
