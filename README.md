@@ -1,6 +1,6 @@
 # Bolha
 
-![Bolha tranquila, feliz ao receber carinho e dormindo](docs/images/bolha-states.jpg)
+![Bolha Qt sem boca, com olhos e orelhinhas](docs/images/bolha-qt.png)
 
 A Bolha passeia, pula e quica pela sua tela, brinca com uma bolinha, senta no
 próprio notebook e aprende com suas interações.
@@ -11,36 +11,36 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-*Composição estática a partir do código da versão 0.2.1
-([commit 8d67085](https://github.com/kuky13/bolha/commit/8d6708574ebe636b9ecce58e50dc89342a7ea4a4)).
-O download leva à versão publicada mais recente. Artes de André Ribeiro Lima
-(KukySolutions), sob [CC BY-NC 4.0](licenses/BOLHA-ASSETS.md);
-composição e captura estática para esta apresentação.*
+*Execução Qt capturada em Linux offscreen, com fundo composto para apresentar
+janelas transparentes. A validação em Windows é separada. A personagem Bolha
+é arte própria de André Ribeiro Lima (KukySolutions), sob
+[CC BY-NC 4.0](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
+Qt de Pestinha, de mille-okws e contribuidores, sob
+[GPL-3.0-or-later](NOTICE.md).*
 
 ## O que acompanha
 
 - Carinho, cutucada, arrasto direto, arremesso, giro e pouso sobre janelas.
-- Rosto vetorial com olhos simétricos, brilho suave e flutuação independente.
-  Deitar vira somente o rosto; a esfera continua redonda. O chão é físico e invisível.
+- Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
+  olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
+  O chão é físico e invisível.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
 - Bolinha, notebook de brincadeira, fogos, cartazes, protestos e castigo.
 - Oito memes novos da Bolha e bilhetes: no máximo uma travessura a cada cinco
   minutos, até três objetos na tela; tudo configurável.
-- Se for muito arremessada, a Bolha estoura, some por 30 segundos e volta
-  tímida pelo canto. Carinho acelera a recuperação. O limite começa em 12
-  arremessos fortes por minuto; os saltos dela não entram nessa conta.
-- Controles de música do Windows, com atalhos e dança.
 - Painel com atividade neural, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
   contexto. Carinho reforça preferências; ausência de resposta é neutra.
 - Opções para desligar o comportamento adaptativo e apagar todo o aprendizado.
 
 Veja [a implementação da inteligência e seu orçamento](docs/INTELLIGENCE.md).
-O alvo de 100 MB se aplica ao cérebro Python; o Electron é medido separadamente.
+O aplicativo agora usa Qt e o cérebro no mesmo processo. O diagnóstico mede
+a memória total e o tamanho dos arrays neurais separadamente; a meta do cérebro
+não desliga recursos com base no consumo da interface.
 
 ## Instalação e primeiros passos
 
-Instale o `.exe` da página de versões. O instalador já inclui o cérebro Python;
+Instale o `.exe` da página de versões. O instalador já inclui Python, Qt e o cérebro;
 não é necessário instalar Python separadamente.
 
 ### Como interagir
@@ -51,9 +51,9 @@ não é necessário instalar Python separadamente.
 | Passar o mouse de um lado para o outro sobre ela | Faz carinho |
 | Arrastar e soltar | Leva junto ou arremessa |
 | Rodinha | Gira |
-| Configurações → Bolha → Deitar / Levantar | Descansa o rosto e volta a olhar para você |
+| Dormir um pouco | A esfera inteira tomba e descansa |
 | Botão direito | Abre configurações e atividades |
-| Duplo clique | Abre o painel do cérebro |
+| Menu → Cérebro e emoções | Abre o painel do cérebro |
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
 | Ctrl + Alt + Shift + B | Pausa ou retoma tudo |
 
@@ -64,70 +64,69 @@ ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
 
 Tudo o que a Bolha aprende fica em `%APPDATA%\bolha\brain`. Aparência e
 preferências ficam no diretório próprio `%APPDATA%\bolha`, separado de outros
-aplicativos. Reinstalar ou atualizar preserva esses arquivos. A versão 0.2 migra
-a pasta de memória anterior automaticamente, sem sobrescrever uma pasta nova existente.
+aplicativos. Reinstalar ou atualizar preserva esses arquivos. A versão 0.3 faz backup verificável antes de converter preferências e preserva
+a semente da rede e os formatos do aprendizado. A migração pode ser repetida
+sem sobrescrever uma pasta de memória nova existente. Perfis da versão 0.1
+continuam lendo e gravando na pasta original de aprendizado, para uma recuperação
+da versão anterior encontrar a mesma memória; ela não é renomeada na atualização.
 
 Você pode desligar separadamente a leitura do nome do programa ativo, do
 tempo ocioso, da posição do cursor e da geometria das janelas. Não há captura
 de tela, leitura de títulos/conteúdo, chat, conta, créditos ou provedor de IA.
 
 A única comunicação de rede do aplicativo é a busca/download de atualizações
-no GitHub. O cérebro conversa com a interface por entrada/saída padrão, sem
+no GitHub. O cérebro e a interface usam o mesmo processo Python, sem
 abrir portas locais ou enviar sua memória para servidores.
 
 ## Atualizações
 
 A versão instalada consulta o GitHub ao abrir e a cada seis horas. Uma versão
-nova é baixada e verificada. Depois aparece um aviso de 30 segundos, com opção
-de adiar por uma hora. Ao instalar, a Bolha salva e fecha o cérebro, atualiza
+nova é baixada e verificada por tamanho e SHA-256. Depois aparece um aviso de 30 segundos, com opção
+de adiar por uma hora. Ao instalar, a Bolha salva seu aprendizado, atualiza
 e reabre. O instalador usado é removido depois que a nova interface e o cérebro
 confirmam a inicialização; arquivos ainda bloqueados são limpos depois.
+O instalador prepara os arquivos antes de substituir a versão anterior e recupera
+a instalação se a nova não confirmar saúde. Arquivos desconhecidos e o backup
+legado do Electron ficam preservados para recuperação; o diagnóstico local
+registra o caminho quando essa cópia precisa ser mantida.
 
 ## Como funciona
 
-O desenho da Bolha usa Electron/React; o cérebro é uma adaptação da rede neural
-local original do [Pestinha](https://github.com/mille-okws/pestinha), com 470
-neurônios. A origem do motor e as adaptações estão em [NOTICE.md](NOTICE.md).
+O desenho e as janelas transparentes usam Python 3.11 e Qt/PySide6. O cérebro é
+uma adaptação da rede neural local original do [Pestinha](https://github.com/mille-okws/pestinha),
+com 470 neurônios. A origem do motor e as adaptações estão em [NOTICE.md](NOTICE.md).
 
 ## Compilar pelo código
 
-Use Node.js 22 e Python 3.11. Em um terminal no projeto:
+No Windows x64, use Python 3.11. Nenhum Node.js, `.env`, credencial ou serviço
+da OneDrip é necessário.
 
 ```powershell
-npm ci
-python -m venv .venv
-.venv\Scripts\python -m pip install -r brain/requirements.txt pytest==8.4.2 pyinstaller==6.22.3
-$env:BOLHA_PYTHON = (Resolve-Path .venv\Scripts\python.exe).Path
-npm run dev
+py -3.11 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements-build.txt
+.venv\Scripts\python -m bolha
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python scripts/build_native.py
 ```
 
-Para testar e gerar o instalador, no Windows:
-
-```powershell
-npm run typecheck
-npm test
-.venv\Scripts\python -m pytest brain/tests -q
-npm run build
-npm run audit:standalone
-.venv\Scripts\python scripts/build-brain.py
-npx electron-builder --win --publish never
-```
-
-O resultado fica em `release/`. Nenhuma credencial, `.env` ou serviço externo
-é necessário para compilar. O GitHub Actions gera e testa o instalador; tags
-`v<versão>` publicam os arquivos depois dos testes.
+O resultado fica em `release/`. O script usa PyInstaller e NSIS portátil fixado
+por checksum, sem instalar o compilador globalmente. Veja
+[compilação e testes Windows](docs/BUILD.md) e [estado da validação](docs/VALIDATION-NATIVE.md).
+O pipeline da Bolha só roda manualmente ou por tag; salvar commits e abrir
+PRs não dispara compilações de instalador. Tags só publicam após os testes.
 
 ## Organização
 
-- `src/`: aplicativo, ponte Electron, interface e renderização da Bolha.
-- `brain/`: cérebro original do Pestinha, adaptadores de cena e processo local.
-- `assets/bolha/`: geometrias, aparência, ícones e conteúdo da personagem.
-- `docs/`: notas e validação; `NOTICE.md`: autoria e origem do código.
+- `bolha/`: janelas Qt, desenho, preferências, diálogos e atualização.
+- `brain/`: cérebro do Pestinha, física, comportamento e aprendizado.
+- `assets/bolha/content/`: memes, cartazes e recados próprios.
+- `packaging/`: instalador NSIS e avisos do pacote.
+- `tests/native/` e `brain/tests/`: verificações automatizadas.
+- `docs/`: instruções e validação; `NOTICE.md`: autoria e origem do código.
 
-Não há dois motores disputando o corpo: Python decide física e comportamento,
-e a interface desenha o estado recebido. A rede é uma simulação LIF com
-topologia definida pelo projeto original; o notebook do pet é uma brincadeira,
-não executa comandos no computador.
+O Game é a única autoridade para física e comportamento. O notebook do pet
+é uma brincadeira e não executa comandos no computador. Electron, React,
+Framer Motion, IPC e o processo separado do cérebro foram retirados.
 
 ## Licenças
 

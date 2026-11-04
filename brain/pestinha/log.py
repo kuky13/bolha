@@ -1,76 +1,47 @@
-"""
-LOG - um lugar só para mensagens do app: terminal e arquivo em memory/logs/.
-
-O arquivo é aparado quando passa de 1 MB (fica com a metade mais recente).
-Se o arquivo não puder ser escrito, a mensagem vai só para o terminal.
-"""
-
+"""Log local UTF-8; funciona sem terminal no executável e nunca derruba o pet."""
 import datetime
-import os
 import sys
 import traceback
 from pathlib import Path
-
-MAX_BYTES = 1_000_000
-_file = None
-
+from .store import write_text
+MAX_BYTES=1_000_000
+_file=None
 
 def setup(path):
-    """Escolhe o arquivo do log (criado sob demanda)."""
     global _file
-    _file = Path(path)
-
+    _file=Path(path)
+    # Rotaciona antes do loop gráfico, preservando o log anterior.
+    try:
+        if _file.exists() and _file.stat().st_size>MAX_BYTES:
+            import time
+            _file.rename(_file.with_name(_file.name+'.'+str(time.time_ns())+'.old'))
+    except OSError:pass
 
 def desligar_arquivo():
-    """Para de gravar em arquivo (usado ao apagar os dados: nada pode recriar a pasta)."""
     global _file
-    _file = None
-
-
-def _trim():
-    """Corta o início do log quando ele passa do limite, para não crescer sem fim."""
-    try:
-        if _file.exists() and _file.stat().st_size > MAX_BYTES:
-            lines = _file.read_text(encoding="utf-8", errors="replace").splitlines()
-            _file.write_text("\n".join(lines[len(lines) // 2:]) + "\n", encoding="utf-8")
-    except OSError:
-        pass
-
+    _file=None
 
 def log(*parts):
-    """Escreve uma mensagem no terminal e no arquivo do log (uma linha por chamada)."""
-    text = " ".join(str(p) for p in parts)
-    try:
-        print(text, file=sys.stderr)
-    except UnicodeEncodeError:
-        print(text.encode("ascii", "replace").decode("ascii"), file=sys.stderr)
+    text=' '.join(str(p) for p in parts)
+    stream=sys.stderr
+    if stream is not None:
+        try:stream.write(text+'\n')
+        except UnicodeEncodeError:
+            try:stream.write(text.encode('ascii','replace').decode('ascii')+'\n')
+            except (OSError,ValueError,AttributeError):pass
+        except (OSError,ValueError,AttributeError):pass
     _gravar(text)
 
-
 def _gravar(text):
-    """Acrescenta a mensagem ao arquivo do log, se houver um."""
-    if _file is None:
-        return
-    try:
-        _file.parent.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.datetime.now().isoformat(timespec="seconds")
-        with open(_file, "a", encoding="utf-8") as f:
-            f.write(f"{stamp} {text}{os.linesep}")
-        _trim()
-    except OSError:
-        pass
-
+    if _file is None:return
+    try:write_text(_file,f'{datetime.datetime.now().isoformat(timespec="seconds")} {text}\n',append=True)
+    except (OSError,ValueError):pass
 
 def capturar_erros():
-    """Grava no log os erros não tratados: o executável não tem terminal onde eles apareceriam."""
-    anterior = sys.excepthook
-    if getattr(anterior, "_do_pestinha", False):
-        return
-
-    def gancho(tipo, valor, rastro):
-        """Registra o erro e deixa o tratamento anterior seguir normalmente."""
-        _gravar("[erro] " + "".join(traceback.format_exception(tipo, valor, rastro)).rstrip())
-        anterior(tipo, valor, rastro)
-
-    gancho._do_pestinha = True
-    sys.excepthook = gancho
+    anterior=sys.excepthook
+    if getattr(anterior,'_do_pestinha',False):return
+    def gancho(tipo,valor,rastro):
+        _gravar('[erro] '+''.join(traceback.format_exception(tipo,valor,rastro)).rstrip())
+        try:anterior(tipo,valor,rastro)
+        except (OSError,ValueError,AttributeError):pass
+    gancho._do_pestinha=True;sys.excepthook=gancho

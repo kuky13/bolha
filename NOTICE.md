@@ -9,8 +9,13 @@ contribuidores, sob GPL-3.0-or-later. Base: commit
 Fonte: https://github.com/mille-okws/pestinha
 
 Foram preservados o cérebro LIF, aprendizado, memória, necessidades, física
-e controladores. As janelas Qt foram substituídas por uma cena local para
-Electron, e foram adicionadas integração, controles e a cena de estouro.
+e controladores. A versão 0.3 usa janelas Qt nativas e um único processo;
+acrescenta objetivos persistentes, rotina, desenho circular e controles locais.
+Os dois renderizadores de objetos em `bolha/objects.py` derivam dos desenhos
+Qt de reserva de `pestinha/world/notebook.py:_paint_desenho` e
+`pestinha/body/bolinha.py:paintEvent`: notebook, bolinha e variante de papel.
+Esses desenhos em código mantêm autoria de mille-okws e contribuidores e a
+licença GPL-3.0-or-later; não integram a licença CC BY-NC das artes próprias.
 Imagens, memes e pacotes de conteúdo do Pestinha não foram copiados.
 
 O avatar animado foi extraído do aplicativo desktop original, com autorização do
@@ -20,6 +25,8 @@ visual foi separada da lógica. Os memes e recados desta distribuição são nov
 Código próprio: GPL-3.0-only. Código derivado do Pestinha mantém seus avisos
 GPL-3.0-or-later. Artes: consulte `licenses/BOLHA-ASSETS.md`.
 
-Electron, React, Framer Motion, Lucide, NumPy e as demais dependências mantêm
-suas próprias licenças, incluídas em seus pacotes. O instalador inclui os
-avisos de terceiros do Electron e as licenças deste projeto.
+Qt, PySide6, Shiboken6, CPython, NumPy, psutil, pywin32, PyInstaller e NSIS
+mantêm suas próprias licenças. Consulte `packaging/THIRD-PARTY-NOTICES.txt`.
+O pacote leva o texto GPLv3, as licenças das artes e os avisos coletados das
+distribuições Python. Qt/PySide6 são usados sob a opção GPLv3 compatível com
+este programa, com bibliotecas compartilhadas separadas.

@@ -1,0 +1,70 @@
+{
+  "sourceCommit": "8f752dab64e999aa74be82239872a1e12b31376c",
+  "environment": "Windows x64; Python 3.11.9; Qt 6.11.3",
+  "steadyState": {
+    "discardFirstSeconds": 22,
+    "sampleSeconds": 19.590000000000003,
+    "cpuSeconds": 4.71875,
+    "cpuOneCorePercent": 24.09,
+    "cpuMachinePercent": 2.01,
+    "rssMinMiB": 85.26,
+    "rssMaxMiB": 85.35
+  },
+  "app": {
+    "version": "0.3.0",
+    "neurons": 470,
+    "frameP95Ms": 16,
+    "thinkP95Ms": 9.36,
+    "appRssMiB": 85.39
+  },
+  "nativeInstallation": {
+    "base": "0.3.0",
+    "target": "0.3.1",
+    "passed": true,
+    "scenarios": [
+      {
+        "name": "foreign_directory_preserved",
+        "passed": true
+      },
+      {
+        "name": "clean_install_existing_empty_directory",
+        "passed": true
+      },
+      {
+        "name": "checksum_rejected_app_continues",
+        "passed": true
+      },
+      {
+        "name": "interrupted_rejected_app_continues",
+        "passed": true
+      },
+      {
+        "name": "one_hour_deferral_persistent",
+        "passed": true
+      },
+      {
+        "name": "restart_offline_uses_verified_pending",
+        "passed": true
+      },
+      {
+        "name": "tampered_cached_installer_rejected",
+        "passed": true
+      },
+      {
+        "name": "failed_target_start_restores_previous_installation",
+        "passed": true
+      },
+      {
+        "name": "automatic_30_second_update_and_cleanup",
+        "passed": true
+      },
+      {
+        "name": "preferences_seed_learning_and_registry_preserved",
+        "passed": true
+      }
+    ],
+    "registryUnchanged": true,
+    "workspaceRetained": false
+  },
+  "scope": "Medições anteriores aos desenhos GPL dos objetos e ao ajuste de foco do aviso automático. A compilação final e as migrações Electron ainda dependem do CI."
+}

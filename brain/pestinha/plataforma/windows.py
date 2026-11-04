@@ -3,6 +3,7 @@
 
 
 import ctypes
+from ..log import log
 from ctypes import wintypes
 import psutil
 import pywintypes

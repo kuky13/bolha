@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Cena sem Qt: as decisões Python enviam objetos para a interface Electron."""
+"""Objetos do modelo: uma única física compartilhada pelas janelas Qt."""
 import math
 import time
 from pathlib import Path
@@ -105,6 +105,16 @@ class ImageThing(ObjectThing):
         super().__init__('meme', min(240, max_side), min(240, max_side))
         self.valida = bool(path and Path(path).is_file())
         self.image = Path(path).stem if path else None
+        self.emotion=Path(path).parent.name if path else 'observando'
+        self.title='';self.subtitle=''
+        if self.valida and Path(path).suffix.lower()=='.svg':
+            import xml.etree.ElementTree as ET
+            try:
+                root=ET.fromstring(Path(path).read_text(encoding='utf-8'))
+                texts=[''.join(node.itertext()) for node in root if node.tag.endswith('text')]
+                self.title=texts[0] if texts else ''
+                self.subtitle=texts[1] if len(texts)>1 else ''
+            except (OSError,ET.ParseError):self.valida=False
 
 
 class NoteThing(ObjectThing):
@@ -154,13 +164,20 @@ class Fireworks(Item):
 
 class Ball(Item):
     def __init__(self, x, y, kind='ball', sprite=None):
-        super().__init__('paper' if kind == 'papel' else 'ball', 34, 34)
+        # Margem do desenho original, sem alterar o raio da física existente.
+        super().__init__('paper' if kind == 'papel' else 'ball', 42, 42)
         self.body = Body(x, y, 17, 17)
+        self.roll_angle = 0.0  # fase visual original em radianos, não é outro corpo
         self.dragging = False
         self.last_handled = -1e9
         self.place()
     def kick(self, vx, vy): self.body.jump(vx, vy)
     def handled_by_user(self, now): return self.dragging or now - self.last_handled < 1
-    def step(self, dt, bounds, areas=None, monitors=None):
-        if not self.dragging: self.body.step(dt, bounds, [], areas, monitors)
+    def step(self, dt, bounds, areas=None, monitors=None, displays=None):
+        if not self.dragging:
+            self.roll_angle += self.body.vx*dt*.8  # mesma rolagem do fallback GPL
+            self.body.step(dt, bounds, [], areas, monitors, displays)
         self.place()
+    def snapshot(self):
+        data=super().snapshot();data['angle']=math.degrees(self.roll_angle)
+        return data
