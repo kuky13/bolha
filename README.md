@@ -50,7 +50,7 @@ não é necessário instalar Python separadamente.
 | Rodinha | Gira |
 | Dormir um pouco | A esfera inteira tomba e descansa |
 | Botão direito | Abre configurações e atividades |
-| Duplo clique | Abre o painel do cérebro |
+| Menu → Cérebro e emoções | Abre o painel do cérebro |
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
 | Ctrl + Alt + Shift + B | Pausa ou retoma tudo |
 

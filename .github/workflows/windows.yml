@@ -1,12 +1,18 @@
-name: Windows · validar e publicar
+name: Windows nativo · validar e publicar
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
   workflow_dispatch:
+    inputs:
+      legacy_validation:
+        description: 'Testar também Electron 0.1.0 e 0.2.1 (Windows descartável)'
+        type: boolean
+        default: true
 permissions:
   contents: read
+concurrency:
+  group: bolha-windows-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   windows:
     runs-on: windows-latest
@@ -15,96 +21,82 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          architecture: x64
           cache: pip
-          cache-dependency-path: brain/requirements.txt
-      - name: Instalar dependências
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+      - name: Dependências nativas e testes
         run: |
-          npm ci --no-audit --no-fund
-          python -m pip install -r brain/requirements.txt pytest==8.4.2 pyinstaller==6.22.3
-      - name: Conferir tipos e testes
-        run: |
-          npm run typecheck
-          npm test
-          python -m pytest brain/tests -q
-      - name: Compilar e auditar interface independente
-        run: |
-          npm run build
-          npm run audit:standalone
-      - name: Empacotar cérebro e instalador
-        run: |
-          python scripts/build-brain.py
-          npx electron-builder --win --publish never
+          python -m pip install -r requirements-build.txt
+          python -m pytest -q
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Abrir aplicativo Windows com cérebro empacotado
+          QT_QPA_PLATFORM: offscreen
+      - name: Versão e fixture seguinte
         shell: pwsh
         run: |
-          $env:BOLHA_SMOKE_EXE = Join-Path $PWD 'release/win-unpacked/Bolha.exe'
-          node scripts/smoke.mjs
-      - name: Medir consumo da árvore completa e do cérebro
+          $bolhaVersion = python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
+          $bolhaParts = $bolhaVersion.Split('.')
+          $bolhaNext = $bolhaParts[0] + '.' + $bolhaParts[1] + '.' + ([int]$bolhaParts[2] + 1)
+          "BOLHA_VERSION=$bolhaVersion" >> $env:GITHUB_ENV
+          "BOLHA_NEXT_VERSION=$bolhaNext" >> $env:GITHUB_ENV
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$bolhaVersion") { throw 'A tag diverge da versão do código.' }
+      - name: Compilar e auditar pacote Python/Qt
+        run: python scripts/build_native.py
+      - name: Empacotar fixture de atualização sem recompilar o aplicativo
         shell: pwsh
         run: |
-          $env:BOLHA_SMOKE_EXE = Join-Path $PWD 'release/win-unpacked/Bolha.exe'
-          node scripts/benchmark.mjs
-      - name: Gerar versão seguinte para testar atualização
-        shell: pwsh
-        run: |
-          $parts = (Get-Content package.json | ConvertFrom-Json).version.Split('.')
-          $nextVersion = $parts[0] + '.' + $parts[1] + '.' + ([int]$parts[2] + 1)
-          npx electron-builder --win --publish never --config.directories.output=validation/update-feed --config.extraMetadata.version=$nextVersion
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Validar atualização da 0.1.0 para a correção UTF-8
+          python scripts/build_native.py --version $env:BOLHA_NEXT_VERSION --output validation/update-feed --reuse-bundle "build/$($env:BOLHA_VERSION)/dist/Bolha"
+      - name: Instalação, atualização, recuperação e métricas Windows
         timeout-minutes: 9
         shell: pwsh
         run: |
-          $previousDir = Join-Path $PWD 'validation/previous'
-          New-Item -ItemType Directory -Force $previousDir | Out-Null
-          $previousInstaller = Join-Path $previousDir 'Bolha-Setup-0.1.0-x64.exe'
-          Invoke-WebRequest 'https://github.com/kuky13/bolha/releases/download/v0.1.0/Bolha-Setup-0.1.0-x64.exe' -OutFile $previousInstaller
-          $expected = 'f7cbd370555ed81d9bcc3fb949c1a7091e61433299c65c0958ca97cf09dc8599'
-          if ((Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Checksum da versão anterior inválido.' }
-          $env:BOLHA_UPDATE_TEST_BASE = $previousInstaller
-          $env:BOLHA_UPDATE_TEST_FEED = Join-Path $PWD 'release'
-          node scripts/test-windows-update.mjs
-      - name: Testar instalação e atualização automática reais
-        timeout-minutes: 9
-        run: node scripts/test-windows-update.mjs
-      - name: Gerar checksums
+          python scripts/test_windows_native.py --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --target-installer "validation/update-feed/Bolha-Setup-$($env:BOLHA_NEXT_VERSION)-x64.exe" --output validation/windows-native
+      - uses: actions/setup-node@v4
+        if: github.ref_type == 'tag' || inputs.legacy_validation
+        with:
+          node-version: '22'
+      - name: Preparar somente o controlador de teste Electron legado
+        if: github.ref_type == 'tag' || inputs.legacy_validation
+        run: npm install --prefix validation/legacy-runner --no-audit --no-fund --no-save @playwright/test@1.56.1
+      - name: Validar migração real das versões Electron no runner descartável
+        if: github.ref_type == 'tag' || inputs.legacy_validation
+        timeout-minutes: 10
         shell: pwsh
         run: |
-          Get-ChildItem release/*.exe,release/*.blockmap,release/latest.yml | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)"
-          } | Set-Content release/SHA256SUMS.txt
+          New-Item -ItemType Directory -Force validation/previous | Out-Null
+          $bolhaPrevious = @{
+            '0.1.0' = 'f7cbd370555ed81d9bcc3fb949c1a7091e61433299c65c0958ca97cf09dc8599'
+            '0.2.1' = '20078a4cda5d563b6ebac461103cf8a2a2f1b26589cb36dea41b26a8243d16a4'
+          }
+          foreach ($bolhaOld in @('0.1.0','0.2.1')) {
+            $bolhaFile = "validation/previous/Bolha-Setup-$bolhaOld-x64.exe"
+            Invoke-WebRequest "https://github.com/kuky13/bolha/releases/download/v$bolhaOld/Bolha-Setup-$bolhaOld-x64.exe" -OutFile $bolhaFile
+            if ((Get-FileHash $bolhaFile -Algorithm SHA256).Hash.ToLower() -ne $bolhaPrevious[$bolhaOld]) { throw "Checksum inválido: $bolhaOld" }
+            python scripts/test_windows_native.py --legacy-installer $bolhaFile --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --playwright-root validation/legacy-runner --output "validation/from-$bolhaOld"
+            if ($LASTEXITCODE -ne 0) { throw "Migração $bolhaOld falhou." }
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bolha-windows-validation
+          name: bolha-windows-${{ github.sha }}
+          retention-days: 7
           path: |
-            validation/*.png
-            validation/*.json
+            validation/**/*.json
+            validation/**/*.png
             release/*.exe
-            release/*.blockmap
             release/latest.yml
             release/SHA256SUMS.txt
-      - name: Conferir tag da versão
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: pwsh
-        run: |
-          $expected = 'v' + (Get-Content package.json | ConvertFrom-Json).version
-          if ($env:GITHUB_REF_NAME -ne $expected) { throw "A tag deve ser $expected" }
-      - name: Publicar instalador validado
-        if: startsWith(github.ref, 'refs/tags/')
+            release/THIRD-PARTY-NOTICES.txt
+      - name: Publicar somente tag validada
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create $env:GITHUB_REF_NAME release/*.exe release/*.blockmap release/latest.yml release/SHA256SUMS.txt --title "Bolha $env:GITHUB_REF_NAME" --notes-file docs/RELEASE.md
+          gh release create $env:GITHUB_REF_NAME release/*.exe release/latest.yml release/SHA256SUMS.txt release/THIRD-PARTY-NOTICES.txt --title "Bolha $env:BOLHA_VERSION" --notes-file docs/RELEASE.md

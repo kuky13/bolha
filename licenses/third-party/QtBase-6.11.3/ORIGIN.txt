@@ -1,0 +1,4 @@
+QtBase v6.11.3: https://github.com/qt/qtbase/tree/v6.11.3
+
+LICENSES integrais e metadados/avisos dos componentes qtcore, qtgui, qtwidgets e qtopengl.
+Componentes opcionais podem não estar presentes neste pacote.

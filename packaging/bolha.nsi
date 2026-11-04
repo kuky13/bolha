@@ -3,6 +3,7 @@ Unicode true
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 !include "MUI2.nsh"
+!include "x64.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 !include "StrFunc.nsh"
@@ -49,6 +50,9 @@ Var PreviousQuietUninstall
 Var PreviousIcon
 
 Function .onInit
+  ${IfNot} ${RunningX64}
+    Abort "A Bolha exige Windows64bits."
+  ${EndIf}
   SetRegView 64
   SetShellVarContext current
   StrCpy $RegistryGuid "${APPGUID}"

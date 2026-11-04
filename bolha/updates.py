@@ -29,6 +29,19 @@ ALLOWED_HOSTS = frozenset(('github.com', 'api.github.com', 'release-assets.githu
 LOG = logging.getLogger(__name__)
 
 
+class LocalUpdateLog(logging.Handler):
+    def emit(self, record):
+        try:
+            from pestinha.log import log
+            log('[atualização]', record.getMessage())
+        except (ImportError, OSError, ValueError):
+            pass
+
+
+LOG.addHandler(LocalUpdateLog())
+LOG.propagate = False
+
+
 class UpdateCancelled(Exception):
     pass
 
@@ -201,8 +214,11 @@ def fetch_update(transport, current_version, data_dir, cache_root, progress=None
         verify_file(installer, release.size, release.sha256)
     except (OSError, ValueError):
         part = installer.with_name(installer.name + '.' + uuid.uuid4().hex + '.part')
-        transport.download(release, part, progress)
-        os.replace(part, installer)
+        try:
+            transport.download(release, part, progress)
+            os.replace(part, installer)
+        finally:
+            part.unlink(missing_ok=True)
     record_update(data_dir, release.version, installer, cache_root, size=release.size, sha256=release.sha256)
     return dict(version=release.version, installer=str(installer), size=release.size, sha256=release.sha256)
 

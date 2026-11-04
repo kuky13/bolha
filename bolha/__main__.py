@@ -17,6 +17,8 @@ def main():
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication,QMessageBox
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    from .platform import set_app_id
+    app_id_warning=set_app_id()
     app=QApplication(sys.argv);app.setApplicationName('Bolha');app.setOrganizationName('solutions.kuky');app.setQuitOnLastWindowClosed(False)
     from .app import NativeApp,palette,icon
     palette(app);app.setWindowIcon(icon())
@@ -30,6 +32,7 @@ def main():
             (data/'startup-error.log').write_text(traceback.format_exc(),encoding='utf-8')
         except OSError:pass
         QMessageBox.critical(None,'Bolha não iniciou',str(error));return 1
+    if app_id_warning:controller.warn(app_id_warning)
     app.aboutToQuit.connect(controller.quit)
     return app.exec()
 

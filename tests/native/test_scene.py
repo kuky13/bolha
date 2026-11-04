@@ -90,3 +90,45 @@ def test_falha_inicial_so_ativa_no_modo_teste(monkeypatch):
     with pytest.raises(ReachedApplication):main()
     monkeypatch.setenv('BOLHA_TEST','1');monkeypatch.setenv('BOLHA_TEST_FAIL_START','999.0.0')
     with pytest.raises(ReachedApplication):main()
+
+
+def test_objeto_parado_nao_repinta_sem_mudanca_mas_invalida_estado_tamanho_dpi(qt_application,tmp_path,monkeypatch):
+    game=Game(tmp_path,CONTENT);item=game.mesa.caderno;item.show()
+    window=ObjectWindow(NativeScene(game),item);calls=[]
+    monkeypatch.setattr(window,'update',lambda:calls.append('update'))
+    window.sync();assert len(calls)==1
+    window.sync();window.sync();assert len(calls)==1
+    item.place(item._cx+50,item._cy);window.sync();assert len(calls)==2
+    item.set_working(True);window.sync();assert len(calls)==3
+    window.resize(window.width()+2,window.height());window.sync();assert len(calls)==4
+    monkeypatch.setattr(window,'devicePixelRatioF',lambda:1.5);window.sync();assert len(calls)==5
+    item.hide();window.sync();assert len(calls)==6
+    item.show();window.sync();assert len(calls)==7
+    window.close()
+
+
+def test_fogos_visiveis_continuam_animados(qt_application,tmp_path,monkeypatch):
+    game=Game(tmp_path,CONTENT);item=game.festa.fogos;item.launch(400,300)
+    window=ObjectWindow(NativeScene(game),item);calls=[]
+    monkeypatch.setattr(window,'update',lambda:calls.append('update'))
+    window.sync();window.sync();window.sync();assert len(calls)==3
+    window.close()
+
+
+def test_mascara_pet_cacheada_invalida_tamanho_e_recorte_ao_mover(qt_application,tmp_path,monkeypatch):
+    from bolha.pet import PetWindow
+    from PySide6.QtGui import QRegion
+    game=Game(tmp_path,CONTENT);pet=PetWindow(game);calls=[]
+    original=pet.setMask
+    def changed(mask):calls.append(QRegion(mask));original(mask)
+    monkeypatch.setattr(pet,'setMask',changed)
+    pet.sync();pet.sync();assert not calls
+    game.configure(dict(avatarSize=180));pet.sync();assert len(calls)==1
+    assert pet.mask().boundingRect().width()==180
+    game.state.desk_top=game.body.y;pet.sync();assert len(calls)==2
+    assert pet.mask().boundingRect().bottom()<128
+    game.body.y-=20;pet.sync();assert len(calls)==3
+    game.state.desk_top=None;pet.sync();assert len(calls)==4
+    assert pet.mask().boundingRect().height()==180
+    monkeypatch.setattr(pet,'devicePixelRatioF',lambda:1.5);pet.sync();assert len(calls)==5
+    pet.close()

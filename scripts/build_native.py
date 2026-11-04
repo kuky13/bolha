@@ -52,6 +52,27 @@ def icon(output):
         if not picture.save(str(output/name)):raise OSError('Falha ao gravar '+name)
 
 
+def prune_optional_qt(bundle):
+    """O hook QtGui coleta TUIO por padrão; o pet não usa entrada multitoque por UDP."""
+    import pefile
+    plugin=bundle/'_internal/PySide6/plugins/generic/qtuiotouchplugin.dll'
+    if plugin.exists():plugin.unlink()
+    network=bundle/'_internal/PySide6/Qt6Network.dll'
+    if not network.exists():return
+    importers=[]
+    for path in bundle.rglob('*'):
+        if path.suffix.lower() not in ('.dll','.pyd','.exe') or path==network:continue
+        image=pefile.PE(str(path),fast_load=True)
+        try:
+            image.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT'],
+                                                     pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT']])
+            entries=getattr(image,'DIRECTORY_ENTRY_IMPORT',[])+getattr(image,'DIRECTORY_ENTRY_DELAY_IMPORT',[])
+            if any(item.dll.lower()==b'qt6network.dll' for item in entries):importers.append(str(path.relative_to(bundle)))
+        finally:image.close()
+    if importers:raise ValueError('QtNetwork ainda é necessária por: '+', '.join(importers))
+    network.unlink()
+
+
 def build(version, output, makensis=None, reuse_bundle=None):
     if os.name!='nt' or sys.maxsize<=2**32:raise OSError('Compile no Windows x64.')
     if sys.version_info[:2]!=(3,11):raise OSError('Use Python3.11.')
@@ -77,10 +98,12 @@ def build(version, output, makensis=None, reuse_bundle=None):
     args += [str(ROOT/'launcher.py')]
     bundle=work/'dist/Bolha'
     if reuse_bundle:
-        shutil.copytree(Path(reuse_bundle).resolve(),bundle,dirs_exist_ok=True)
+        if Path(reuse_bundle).resolve()!=bundle.resolve():
+            shutil.copytree(Path(reuse_bundle).resolve(),bundle,dirs_exist_ok=True)
         shutil.copy2(resource/'bolha-version.json',bundle/'_internal/bolha-version.json')
     else:
         subprocess.run(args,cwd=ROOT,check=True)
+    prune_optional_qt(bundle)
     subprocess.run([sys.executable,str(ROOT/'scripts/audit_native.py'),str(bundle)],check=True)
     manifest={}
     for path in bundle.rglob('*'):

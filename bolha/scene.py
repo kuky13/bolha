@@ -29,7 +29,13 @@ class ObjectWindow(QWidget):
     def sync(self):
         item=self.item;data=item.snapshot()
         self.move(round(data['x']-self.width()/2),round(data['y']-self.height()/2))
-        self.setVisible(item.isVisible() and self.scene.game.visible());self.update()
+        visible=item.isVisible() and self.scene.game.visible()
+        self.setVisible(visible)
+        key=tuple(data[field] for field in ('kind','text','image','angle','working','x','y'))+(
+            getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'subtitle',None),
+            self.width(),self.height(),self.devicePixelRatioF(),visible)
+        if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
+            self._paint_key=key;self.update()
     def enterEvent(self,event):self.scene.game.hover=True
     def leaveEvent(self,event):
         if self.offset is None:self.scene.game.hover=False

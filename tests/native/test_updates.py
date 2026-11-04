@@ -127,3 +127,11 @@ def test_resume_offline_revalidates_native_pending_and_deferral(tmp_path,monkeyp
     setup.write_bytes(b'tampered')
     with pytest.raises(ValueError):updater._resume()
     updater.stop()
+
+
+def test_final_cache_write_failure_cleans_only_own_partial(feed,tmp_path):
+    base,_,_,_=feed
+    with patch('bolha.updates.os.replace',side_effect=PermissionError('arquivo bloqueado')):
+        with pytest.raises(PermissionError):fetch_update(Transport(base),'0.2.1',tmp_path/'data',tmp_path/'cache')
+    assert not list(tmp_path.rglob('*.part'))
+    assert not (tmp_path/'data/pending-update.json').exists()

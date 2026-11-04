@@ -11,7 +11,10 @@ Bibliotecas compartilhadas Qt permanecem separadas e podem ser substituídas.
 Fontes correspondentes: https://code.qt.io/cgit/qt/qtbase.git/tag/?h=v6.11.3
 https://code.qt.io/cgit/pyside/pyside-setup.git/tag/?h=v6.11.3
 Documentação de licenças: https://doc.qt.io/qt-6/licensing.html
-Texto GPLv3 incluído em licenses/LICENSE. As demais licenças e avisos coletados
+Texto GPLv3 incluído em licenses/LICENSE. Os textos de licença e avisos de
+terceiros do QtBase 6.11.3 acompanham licenses/third-party/QtBase-6.11.3.
+São os originais oficiais dos componentes Core/Gui/Widgets/OpenGL; alguns
+componentes opcionais listados podem não estar presentes nesta distribuição. As demais licenças e avisos coletados
 dos pacotes de distribuição ficam em licenses/third-party/.
 
 CPython 3.11: Python Software Foundation, licença PSF e avisos associados.

@@ -35,6 +35,20 @@ def icon():
     return QIcon(pixmap)
 
 
+def local_log_excerpt(data_dir):
+    """Trecho solicitado: até64KiB e60linhas, nunca lê outro arquivo do PC."""
+    path=Path(data_dir)/'logs'/'main.log'
+    try:
+        with path.open('rb') as stream:
+            size=stream.seek(0,2);stream.seek(max(0,size-65536))
+            text=stream.read(65536).decode('utf-8',errors='replace')
+        lines=text.splitlines()
+        if size>65536:lines=lines[1:]  # descarta a linha parcial na borda do limite
+        return '\n'.join(lines[-60:])
+    except FileNotFoundError:return ''
+    except OSError as error:return '[aviso] Log local indisponível: '+str(error)
+
+
 def palette(app):
     app.setStyle('Fusion');p=QPalette()
     for role,color in ((QPalette.Window,'#211d2d'),(QPalette.WindowText,'#ece7f5'),(QPalette.Base,'#17151f'),(QPalette.AlternateBase,'#292534'),(QPalette.Text,'#ece7f5'),(QPalette.Button,'#353040'),(QPalette.ButtonText,'#ece7f5'),(QPalette.Highlight,'#8062ac'),(QPalette.HighlightedText,'#ffffff'),(QPalette.ToolTipBase,'#353040'),(QPalette.ToolTipText,'#ece7f5')):p.setColor(role,QColor(color))
@@ -125,6 +139,14 @@ class NativeApp:
         except Exception as error:
             self.frame.stop();self.warn('A rotina foi pausada: '+str(error));log('[erro]',repr(error))
     def poll(self):
+        test_profile=os.getenv('BOLHA_TEST_USER_DATA')
+        if (os.getenv('BOLHA_TEST')=='1' and os.getenv('BOLHA_TEST_ALLOW_STOP')=='1' and test_profile
+                and Path(test_profile).resolve()==self.data_dir.resolve()):
+            # Pedido estático do driver isolado: conteúdo nunca é lido/executado.
+            try:(self.data_dir/'test-stop.request').unlink()
+            except FileNotFoundError:pass
+            except OSError as error:self.warn('Não foi possível remover o pedido de parada do teste: '+str(error))
+            else:self.quit();return
         while True:
             try:path,error=self.writer.errors.get_nowait()
             except queue.Empty:break
@@ -245,7 +267,7 @@ class NativeApp:
                     frameCount=len(self.frame_times),thinkCount=len(self.think_times),uptimeSeconds=round(time.monotonic()-self.started,2),errors=list(self.errors))
     def diagnostics_text(self):
         metrics=self.metrics()
-        return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Avisos: '+'; '.join(self.errors)))
+        return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Avisos: '+'; '.join(self.errors),'Log local (trecho):',local_log_excerpt(self.data_dir)))
     def quit(self):
         if self.quitting:return
         self.quitting=True

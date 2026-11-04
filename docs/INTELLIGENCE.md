@@ -1,3 +1,8 @@
+> Histórico: este documento descreve a versão Electron 0.2.1. A versão 0.3.0
+> preserva o modelo neural e usa Qt+Python no mesmo processo. Consumo do Electron
+> e protocolos de worker abaixo são resultados anteriores, não medições nativas.
+> Consulte [validação da versão nativa](VALIDATION-NATIVE.md).
+
 # Inteligência comportamental da Bolha
 
 Esta revisão aplica a proposta “Pestinha 2.0” à Bolha. Mantém Electron e o

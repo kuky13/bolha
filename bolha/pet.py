@@ -74,11 +74,12 @@ class PetWindow(QWidget):
         x,y=round(self.body.x-self.width()/2),round(self.body.y-self.height()/2)
         self.move(x,y);self.visual.move(x,y)
         r=round(self.body.half_w)
-        mask=QRegion(QRect(128-r,128-r,r*2,r*2),QRegion.Ellipse)
-        if self.game.state.desk_top is not None:
-            mask=mask.intersected(QRegion(0,0,256,max(0,int(self.game.state.desk_top-y))))
-        key=(r,self.game.state.desk_top-y if self.game.state.desk_top is not None else None)
-        if key!=getattr(self,'_mask_key',None):self.setMask(mask);self._mask_key=key
+        clip=max(0,min(256,int(self.game.state.desk_top-y))) if self.game.state.desk_top is not None else 256
+        key=(r,clip,self.devicePixelRatioF())
+        if key!=getattr(self,'_mask_key',None):
+            mask=QRegion(QRect(128-r,128-r,r*2,r*2),QRegion.Ellipse)
+            if clip<256:mask=mask.intersected(QRegion(0,0,256,clip))
+            self.setMask(mask);self._mask_key=key
         show=self.game.visible()
         if show and not self.isVisible(): self.visual.show();self.show()
         if not show:

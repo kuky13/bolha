@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 FORBIDDEN=('electron','app.asar','chrome_','chromium','ffmpeg','node.exe','node_modules',
-           'qtwebengine','qt6webengine','qt6qml','qt6quick','qt6network','brain.exe','worker.py')
+           'qtuiotouchplugin','qtwebengine','qt6webengine','qt6qml','qt6quick','qt6network','brain.exe','worker.py')
 
 
 def audit(root):

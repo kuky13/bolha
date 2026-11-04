@@ -1,5 +1,5 @@
-Bolha0.3.0 troca a interface Electron por Python/Qt nativo, no mesmo processo do
-cérebro local com470neurônios. A esfera escura, os olhos dourados e as orelhinhas
+Bolha 0.3.0 troca a interface Electron por Python/Qt nativo, no mesmo processo do
+cérebro local com 470 neurônios. A esfera escura, os olhos dourados e as orelhinhas
 agora giram juntos, sem boca ou rosto separado do corpo.
 
 Carinho, arrasto, arremesso, giro, sono, bolinha, notebook, fogos, protestos,

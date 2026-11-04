@@ -1,4 +1,4 @@
-# Validação da migração Qt0.3.0
+# Validação da migração Qt 0.3.0
 
 Esta versão está em implementação. Não considere o instalador nativo publicado
 ou validado em Windows até que as evidências desta seção sejam atualizadas.
@@ -10,7 +10,7 @@ download incompleto, cache alterado, adiamento persistente, retomada offline e
 limpeza limitada aos arquivos próprios. Testes Qt verificam desenho e diálogos.
 
 Pendentes: compilação e auditoria do pacote Windows, instalação isolada,
-atualização entre duas versões nativas, migração real dos instaladores0.1.0 e
+atualização entre duas versões nativas, migração real dos instaladores 0.1.0 e
 0.2.1 num Windows descartável, falha/recuperação, medições de CPU/RSS e quadros.
 Também pendem monitores físicos com escalas diferentes, desconexão de tela,
 foco/cliques de outros aplicativos e revisão visual prolongada.

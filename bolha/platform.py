@@ -5,6 +5,19 @@ import sys
 from PySide6.QtCore import QAbstractNativeEventFilter
 
 
+def set_app_id():
+    """Fixa a identidade de instalação; falha vira somente um aviso local."""
+    if sys.platform!='win32':return None
+    from .installation import APP_ID
+    try:
+        function=ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
+        function.argtypes=[ctypes.c_wchar_p];function.restype=ctypes.c_long
+        result=function(APP_ID)
+        if result<0:return f'Não foi possível definir o identificador da Bolha: HRESULT0x{result&0xffffffff:08X}.'
+    except (OSError,AttributeError) as error:return 'Não foi possível definir o identificador da Bolha: '+str(error)
+    return None
+
+
 def desktop_layout(app, exclude=()):
     native = {}
     if sys.platform == 'win32':
