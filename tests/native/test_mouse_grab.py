@@ -33,6 +33,7 @@ class Pointer:
 
 @pytest.fixture(params=['pet','toy'])
 def held_window(request,qt_application,tmp_path,monkeypatch):
+    clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     pointer=Pointer();monkeypatch.setattr(grab_module,'drag_pointer',lambda:pointer)
     game=Game(tmp_path,CONTENT);game.configure({'senseCursor':False,'senseWindows':False,'roaming':False})
     game.body.x,game.body.y=500,300
@@ -203,6 +204,7 @@ def test_provider_fora_do_windows_ou_offscreen_e_unsupported(monkeypatch):
 def test_frame_existente_le_pega_antes_fisica_com_sensor_cursor_desligado(qt_application,tmp_path,monkeypatch):
     import bolha.app as app_module
     pointer=Pointer();monkeypatch.setattr(grab_module,'drag_pointer',lambda:pointer)
+    clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     game=Game(tmp_path,CONTENT);game.configure({'senseCursor':False,'senseWindows':False,'roaming':False})
     game.body.x,game.body.y=500,300;pet=PetWindow(game);scene=NativeScene(game)
     controller=SimpleNamespace(quitting=False,updating=False,suspended=False,last_tick=time.monotonic()-.016,
@@ -213,7 +215,7 @@ def test_frame_existente_le_pega_antes_fisica_com_sensor_cursor_desligado(qt_app
         NativeApp.tick(controller)
         assert (game.body.x,game.body.y)==(700,200) and game.body.held
         assert game.cursor==(700,200)  # O contexto desativado continua no centro, sem ler o ponteiro.
-        pointer.down=False;NativeApp.tick(controller)
+        pointer.down=False;clock[0]+=.016;NativeApp.tick(controller)
         assert not game.body.held and game.body.x==700 and game.body.y>200
         assert game.prefs['senseCursor'] is False
     finally:scene.close();pet.close()

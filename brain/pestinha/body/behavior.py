@@ -148,7 +148,7 @@ class Behavior:
             return
 
         if not allow_roaming:
-            body.vx = 0.0
+            if body.grounded:body.vx = 0.0
             return
 
         # objeto carregado acompanha (e solta se o pet cair/voar)

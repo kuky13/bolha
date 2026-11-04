@@ -62,7 +62,7 @@ não é necessário instalar Python separadamente.
 | Pressionar e manter | Segura a Bolha; ela fica irritada aos poucos |
 | Passar o mouse de um lado para o outro sobre ela | Faz carinho |
 | Arrastar | Leva a Bolha ou o brinquedo junto |
-| Soltar | Libera a gravidade, sem impulso do mouse, mesmo após arrasto rápido |
+| Soltar | Parado, cai; em movimento, arremessa na direção do mouse e quica |
 | Rodinha | Gira |
 | Menu → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
 | Menu → Brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |

@@ -120,10 +120,12 @@ def test_cancelar_segurada_imovel_libera_corpo_e_hover(qt_application,tmp_path,r
     finally:pet.close()
 
 
-def test_soltar_apos_arrasto_cai_sem_herdar_velocidade_e_sem_poke(qt_application,tmp_path):
+def test_soltar_apos_arrasto_herda_movimento_recente_sem_poke(qt_application,tmp_path,monkeypatch):
+    import time
     from PySide6.QtCore import QPointF, Qt
     from types import SimpleNamespace
     from bolha.pet import PetWindow
+    clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     game = game_at_rest(tmp_path);pet = PetWindow(game);events=[]
     original=game.interact
     def interact(event):events.append(event.copy());return original(event)
@@ -132,14 +134,17 @@ def test_soltar_apos_arrasto_cai_sem_herdar_velocidade_e_sem_poke(qt_application
     try:
         game.body.vx,game.body.vy,game.body.omega=400,-500,300
         pet.mousePressEvent(mouse(game.body.x+8,game.body.y+9))
+        clock[0]+=.08
         pet.mouseMoveEvent(mouse(game.body.x+128,game.body.y-71))
         position=(game.body.x,game.body.y)
         pet.mouseReleaseEvent(mouse(game.body.x+8,game.body.y+9))
         assert not game.body.held and not game.body.grounded
         assert (game.body.x,game.body.y)==position
-        assert game.body.vx==game.body.vy==game.body.omega==0
+        assert game.body.vx==pytest.approx(1500)
+        assert game.body.vy==pytest.approx(-1000)
+        assert game.body.omega==pytest.approx(525)
         assert [event['type'] for event in events]==['hold-start','drag-start','drag-end','hold-end']
-        assert all('vx' not in event and 'vy' not in event for event in events)
+        assert 'vx' in events[-2] and 'vy' in events[-2]
     finally:pet.close()
 
 

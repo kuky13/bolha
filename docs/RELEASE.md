@@ -11,8 +11,9 @@ O amendoim é o brinquedo padrão; a bolinha original pode ser escolhida em
 Configurações → Comportamento → Brinquedo. A escolha preserva a física e o
 aprendizado. As reações de brincadeira acompanham o cérebro e os eventos do jogo.
 
-Pressionar segura. Soltar a Bolha ou o brinquedo libera a gravidade, sem herdar
-velocidade do mouse, mesmo depois de arrastar rapidamente. O clique deixou de
+Pressionar segura. Soltar parado libera a gravidade; soltar em movimento
+arremessa a Bolha ou o brinquedo com a velocidade recente do mouse, como no
+Pestinha. A força tem um limite, e parar antes de soltar elimina o impulso antigo. O clique deixou de
 ser cutucada. Aproximar o ponteiro alimenta a atenção quando o sensor está
 ligado; o próprio pet decide brincar, sem chute automático do mouse.
 

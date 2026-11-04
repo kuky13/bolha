@@ -278,7 +278,17 @@ class Game:
             if kind == 'drag-end':
                 body.grounded=False;body.platform=None
                 if target is None:
-                    self._release_hold(now)
+                    self._release_hold(now,event.get('cancelled',False))
+                if not event.get('cancelled') and (target is None or target.kind=='ball'):
+                    for axis in ('vx','vy'):
+                        value=event.get(axis,0.)
+                        setattr(body,axis,max(-2500.,min(2500.,value)) if type(value) in (int,float) and -math.inf<value<math.inf else 0.)
+                    body.omega=body.vx*.35
+                    speed=math.hypot(body.vx,body.vy)
+                    if target is None and speed>=700:
+                        self.senses.thrown(min(1.,speed/2000.))
+                        self.drives.stimulate('throw');self.drives.touched('throw')
+                        self.in_flight=True
         elif kind == 'poke':
             self.senses.poke(); self.drives.touched('poke'); self.drives.stimulate('poke'); self.memory.on_interaction(); self.conditioning.outcome(now)
             if self.sleep.asleep: self.sleep.wake(True)
@@ -305,6 +315,7 @@ class Game:
             if obj and obj.kind in ('meme','note','sign'): obj.clicked.emit(obj)
 
     def _start_hold(self,now):
+        self.in_flight=False
         if self.held_since is None:
             self.held_since=now
             self.release_reaction={}
@@ -334,6 +345,7 @@ class Game:
             self.body.grounded=False;self.body.platform=None
         self.body.held=False;self.state.pressing=False;self.senses.set_dragging(False)
         self.held_since=None
+        if cancelled:self.in_flight=False
         if started is None:return
         elapsed=max(0.,now-started)
         if cancelled:
@@ -517,6 +529,7 @@ class Game:
             self.state.gaze=((dx*math.cos(angle)+dy*math.sin(angle))/distance,
                              (-dx*math.sin(angle)+dy*math.cos(angle))/distance)
         self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
+        if self.body.grounded:self.in_flight=False
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])

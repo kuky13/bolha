@@ -107,7 +107,7 @@ class PetWindow(QWidget):
         self.drag_position=QPointF(pos)
         self.game.state.pressing=True
         self.game.interact({'type':'hold-start'})
-        try:self.mouse_grab.begin()
+        try:self.mouse_grab.begin(pos)
         except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
 
     def mouseMoveEvent(self,event):
@@ -122,6 +122,7 @@ class PetWindow(QWidget):
         if self._drag_to(pos):self.sync()
 
     def _drag_to(self,pos):
+        self.mouse_grab.track(pos)
         if pos==self.drag_position:return False
         kind='drag' if self.dragging else 'drag-start'
         self.dragging=True;self.drag_position=QPointF(pos)
@@ -140,9 +141,10 @@ class PetWindow(QWidget):
 
     def _release_at(self,pos):
         moved=self.dragging or pos!=self.drag_position
+        vx,vy=self.mouse_grab.velocity(pos)
         self.press=None;self.dragging=False;self.drag_position=None
         self.mouse_grab.stop()
-        if moved:self.game.interact(dict(type='drag-end',x=pos.x()-self.offset[0],y=pos.y()-self.offset[1]))
+        if moved:self.game.interact(dict(type='drag-end',x=pos.x()-self.offset[0],y=pos.y()-self.offset[1],vx=vx,vy=vy))
         self.game.interact({'type':'hold-end'})
         self.game.state.pressing=False
         self.game.hover=self.mask().contains(self.mapFromGlobal(pos.toPoint()))

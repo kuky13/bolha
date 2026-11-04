@@ -64,12 +64,13 @@ class ObjectWindow(QWidget):
         p=event.globalPosition();self.offset=(p.x()-self.item._cx,p.y()-self.item._cy)
         self.press_position=(p.x(),p.y());self.dragged=False;self.drag_position=QPointF(p)
         self.scene.game.interact(dict(type='drag-start',id=self.item.id,x=self.item._cx,y=self.item._cy))
-        try:self.mouse_grab.begin()
+        try:self.mouse_grab.begin(p)
         except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
     def mouseMoveEvent(self,event):
         if self.offset is None:return
         if self._drag_to(event.globalPosition()):self.sync()
     def _drag_to(self,p):
+        self.mouse_grab.track(p)
         if p==self.drag_position:return False
         self.drag_position=QPointF(p)
         if math.dist(self.press_position,(p.x(),p.y()))>=4:self.dragged=True
@@ -87,9 +88,10 @@ class ObjectWindow(QWidget):
     def _release_at(self,p):
         click=not self.dragged and math.dist(self.press_position,(p.x(),p.y()))<4
         x,y=p.x()-self.offset[0],p.y()-self.offset[1]
+        vx,vy=self.mouse_grab.velocity(p) if self.item.kind=='ball' else (0.,0.)
         self.offset=None;self.press_position=None;self.drag_position=None;self.dragged=False
         self.mouse_grab.stop()
-        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=x,y=y))
+        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=x,y=y,vx=vx,vy=vy))
         if click:
             self.scene.game.interact(dict(type='dismiss',id=self.item.id))
         self.scene.game.hover=self.item.kind!='ball' and self.mask().contains(self.mapFromGlobal(p.toPoint()))
@@ -106,7 +108,7 @@ class ObjectWindow(QWidget):
         if self.offset is None:return
         self.offset=None;self.press_position=None;self.dragged=False;self.drag_position=None
         self.mouse_grab.stop()
-        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=self.item._cx,y=self.item._cy))
+        self.scene.game.interact(dict(type='drag-end',id=self.item.id,x=self.item._cx,y=self.item._cy,cancelled=True))
         self.scene.game.hover=False
     def event(self,event):
         if event.type()==QEvent.UngrabMouse and getattr(self,'offset',None) is not None:

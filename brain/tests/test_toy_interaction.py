@@ -97,7 +97,8 @@ def test_aparencia_do_brinquedo_nao_substitui_corpo_ou_aprendizado(tmp_path):
 
 
 @pytest.mark.parametrize('target',[None,'toy'])
-def test_soltar_ignora_velocidade_antiga_e_cai_no_primeiro_tick_do_game(tmp_path,target,monkeypatch):
+@pytest.mark.parametrize('velocity',[(0,0),(1800,-1500)])
+def test_soltar_substitui_velocidade_antiga_pelo_gesto_recente(tmp_path,target,velocity,monkeypatch):
     clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     game=Game(tmp_path,CONTENT)
     item=game.ball if target else None
@@ -107,14 +108,16 @@ def test_soltar_ignora_velocidade_antiga_e_cai_no_primeiro_tick_do_game(tmp_path
     body.grounded=True;body.platform=55
     game.interact(dict(event,type='drag-start',x=500,y=300))
     assert body.held and body.vx==body.vy==body.omega==0
-    game.interact(dict(event,type='drag-end',x=500,y=300,vx=1800,vy=-1500))
+    vx,vy=velocity
+    game.interact(dict(event,type='drag-end',x=500,y=300,vx=vx,vy=vy))
     assert not body.held and not body.grounded and body.platform is None
-    assert body.vx==body.vy==body.omega==0
+    assert (body.vx,body.vy,body.omega)==(vx,vy,vx*.35)
     before=body.y
     clock[0]+=.016;game.tick(.016,clock[0])
-    assert body.y>before and body.vy>0
-    assert body.x==500 and body.vx==body.omega==0
-    assert game.senses.pulse['THROW']==0
+    if vx:
+        assert body.x>500 and body.y<before and body.vy>vy
+    else:assert body.x==500 and body.y>before and body.vy>0
+    assert bool(game.senses.pulse['THROW'])==(target is None and vx!=0)
 
 
 def test_pegar_no_notebook_desprende_e_cai_sem_esperar_pensamento(tmp_path,monkeypatch):

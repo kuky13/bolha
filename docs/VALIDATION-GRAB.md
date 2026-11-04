@@ -9,9 +9,11 @@ necessárias para avaliá-la no Windows.
 
 - Manter a Bolha presa ao ponteiro enquanto o botão da pega estiver pressionado,
   inclusive ao mover o mouse rapidamente ou para fora da janela do pet.
-- Encerrar a pega quando o botão for solto; liberar a gravidade sem herdar
-  velocidade do mouse. Perda de captura com o botão físico pressionado conserva
-  a pega; cancelamentos explícitos devem limpar a interação.
+- Encerrar a pega quando o botão for solto. Parado, liberar a gravidade;
+  em movimento, conservar o impulso recente para arremessar a Bolha e o
+  amendoim/bolinha, com força semelhante ao Pestinha e velocidade limitada.
+  Perda de captura com o botão físico pressionado conserva a pega;
+  cancelamentos explícitos devem limpar a interação sem arremesso.
 - Reduzir a oscilação visual durante a pega para até **3% de deformação** e
   **1,5° de rotação extra**, sem deslocar o centro visual. Olhos, orelhas e
   risquinhos continuam mostrando irritação gradual modulada pelo cérebro.

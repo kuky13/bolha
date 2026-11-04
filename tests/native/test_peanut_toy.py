@@ -62,7 +62,7 @@ def mouse(x,y):
 
 
 @pytest.mark.parametrize('dragged',[False,True])
-def test_toy_pega_imovel_ou_arrastado_rapido_cai_sem_impulso(qt_application,tmp_path,monkeypatch,dragged):
+def test_toy_pega_imovel_cai_e_arrasto_rapido_continua_com_impulso(qt_application,tmp_path,monkeypatch,dragged):
     clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     game=Game(tmp_path,CONTENT);game.ball.body.x,game.ball.body.y=500,300;game.ball.place()
     window=ObjectWindow(NativeScene(game),game.ball);window.sync()
@@ -77,9 +77,12 @@ def test_toy_pega_imovel_ou_arrastado_rapido_cai_sem_impulso(qt_application,tmp_
         before=body.x,body.y
         window.mouseReleaseEvent(mouse(*before))
         assert not body.held and not game.ball.dragging and window.offset is None
-        assert not game.hover and body.vx==body.vy==body.omega==0
+        assert not game.hover
+        if dragged:assert (body.vx,body.vy,body.omega)==(2500,-2500,875)
+        else:assert body.vx==body.vy==body.omega==0
         clock[0]+=.016;game.tick(.016,clock[0])
-        assert body.x==before[0] and body.y>before[1] and body.vy>0
+        if dragged:assert body.x>before[0] and body.y<before[1] and body.vy<0
+        else:assert body.x==before[0] and body.y>before[1] and body.vy>0
     finally:window.close()
 
 
