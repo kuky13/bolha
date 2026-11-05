@@ -680,6 +680,7 @@ class NeuralDialog(QDialog):
                                 'roam_duration':'pausa do passeio', 'gaze_target':'direção do olhar',
                                 'gaze_point':'ponto observado', 'continue_roam':'continuar o passeio',
                                 'celebration':'comemorar', 'toy_play':'brincar com o brinquedo',
+                                'toy_return':'devolver o brinquedo',
                                 'sleep_cycle':'sono', 'mischief':'travessura', 'paper_throw':'jogar papel',
                                 'punishment_sign':'mostrar cartaz', 'punishment_sign_text':'texto do cartaz',
                                 'accept_punishment':'aceitar o perdão', 'escape_punishment':'fugir do castigo'}

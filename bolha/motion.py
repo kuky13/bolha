@@ -50,7 +50,7 @@ def animation_pose(mode, seconds, strength=1.):
         pose.update(emotion='feliz' if mode == 'caress' else 'comemorando',
                     ear_raise=1.8 + 1.2 * math.sin(t * 10), ear_tilt=10 * math.sin(t * 11),
                     squash=-.13 * math.sin(t * 8) * joy, angle_offset=5. * math.sin(t * 6) * joy,
-                    effect='carinho' if mode == 'caress' else None, effect_strength=joy)
+                    effect='carinho' if mode == 'caress' else 'comemorando', effect_strength=joy)
     elif mode == 'airborne':
         pose.update(emotion='assustado', eye_open=1.25, ear_raise=2.4,
                     squash=-.15 * strength, angle_offset=2 * math.sin(t * 7))
@@ -81,6 +81,25 @@ def animation_pose(mode, seconds, strength=1.):
         pose.update(emotion='atento', eye_open=1.15 - .4 * crouch,
                     ear_raise=-1.5 * crouch, ear_tilt=-6 * crouch,
                     squash=.19 * crouch, angle_offset=4 * math.sin(t * 11) * crouch)
+    elif mode == 'brinquedo_frustrado':
+        # O abalo cresce com a intensidade, mas a esfera continua no mesmo centro.
+        rage = _ease(t / .32) * (.72 + .28 * strength)
+        pulse = .82 + .18 * math.sin(t * 21)
+        pose.update(emotion='bravo', eye_open=.46 - .08 * rage,
+                    ear_raise=-2.8 - 1.1 * rage,
+                    ear_tilt=12 * math.sin(t * 22) * rage,
+                    squash=.07 * math.sin(t * 19) * rage,
+                    angle_offset=6.5 * math.sin(t * 20) * rage,
+                    effect='bravo', effect_strength=_unit(rage * strength),
+                    anger=_unit((.72 + .28 * strength) * pulse))
+    elif mode == 'brinquedo_perseguindo':
+        dash = .5 + .5 * math.sin(t * 15)
+        pose.update(emotion='atento', eye_open=1.16,
+                    ear_raise=1.4 - 2.5 * strength,
+                    ear_tilt=-8. - 5. * dash * strength,
+                    squash=.10 * dash * strength - .045,
+                    angle_offset=5. * math.sin(t * 10) * strength,
+                    effect='perseguindo', effect_strength=.45 + .55 * strength)
     elif mode == 'bote_erro':
         flump = math.exp(-((t - .25) / .16) ** 2)
         wobble = math.sin(t * 13) * math.exp(-t * 1.8)
@@ -134,13 +153,13 @@ def animation_pose(mode, seconds, strength=1.):
         pose.update(emotion='contente', **{key: value for key, value in wink.items() if key != 'tilt'})
         pose['angle_offset'] = wink['tilt']
     elif mode == 'bravo':
-        pulse = .88 + .12 * math.sin(t * 14)
-        pose.update(eye_open=.54, ear_raise=-2.1,
+        pulse = .92 + .08 * math.sin(t * 17)
+        pose.update(eye_open=.56-.17*strength, ear_raise=-2.1-1.5*strength,
                     ear_tilt=6. * strength + 3. * math.sin(t * 16) * strength,
                     squash=.06 * math.sin(t * 12) * strength,
                     angle_offset=2.5 * math.sin(t * 13) * strength,
                     effect='bravo', effect_strength=strength,
-                    anger=_unit((.45 + .55 * strength) * pulse))
+                    anger=_unit((.58 + .42 * strength) * pulse))
     elif mode == 'triste':
         pose.update(ear_raise=-1.2 + .35 * math.sin(t * 2), eye_open=.8,
                     gaze=(0., .8), squash=.045 * math.sin(t * 2), angle_offset=2. * math.sin(t * 1.5))

@@ -84,6 +84,11 @@ Soltar obedece à mesma regra na personagem e no brinquedo. Quando o sensor de
 cursor está ligado, aproximar o ponteiro do amendoim ou da bolinha empurra o
 brinquedo para o lado e alimenta a atenção do cérebro.
 
+Na candidata 0.4.1, passar o mouse de baixo para cima faz o brinquedo pular.
+A Bolha corre atrás dele e o devolve quando alcança. Se você o tirar do
+alcance repetidamente, ela fica brava. O brinquedo para de rolar quando repousa,
+e as reações online surgem em cantos variados da área útil das telas.
+
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
 

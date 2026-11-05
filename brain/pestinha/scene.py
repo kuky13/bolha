@@ -217,7 +217,7 @@ class Ball(Item):
     def __init__(self, x, y, kind='ball', sprite=None):
         # Margem do desenho original, sem alterar o raio da física existente.
         super().__init__('paper' if kind == 'papel' else 'ball', 42, 42)
-        self.body = Body(x, y, 17, 17)
+        self.body = Body(x, y, 17, 17, circular=kind!='papel')
         self.roll_angle = 0.0  # fase visual original em radianos, não é outro corpo
         self.appearance = 'ball' if kind=='papel' else 'peanut'
         self.dragging = False
@@ -227,6 +227,8 @@ class Ball(Item):
     def handled_by_user(self, now): return self.dragging or now - self.last_handled < 1
     def step(self, dt, bounds, areas=None, monitors=None, displays=None):
         if not self.dragging:
+            if self.body.grounded and abs(self.body.vx)<9.:
+                self.body.vx = self.body.omega = 0.
             self.roll_angle += self.body.vx*dt*.8  # mesma rolagem do fallback GPL
             self.body.step(dt, bounds, [], areas, monitors, displays)
         self.place()

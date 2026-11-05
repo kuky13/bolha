@@ -109,6 +109,34 @@ def test_scene_toy_size_mask_and_negative_monitor_clamp(qt_app,tmp_path):
     scene.close()
 
 
+def test_online_gif_uses_random_usable_desktop_corners_without_repeat(qt_app,tmp_path,monkeypatch):
+    import sys
+    sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
+    import bolha.scene as scene_module
+    from game import Game
+    from bolha.scene import NativeScene
+    repo=Path(__file__).resolve().parents[2]
+    game=Game(tmp_path,repo/'assets/bolha/content')
+    game.areas=[(-900.,-200.,-200.,500.),(100.,0.,700.,500.)]
+    first=game.mischief.create_online_reaction('feliz')
+    second=game.mischief.create_online_reaction('observando')
+    scene=NativeScene(game)
+    monkeypatch.setattr(scene_module.random,'choice',lambda options:options[0])
+    assert scene._place_reaction_in_corner(first)
+    first_point=(first._cx,first._cy)
+    assert scene._place_reaction_in_corner(second)
+    second_point=(second._cx,second._cy)
+    assert first_point!=second_point
+    for thing in (first,second):
+        left,top,right,bottom=game.bounds((thing._cx,thing._cy))
+        assert left<=thing._cx-thing.width()/2
+        assert thing._cx+thing.width()/2<=right
+        assert top<=thing._cy-thing.height()/2
+        assert thing._cy+thing.height()/2<=bottom
+    assert first_point[0]<0 or second_point[0]<0
+    scene.close()
+
+
 def test_gif_fica_limpo_expira_apos_exibicao_e_pausa_no_hover(qt_app,tmp_path,monkeypatch):
     import sys
     sys.path.insert(0,str(Path(__file__).resolve().parents[0]))

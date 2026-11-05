@@ -53,7 +53,7 @@ def test_angry_and_sad_eyes_have_opposite_readable_lids(qt_application):
     assert slopes['triste'] < -.03
 
 
-@pytest.mark.parametrize('kind', ['carinho', 'tonto', 'bravo'])
+@pytest.mark.parametrize('kind', ['carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando'])
 def test_reaction_marks_move_fade_and_fit_visual_window(qt_application, kind):
     assert not render(draw_reaction_marks, kind=kind, strength=0).any()
     first = render(draw_reaction_marks, kind=kind, phase=.2, scale=100/49)

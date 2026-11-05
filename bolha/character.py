@@ -252,9 +252,9 @@ def draw_sleep_marks(painter, cx, cy, scale=1.0, phase=0.0, strength=1.0, angle=
 
 def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
                         angle=0.0, squash=0.0):
-    """Pequenos corações, estrelas e risquinhos; acompanham a pose do corpo, sem hitbox."""
+    """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
-    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo'): return
+    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando'): return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
@@ -283,6 +283,34 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
                 star.lineTo(x+dx,y+dy)
             star.closeSubpath()
             painter.drawPath(star)
+    elif kind in ('perseguindo', 'comemorando'):
+        painter.setPen(Qt.NoPen)
+        for index in range(3):
+            phase_i = phase * (8 if kind == 'perseguindo' else 2.5) + index * math.tau / 3
+            if kind == 'perseguindo':
+                # Riscos atrás do movimento e pequenos brilhos laterais.
+                x = -39 + (index % 2) * 5
+                y = 8 + (index - 1) * 12 + math.sin(phase_i) * 2
+                painter.setPen(_pen(color='#a8efff', width=1.7 + index * .35,
+                                    alpha=strength * (.45 + .18 * index)))
+                painter.drawLine(QPointF(x - 5, y), QPointF(x + 1, y - 2))
+                painter.setPen(Qt.NoPen)
+                x = 35 * math.cos(phase_i)
+                y = -30 + 8 * math.sin(phase_i)
+                size = 1.7 + .8 * (1 + math.sin(phase_i * 1.7))
+                painter.setBrush(_color('#fff0a6', strength * .8))
+                painter.drawEllipse(QPointF(x, y), size, size)
+            else:
+                x = 34 * math.cos(phase_i)
+                y = -30 + 10 * math.sin(phase_i)
+                size = 3.2 + .7 * math.sin(phase_i * 2)
+                star = QPainterPath(QPointF(x, y - size))
+                for dx, dy in ((1, -1), (size, 0), (1, 1), (0, size),
+                               (-1, 1), (-size, 0), (-1, -1)):
+                    star.lineTo(x + dx, y + dy)
+                star.closeSubpath()
+                painter.setBrush(_color(GOLD, strength * .9))
+                painter.drawPath(star)
     else:
         painter.setBrush(Qt.NoBrush)
         for side in (-1, 1):

@@ -51,10 +51,70 @@ class Play:
         self.energy = 1.
         self.contact = 0.
         self.requested_action = None
+        self.chase_until = 0.
+        self.toy_in_reach = False
+        self.last_tease = -math.inf
+        self.teases = 0
 
     def weight(self, key):
         """Peso de uma brincadeira pelo nome (0 se não existir)."""
         return self.w.get(key, 0.0)
+
+    def notice_toy_move(self, now, body, ball):
+        """Um movimento do jogador convida para brincar e pode tirar a bola do alcance."""
+        if self.weight('bola') <= 0.:
+            return None
+        started = now >= self.chase_until
+        if started:
+            self.toy_in_reach = False
+        self.chase_until = now + 6.
+        distance = math.hypot(ball.body.x-body.x, ball.body.y-body.y)
+        reach = body.half_w + ball.body.half_w + 34.
+        if distance <= reach:
+            self.toy_in_reach = True
+        elif distance > reach + 42. and self.toy_in_reach:
+            self.toy_in_reach = False
+            if now-self.last_tease > 10.:
+                self.teases = 0
+            self.last_tease = now
+            self.teases += 1
+            return 'taken'
+        return 'started' if started else None
+
+    def stop_chase(self):
+        self.chase_until = 0.
+        self.toy_in_reach = False
+
+    def follow(self, now, body, ball, cursor, tone, emotion):
+        """Corre e salta atrás do brinquedo, devolvendo apenas quando o alcança."""
+        if (now >= self.chase_until or not ball.isVisible() or self.energy <= .18):
+            return None
+        toy = ball.body
+        dx, dy = toy.x-body.x, toy.y-body.y
+        reach = body.half_w + toy.half_w
+        distance = math.hypot(dx, dy)
+        held = toy.held or ball.dragging
+        if distance <= reach+34.:
+            self.toy_in_reach = True
+        if not held and distance <= reach+12.:
+            player_side = cursor[0]-toy.x if cursor is not None else 0.
+            direction = math.copysign(1., player_side if abs(player_side)>40. else dx or 1.)
+            style = self.policy.choose('toy_return', ['tap','lob'], rates=self.rates, emotion=emotion,
+                                       energy=self.energy, contact=self.contact,
+                                       weights={'tap':.25, 'lob':.14+.55*tone.vigor()}) if self.policy else 'tap'
+            ball.kick(direction*(340. if style=='lob' else 460.), -535. if style=='lob' else -365.)
+            self.stop_chase()
+            self.next_at = now+2.2
+            if body.grounded:
+                body.jump(body.vx*.3, -235.)
+            return 'return'
+        if body.grounded:
+            speed = min(430., max(220., tone.speed()*1.7))
+            body.vx = max(-speed, min(speed, dx*5.)) if abs(dx)>reach*.72 else 0.
+            if -160. <= dy < -28. and abs(dx) < reach+90.:
+                body.jump(body.vx, max(-770., min(-440., -tone.hop_power())))
+                return 'hop'
+        return 'chase'
 
     def tick(self, now, body, ball, cursor, emotion, pull=1.0):
         """
@@ -78,6 +138,8 @@ class Play:
             if action == 'throw':
                 return self.throw_at(ball, cursor, FLIGHT_TIME, ball.body.x, ball.body.y) and 'throw'
         if pull <= 0.0:
+            return None
+        if math.hypot(ball.body.x-body.x, ball.body.y-body.y) > body.half_w+ball.body.half_w+12.:
             return None
         choices = ['kick'] if emotion in ("feliz", "curioso", "contente") and self.weight("bola") > 0 else []
         if emotion == 'bravo' and self.weight('arremesso') > 0: choices.append('throw')
