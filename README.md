@@ -5,15 +5,14 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Bolha 0.4.0 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.0).
+**Bolha 0.4.1 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.1).
 
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A 0.4.0 mostra GIFs sem moldura, explica decisões no painel neural e permite
-ajustar o tamanho dos objetos separadamente. O instalador passou pelos testes
-de atualização e recuperação no CI Windows e no notebook físico.
-[Validação da 0.4.0](docs/VALIDATION-0.4.0.md).
+A 0.4.1 acrescenta a brincadeira de bobinho, os efeitos de raiva animados e
+os GIFs em cantos variados. A atualização a partir da 0.4.0 foi testada
+no Windows. [Validação da 0.4.1](docs/VALIDATION-0.4.1.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
@@ -84,7 +83,7 @@ Soltar obedece à mesma regra na personagem e no brinquedo. Quando o sensor de
 cursor está ligado, aproximar o ponteiro do amendoim ou da bolinha empurra o
 brinquedo para o lado e alimenta a atenção do cérebro.
 
-Na candidata 0.4.1, passar o mouse de baixo para cima faz o brinquedo pular.
+Passar o mouse de baixo para cima faz o brinquedo pular.
 A Bolha corre atrás dele e o devolve quando alcança. Se você o tirar do
 alcance repetidamente, ela fica brava. O brinquedo para de rolar quando repousa,
 e as reações online surgem em cantos variados da área útil das telas.
