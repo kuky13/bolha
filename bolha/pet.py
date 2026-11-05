@@ -53,7 +53,7 @@ class PetVisual(QWidget):
         if pose['effect'] and pose['effect_strength']>0:
             draw_reaction_marks(p,self.width()/2,self.height()/2,scale,
                                 pose['effect_phase'],pose['effect'],pose['effect_strength'],
-                                angle=angle,squash=squash)
+                                angle=angle,squash=squash,effect_angle=pose.get('effect_angle',0.))
         p.end();self.paint_times.append(now);self.painted.emit()
 
 

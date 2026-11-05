@@ -286,10 +286,10 @@ def _draw_anger_marks(painter, phase, strength):
 
 
 def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
-                        angle=0.0, squash=0.0):
+                        angle=0.0, squash=0.0, effect_angle=0.0):
     """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
-    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando'): return
+    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida'): return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
@@ -348,6 +348,20 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
                 painter.drawPath(star)
     elif kind == 'bravo':
         _draw_anger_marks(painter, phase, strength)
+    elif kind == 'rebatida':
+        painter.rotate(_clamp(effect_angle,-180.,180.))
+        progress = _clamp(phase/.24,0.,1.)
+        x, height = 47.+6.*progress, 7.+4.*progress
+        arc = QPainterPath(QPointF(x-2.,-height))
+        arc.quadTo(x+7.,0.,x-2.,height)
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(_pen('#6ce7f3',4.4,strength*.45))
+        painter.drawPath(arc)
+        painter.setPen(_pen('#d5ffff',1.8,strength))
+        painter.drawPath(arc)
+        painter.setPen(_pen('#ffd364',1.8,strength))
+        for side in (-1,1):
+            painter.drawLine(QPointF(x+2.,side*(height+1.)),QPointF(x+5.,side*(height+4.)))
     painter.restore()
 
 

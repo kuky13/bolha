@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Expressões reais respeitam cérebro, relógio e a única autoridade física."""
 from pathlib import Path
+import time
 import pytest
 from game import Game
 from bolha.motion import animation_pose, ExpressionMotion, QUIRK_SECONDS
@@ -83,6 +84,30 @@ def test_cena_comedia_vem_da_brincadeira_real_e_nao_escolhe_politica_na_view(tmp
     assert motion.update(game, 101.9)['emotion'] == 'atento'
     assert motion.mode == 'fingir_trabalho'
     assert motion.update(game, 104)['emotion'] == game.state.emotion
+
+
+def test_rebatida_real_do_pingpong_comprime_estica_e_fecha_o_efeito(tmp_path,monkeypatch):
+    monkeypatch.setattr(time,'monotonic',lambda:100.)
+    game=game_at_rest(tmp_path)
+    game.interact({'type':'pingpong'})
+    match=game.pingpong
+    game.interact(dict(type='cursor',x=920.,y=450.))
+    game.last_think=100.
+    match.serve_delay=0.
+    match.ball_x=match.pet_x+match.pet_radius+match.toy_radius+2.
+    match.ball_y=match.pet_y+8.
+    match.vx=-430.
+    game.tick(.016,100.)
+    assert match.rally==1 and match.vx>0.
+    assert game.play_reaction['kind']=='pingpong_rebatida'
+    motion=ExpressionMotion(100.)
+    impact=motion.update(game,100.)
+    stretch=motion.update(game,100.13)
+    settled=motion.update(game,100.38)
+    assert impact['squash']<-.1 and impact['effect']=='rebatida'
+    assert stretch['squash']>.1 and stretch['ear_raise']>0.
+    assert settled['squash']==0. and settled['effect_strength']==0.
+    assert motion.update(game,100.5)['effect'] is None
 
 
 def test_reacoes_a_perseguir_e_keep_away_sao_visuais_sem_alterar_a_fisica(tmp_path):

@@ -26,7 +26,7 @@ def animation_pose(mode, seconds, strength=1.):
     pose = dict(emotion=mode, eye_open=1., ear_tilt=0., ear_raise=0., squash=0.,
                 gaze=None, blink=0., blink_left=None, blink_right=None,
                 angle_offset=0., zzz_strength=0., zzz_phase=t,
-                effect=None, effect_strength=0., effect_phase=t, anger=0.)
+                effect=None, effect_strength=0., effect_phase=t, effect_angle=0., anger=0.)
     if mode == 'held':
         irritation = _ease((t - .7) / 3.)
         rage = _ease((t - 1.1) / 2.6) * (.55 + .45 * strength)
@@ -101,6 +101,14 @@ def animation_pose(mode, seconds, strength=1.):
                     squash=.10 * dash * strength - .045,
                     angle_offset=5. * math.sin(t * 10) * strength,
                     effect='perseguindo', effect_strength=.45 + .55 * strength)
+    elif mode == 'pingpong_rebatida':
+        impact = 1. - _ease(t/.09)
+        stretch = _ease((t-.035)/.085)*(1.-_ease((t-.13)/.22))
+        pose.update(emotion='atento', eye_open=1.-.56*impact+.24*stretch,
+                    ear_raise=-3.2*impact+3.3*stretch, ear_tilt=12.*impact-11.*stretch,
+                    squash=(-.20*impact+.17*stretch)*strength,
+                    angle_offset=(-5.5*impact+7.5*stretch)*strength,
+                    effect='rebatida', effect_strength=strength*(1.-_ease((t-.035)/.22)))
     elif mode == 'bote_erro':
         flump = math.exp(-((t - .25) / .16) ** 2)
         wobble = math.sin(t * 13) * math.exp(-t * 1.8)
@@ -236,5 +244,7 @@ class ExpressionMotion:
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if mode == 'pingpong_rebatida':
+            self.pose['effect_angle'] = play_reaction.get('heading',0.)-body.angle-self.pose['angle_offset']
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         return self.pose

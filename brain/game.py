@@ -569,9 +569,13 @@ class Game:
             self.drives.stimulate('novelty',.3)
             self.drives.touched('poke',.2)
         if event in ('pet_hit','player_point','pet_point'):
-            kind = {'pet_hit':'brinquedo_perseguindo','player_point':'bote_erro','pet_point':'comemorando'}[event]
-            duration = .40 if event == 'pet_hit' else 1.15
+            kind = {'pet_hit':'pingpong_rebatida','player_point':'bote_erro','pet_point':'comemorando'}[event]
+            duration = .42 if event == 'pet_hit' else 1.15
             self.play_reaction = dict(kind=kind,started=now,until=now+duration,intensity=.8)
+            if event == 'pet_hit':
+                speed = math.hypot(match.vx,match.vy)/match.speed_scale
+                self.play_reaction['intensity'] = .62+.38*min(1.,speed/780.)
+                self.play_reaction['heading'] = math.degrees(math.atan2(match.vy,match.vx))
         if now-self.last_save >= 30:
             self.save()
             self.last_save = now
