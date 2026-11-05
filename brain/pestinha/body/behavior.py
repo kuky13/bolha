@@ -54,6 +54,7 @@ class Behavior:
         self.play = None            # Play: estilo de brincadeira do pet, ligado pelo app
         self.play_pull = 0.0        # 0..1, da rede: quanto ele quer brincar agora (ver mesa.pull)
         self.last_play = None      # último resultado real, usado pela expressão da Bolha
+        self.toy_action = None
         self.canto = False          # o neurônio CANTO está disparando: ele vai para o cantinho
         self.fuga_alvo = None       # x para onde ele está fugindo do cantinho (None: não está fugindo)
         self.march_dir = 1
@@ -132,11 +133,12 @@ class Behavior:
                 self.mischief.release(thing)
         self.mission = None
 
-    def tick(self, dt, now, cursor, bounds, prof, platforms=(), allow_roaming=True):
+    def tick(self, dt, now, cursor, bounds, prof, platforms=(), allow_roaming=True, sense_cursor=True):
         """Um passo do comportamento: anda, mexe na bolinha e reage ao cursor, respeitando as plataformas."""
         body = self.body
         st = self.state
         self.cursor = cursor
+        self.toy_action = None
 
         # olhar: janela recém-aberta > cursor; virado, olha para "cima" do mundo (indignado)
         if self.look and now > self.look[2]:
@@ -182,6 +184,17 @@ class Behavior:
         if not allow_roaming:
             if body.grounded:body.vx = 0.0
             return
+
+        if (self.play is not None and self.ball is not None and not self.play.requested_action
+                and not self.mission and self.fuga_alvo is None and not self.canto
+                and not st.castigo and not st.protest_stage and not st.at_desk
+                and self.emotion not in STILL and not dizzy and not st.caressing(now) and body.upright()):
+            self.toy_action = self.play.follow(now, body, self.ball, cursor if sense_cursor else None,
+                                              self.tone, self.emotion)
+            if self.toy_action == 'return':
+                self.last_play = dict(started=now, action='return')
+            if self.toy_action:
+                return
 
         # objeto carregado acompanha (e solta se o pet cair/voar)
         if self.mission and self.mission[0] == "deliver":

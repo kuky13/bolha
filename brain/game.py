@@ -156,12 +156,12 @@ class Game:
             if area[0] <= x < area[2] and area[1] <= y < area[3]: return area
         return min(areas, key=lambda a: math.hypot(x - (a[0] + a[2]) / 2, y - (a[1] + a[3]) / 2))
 
-    def fit(self, body):
+    def fit(self, body, margin=4.):
         a = self.bounds((body.x, body.y))
         ex, ey = body.extents()
         old = (body.x, body.y)
-        body.x = max(a[0] + ex + 4, min(a[2] - ex - 4, body.x))
-        body.y = max(a[1] + ey + 4, min(a[3] - ey - 4, body.y))
+        body.x = max(a[0] + ex + margin, min(a[2] - ex - margin, body.x))
+        body.y = max(a[1] + ey + margin, min(a[3] - ey - margin, body.y))
         if old != (body.x, body.y): body.grounded = False; body.platform = None
 
     def visible(self):
@@ -180,12 +180,11 @@ class Game:
             self.behavior.adaptive_goal = None
         size = float(self.prefs.get('avatarSize', 136)) / 2
         self.body.half_w = self.body.half_h = max(24., min(100., size))
-        self.fit(self.ball.body)
         for item in self.objects.values():
             if hasattr(item, 'apply_scale'):
                 item.apply_scale(object_scale(item, self.prefs.get('avatarSize', 136), self.prefs.get('objectScales', {})))
             if hasattr(item, 'body'):
-                self.fit(item.body)
+                self.fit(item.body, margin=0.)
                 item.place(item.body.x, item.body.y)
             elif hasattr(item, 'place'):
                 area = self.bounds((item._cx, item._cy))
@@ -208,7 +207,7 @@ class Game:
         self.blocked.clear()
         self.excluded = set(data.get('exclude', []))
         self.fit(self.body)
-        self.fit(self.ball.body)
+        self.fit(self.ball.body, margin=0.)
         for obj in self.objects.values():
             if isinstance(obj, FloatingThing):
                 area = self.bounds((obj._cx, obj._cy))
@@ -252,7 +251,7 @@ class Game:
             if self.available_areas():
                 if previous_blocked != self.blocked:
                     self.fit(self.body)
-                    self.fit(self.ball.body)
+                    self.fit(self.ball.body, margin=0.)
                     for obj in self.objects.values():
                         area=self.bounds((obj._cx,obj._cy))
                         obj.place(max(area[0]+obj.width()/2,min(area[2]-obj.width()/2,obj._cx)),max(area[1]+obj.height()/2,min(area[3]-obj.height()/2,obj._cy)))
@@ -322,6 +321,7 @@ class Game:
                 self.scene_dragging = kind != 'drag-end'
                 target.place(event['x'], event['y'])
                 return
+            moved = math.hypot(event['x']-body.x, event['y']-body.y) >= 3.
             body.held = kind != 'drag-end'
             body.vx=body.vy=body.omega=0.
             body.x, body.y = event['x'], event['y']
@@ -333,6 +333,9 @@ class Game:
                 self.drives.touched('drag')
                 self.conditioning.outcome(now)
             self.fit(body)
+            if (target is self.ball and not event.get('cancelled')
+                    and (kind == 'drag-start' or moved)):
+                self._notice_toy_move(now)
             if kind == 'drag-end':
                 body.grounded=False;body.platform=None
                 if target is None:
@@ -361,6 +364,7 @@ class Game:
             self.quiet_until = now+30
             self.behavior.adaptive_goal = 'watch'
             self.behavior.drop_carried()
+            self.play.stop_chase()
             decision = dict(action='watch', target=None, intensity=1., duration=30.,
                             source='explicit_user_command', factors=dict(reason='quiet command'))
             self.intelligence.current_decision = decision
@@ -416,7 +420,11 @@ class Game:
             self.intelligence.history.append(dict(self.intelligence.current_decision))
         elif kind == 'notebook': self.mesa.alternar_notebook()
         elif kind == 'corner': self.castigo.toggle(self.bounds())
-        elif kind == 'ball': self.ball_stored = not self.ball_stored; self.ball.setVisible(not self.ball_stored)
+        elif kind == 'ball':
+            self.ball_stored = not self.ball_stored
+            self.ball.setVisible(not self.ball_stored)
+            self.play.stop_chase()
+            self.play_reaction = {}
         elif kind == 'mischief': self.mischief_ctl.pedir(now)
         elif kind == 'dismiss':
             obj = self.objects.get(str(event.get('id')))
@@ -498,12 +506,14 @@ class Game:
         return 0 <= now - self.mouse_moved_at <= .02
 
     def _sense_toy_cursor(self,now):
-        if (not self.prefs.get('senseCursor',True) or not self.visible() or self.panel
-                or self.ball_stored or not self.ball.isVisible()
+        if not self.prefs.get('senseCursor',True) or not self.visible():
+            self._reset_cursor_motion()
+            return
+        if (self.panel or self.ball_stored or not self.ball.isVisible()
                 or self.ball.dragging or self.ball.body.held
                 or self.body.held or self.held_since is not None
                 or self.state.pressing or self.scene_dragging):
-            self._reset_cursor_motion()
+            self.cursor_toy_near = False
             return
         moved=self._track_cursor(now)
         radius=self.ball.body.half_w+24
@@ -512,10 +522,50 @@ class Game:
             self.senses.kick('NOVELTY',.35)
             self.behavior.look_at(self.ball.body.x,self.ball.body.y,now)
             self.next_toy_attention=now+2.5
-        if near and (not self.cursor_toy_near or moved):
-            self.last_toy_push=push_from_cursor(
+        if near and moved:
+            pushed_at = push_from_cursor(
                 self.ball,self.cursor,self.cursor_velocity,now,self.last_toy_push,radius=radius)
+            if pushed_at != self.last_toy_push:
+                self.last_toy_push = pushed_at
+                self.ball.last_handled = now
+                self._notice_toy_move(now)
         self.cursor_toy_near=near
+
+    def _notice_toy_move(self, now):
+        if (not self.prefs.get('roaming',True) or not self.visible() or self.panel
+                or self.ball_stored or not self.ball.isVisible() or self.sleep.asleep
+                or self.body.held or self.castigo.dentro or now < self.quiet_until):
+            return
+        reaction = self.play.notice_toy_move(now, self.body, self.ball)
+        if reaction == 'taken':
+            self.senses.kick('TOY_TAKEN', .45 if self.play.teases == 1 else .9)
+            if self.play.teases >= 2:
+                anger = self.state.tone.r.get('ANGRY',0.)
+                self.play_reaction = dict(kind='brinquedo_frustrado',started=now,until=now+2.8,
+                                          intensity=min(1.,.70+.10*(self.play.teases-2)+.30*anger))
+
+    def _focus_gaze(self, now):
+        if self.panel or self.sleep.asleep or self.state.dizzy(now) or self.state.caressing(now):
+            return
+        reaction = self.release_reaction
+        released_angry = reaction.get('until',0)>now and reaction.get('kind') in ('bravo','birra')
+        toy_angry = (self.play_reaction.get('until',0)>now
+                     and self.play_reaction.get('kind')=='brinquedo_frustrado')
+        cursor_enabled = self.prefs.get('senseCursor',True)
+        nearby = math.dist(self.cursor,(self.body.x,self.body.y)) < 390.
+        if cursor_enabled and (released_angry or toy_angry):
+            point = self.cursor
+        elif self.behavior.toy_action in ('chase','hop'):
+            point = self.ball.body.x,self.ball.body.y
+        elif cursor_enabled and nearby and now-self.mouse_moved_at < 1.8:
+            point = self.cursor
+        else:
+            return
+        dx,dy = point[0]-self.body.x,point[1]-self.body.y
+        distance = math.hypot(dx,dy) or 1.
+        angle = math.radians(self.body.angle)
+        self.state.gaze = ((dx*math.cos(angle)+dy*math.sin(angle))/distance,
+                           (-dx*math.sin(angle)+dy*math.cos(angle))/distance)
 
     def _play_expression(self,now):
         attempt=self.behavior.last_play
@@ -523,6 +573,13 @@ class Game:
         if attempt and attempt['started']!=self.last_play_attempt:
             self.last_play_attempt=attempt['started']
             kind='comemorando' if attempt['action'] else 'bote_erro'
+        elif self.behavior.toy_action in ('chase','hop'):
+            current = self.play_reaction
+            if current.get('kind')=='brinquedo_perseguindo':
+                current['until'] = now+.3
+            elif now >= current.get('until',0.):
+                self.play_reaction = dict(kind='brinquedo_perseguindo',started=now,until=now+.3,intensity=.8)
+            return
         elif (now>=self.next_play_scene and not self.body.held and self.body.grounded
                 and not self.panel and not self.sleep.asleep and not self.state.caressing(now)):
             near=not self.ball_stored and self.ball.isVisible() and math.dist(
@@ -675,6 +732,7 @@ class Game:
         if frozen:
             self._cancel_holds(now)
             self._reset_cursor_motion()
+            self.play.stop_chase()
             if self.paused_at is None: self.paused_at = now
             return
         if self.paused_at is not None:
@@ -698,24 +756,18 @@ class Game:
         self.castigo.act(now,self.body,area,self.cursor if self.prefs.get('senseCursor',True) else (1e9,1e9),self.state,self.rates,self.sleep.asleep)
         manual_play = self.play.requested_action is not None
         resting = (self.hover or self.panel or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
-        self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting)
+        self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
+                           self.prefs.get('senseCursor',True))
         if manual_play:
             # A situação pode mudar entre o clique e o próximo quadro.
             self.play.requested_action = None
         self._play_expression(now)
-        reaction=self.release_reaction
-        if (reaction.get('until',0)>now and reaction.get('kind') in ('bravo','birra')
-                and self.prefs.get('senseCursor',True) and not self.state.caressing(now)):
-            dx,dy=self.cursor[0]-self.body.x,self.cursor[1]-self.body.y
-            distance=math.hypot(dx,dy) or 1.
-            angle=math.radians(self.body.angle)
-            self.state.gaze=((dx*math.cos(angle)+dy*math.sin(angle))/distance,
-                             (-dx*math.sin(angle)+dy*math.cos(angle))/distance)
         self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
         if self.body.grounded:self.in_flight=False
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
+        self._focus_gaze(now)
         impacts = self.body.pop_impacts()
         self.landing *= math.exp(-dt * 12)
         for strength in impacts:

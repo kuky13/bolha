@@ -24,6 +24,12 @@ for _index in range(41):
     if _index == 0: _DIZZY_EYE.moveTo(_point)
     else: _DIZZY_EYE.lineTo(_point)
 
+# Quatro curvas do símbolo de raiva dos quadrinhos, com o centro aberto.
+_ANGER_MARK = QPainterPath()
+for _sx, _sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+    _ANGER_MARK.moveTo(1.7 * _sx, 8. * _sy)
+    _ANGER_MARK.quadTo(2.2 * _sx, 2.2 * _sy, 8. * _sx, 1.7 * _sy)
+
 
 def _clamp(value, low, high):
     try:
@@ -250,11 +256,40 @@ def draw_sleep_marks(painter, cx, cy, scale=1.0, phase=0.0, strength=1.0, angle=
     painter.restore()
 
 
+def _draw_anger_marks(painter, phase, strength):
+    """Um símbolo grande pulsa, seguido de outro menor e faíscas breves."""
+    painter.setBrush(Qt.NoBrush)
+    for x, y, size, tilt, delay in ((-37., -36., 1., -13., 0.), (47., -18., .68, 18., .23)):
+        beat = (.5 + .5 * math.cos((phase-delay)*math.tau*1.8)) ** 2
+        pop = .76 + .20 * strength * beat
+        painter.save()
+        painter.translate(x, y - 1.5 * beat)
+        painter.rotate(tilt + 4. * math.sin((phase-delay)*8))
+        painter.scale(size * pop, size * pop)
+        painter.setPen(_pen('#3b1026', 5.1, .90 * strength))
+        painter.drawPath(_ANGER_MARK)
+        painter.setPen(_pen('#ff455f', 3.2, strength))
+        painter.drawPath(_ANGER_MARK)
+        painter.setPen(_pen('#ffbec2', 1.2, (.68 + .32 * beat) * strength))
+        painter.drawPath(_ANGER_MARK)
+        painter.restore()
+
+    for index, direction in enumerate((-2.77, -1.92, -.55)):
+        progress = (phase * 1.55 + .15 * index) % 1.
+        if progress >= .60:
+            continue
+        distance = 50. + 12. * progress
+        x, y = math.cos(direction), math.sin(direction)
+        fade = math.sin(math.pi * progress / .60)
+        painter.setPen(_pen('#ff5f6d', 1.8, strength * strength * .78 * fade))
+        painter.drawLine(QPointF(x*distance, y*distance), QPointF(x*(distance+3.), y*(distance+3.)))
+
+
 def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
                         angle=0.0, squash=0.0):
-    """Pequenos corações, estrelas e risquinhos; acompanham a pose do corpo, sem hitbox."""
+    """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
-    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo'): return
+    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando'): return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
@@ -283,18 +318,36 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
                 star.lineTo(x+dx,y+dy)
             star.closeSubpath()
             painter.drawPath(star)
-    else:
-        painter.setBrush(Qt.NoBrush)
-        for side in (-1, 1):
-            for index in range(2):
-                offset = math.sin(phase*18+index)*.8*strength
-                mark = QPainterPath(QPointF(side*(42+index*5), -19-index*4+offset))
-                mark.lineTo(side*(45+index*5), -23-index*4+offset)
-                mark.lineTo(side*(43+index*5), -27-index*4+offset)
-                painter.setPen(_pen(color='#ff3352', width=2.6, alpha=strength*.55))
-                painter.drawPath(mark)
-                painter.setPen(_pen(width=1.55, alpha=strength*.9))
-                painter.drawPath(mark)
+    elif kind in ('perseguindo', 'comemorando'):
+        painter.setPen(Qt.NoPen)
+        for index in range(3):
+            phase_i = phase * (8 if kind == 'perseguindo' else 2.5) + index * math.tau / 3
+            if kind == 'perseguindo':
+                # Riscos atrás do movimento e pequenos brilhos laterais.
+                x = -39 + (index % 2) * 5
+                y = 8 + (index - 1) * 12 + math.sin(phase_i) * 2
+                painter.setPen(_pen(color='#a8efff', width=1.7 + index * .35,
+                                    alpha=strength * (.45 + .18 * index)))
+                painter.drawLine(QPointF(x - 5, y), QPointF(x + 1, y - 2))
+                painter.setPen(Qt.NoPen)
+                x = 35 * math.cos(phase_i)
+                y = -30 + 8 * math.sin(phase_i)
+                size = 1.7 + .8 * (1 + math.sin(phase_i * 1.7))
+                painter.setBrush(_color('#fff0a6', strength * .8))
+                painter.drawEllipse(QPointF(x, y), size, size)
+            else:
+                x = 34 * math.cos(phase_i)
+                y = -30 + 10 * math.sin(phase_i)
+                size = 3.2 + .7 * math.sin(phase_i * 2)
+                star = QPainterPath(QPointF(x, y - size))
+                for dx, dy in ((1, -1), (size, 0), (1, 1), (0, size),
+                               (-1, 1), (-size, 0), (-1, -1)):
+                    star.lineTo(x + dx, y + dy)
+                star.closeSubpath()
+                painter.setBrush(_color(GOLD, strength * .9))
+                painter.drawPath(star)
+    elif kind == 'bravo':
+        _draw_anger_marks(painter, phase, strength)
     painter.restore()
 
 

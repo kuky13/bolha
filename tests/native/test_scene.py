@@ -115,6 +115,30 @@ def test_fogos_visiveis_continuam_animados(qt_application,tmp_path,monkeypatch):
     window.close()
 
 
+def test_brinquedo_repousa_no_chao_com_sincronizacao_qt(qt_application,tmp_path):
+    game=Game(tmp_path,CONTENT)
+    game.configure(dict(senseCursor=False,roaming=False,mischiefEnabled=False))
+    scene=NativeScene(game)
+    ball=game.ball
+    body=ball.body
+    floor=game.bounds()[3]
+    body.x,body.y=420.,floor-body.half_h-28.
+    ball.kick(120.,20.)
+    ball.place()
+    try:
+        for _ in range(180):
+            ball.step(.016,game.bounds())
+            scene.sync()
+        assert body.grounded and body.y == floor-body.half_h
+        assert body.vx == body.vy == 0.
+        resting=(body.x,body.y,ball.roll_angle)
+        for _ in range(60):
+            ball.step(.016,game.bounds())
+            scene.sync()
+        assert (body.x,body.y,ball.roll_angle)==resting
+    finally:scene.close()
+
+
 def test_mascara_pet_cacheada_invalida_tamanho_e_recorte_ao_mover(qt_application,tmp_path,monkeypatch):
     from bolha.pet import PetWindow
     from PySide6.QtGui import QRegion

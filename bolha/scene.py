@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Janelas Qt dos objetos; posições e física pertencem somente ao Game."""
 import math
+import random
 import time
 from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent,QUrl
 from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath,QDesktopServices
@@ -251,6 +252,37 @@ class NativeScene:
         self.on_scale_change=on_scale_change
         self.reaction_status={}
         self._reaction_deadlines={}
+        self._last_reaction_corner=None
+
+    def _place_reaction_in_corner(self,item):
+        """Sorteia um canto da área útil, dando preferência aos livres."""
+        choices,free=[],[]
+        for area in self.game.available_areas():
+            left,top,right,bottom=area
+            width,height=object_dimensions(item,self.game.prefs.get('avatarSize',136),
+                                            self.game.prefs.get('objectScales'),area)
+            if right-left < width or bottom-top < height:continue
+            margin=min(18.,max(0.,(right-left-width)/2),max(0.,(bottom-top-height)/2))
+            half_w,half_h=width/2,height/2
+            corners=((left+half_w+margin,top+half_h+margin),
+                     (right-half_w-margin,top+half_h+margin),
+                     (left+half_w+margin,bottom-half_h-margin),
+                     (right-half_w-margin,bottom-half_h-margin))
+            for corner_index,point in enumerate(corners):
+                key=(area,corner_index)
+                occupied=any(other is not item and other.isVisible()
+                             and abs(point[0]-other._cx)<half_w+other.width()/2+8
+                             and abs(point[1]-other._cy)<half_h+other.height()/2+8
+                             for other in self.game.objects.values())
+                choices.append((key,point))
+                if not occupied:free.append((key,point))
+        if not choices:return False
+        choices=free or choices
+        alternatives=[choice for choice in choices if choice[0]!=self._last_reaction_corner]
+        key,point=random.choice(alternatives or choices)
+        item.place(*point)
+        self._last_reaction_corner=key
+        return True
     @staticmethod
     def scale_kind(item):
         kind=getattr(item,'kind','')
@@ -327,6 +359,7 @@ class NativeScene:
                 self._status(ident,'decode',str(error));self._reaction_deadlines.pop(str(ident),None)
                 self._abort_meme(ident,item)
                 continue
+            self._place_reaction_in_corner(item)
             window.set_reaction_media(media)
             self._status(ident,'ready','');self._reaction_deadlines.pop(str(ident),None)
     def sync(self):
@@ -341,11 +374,15 @@ class NativeScene:
         online=self.game.prefs.get('onlineReactions',True) and self.game.prefs.get('mischiefEnabled',True)
         for ident,item in list(self.game.objects.items()):
             area=self.game.bounds((item._cx,item._cy))
-            item.apply_scale(object_scale(item,self.game.prefs.get('avatarSize',136),self.game.prefs.get('objectScales'),area))
             body=getattr(item,'body',None)
+            previous_radius=(body.half_w,body.half_h) if body is not None else None
+            item.apply_scale(object_scale(item,self.game.prefs.get('avatarSize',136),self.game.prefs.get('objectScales'),area))
             held=bool(item.carried or getattr(item,'dragging',False) or getattr(body,'held',False))
             if not held and body is not None:
-                self.game.fit(body);item.place(body.x,body.y)
+                left,top,right,bottom=area
+                if previous_radius!=(body.half_w,body.half_h) or not (left<=body.x<right and top<=body.y<bottom):
+                    self.game.fit(body,margin=0.)
+                item.place(body.x,body.y)
             elif not held:
                 left,top,right,bottom=area;half_w,half_h=math.ceil(item.width()/2),math.ceil(item.height()/2)
                 x=max(left+half_w,min(right-half_w,item._cx))

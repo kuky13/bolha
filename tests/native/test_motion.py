@@ -85,6 +85,28 @@ def test_cena_comedia_vem_da_brincadeira_real_e_nao_escolhe_politica_na_view(tmp
     assert motion.update(game, 104)['emotion'] == game.state.emotion
 
 
+def test_reacoes_a_perseguir_e_keep_away_sao_visuais_sem_alterar_a_fisica(tmp_path):
+    game = game_at_rest(tmp_path);motion = ExpressionMotion(100)
+    body_before = vars(game.body).copy()
+    game.play_reaction = dict(kind='brinquedo_frustrado', started=100, until=102,
+                              intensity=.9)
+    frustrated = motion.update(game, 100.55)
+    assert frustrated['emotion'] == 'bravo'
+    assert frustrated['anger'] > .6 and frustrated['effect'] == 'bravo'
+    assert frustrated['ear_raise'] < -3 and frustrated['eye_open'] < .5
+    cooling = animation_pose('brinquedo_frustrado', 2.7, .9)
+    assert cooling['anger'] < .15 and cooling['effect_strength'] < .15
+    game.play_reaction = dict(kind='brinquedo_perseguindo', started=101, until=103,
+                              intensity=.8)
+    chase = motion.update(game, 101.4)
+    assert chase['emotion'] == 'atento' and chase['effect'] == 'perseguindo'
+    assert chase['effect_strength'] > .8
+    game.play_reaction = dict(kind='comemorando', started=102, until=104, intensity=.9)
+    cheer = motion.update(game, 102.3)
+    assert cheer['emotion'] == 'comemorando' and cheer['effect'] == 'comemorando'
+    assert vars(game.body) == body_before
+
+
 @pytest.mark.parametrize('reason',['ungrab','hidden'])
 def test_cancelar_segurada_imovel_libera_corpo_e_hover(qt_application,tmp_path,reason):
     from PySide6.QtCore import QEvent, QPointF, Qt
@@ -144,6 +166,7 @@ def test_soltar_apos_arrasto_herda_movimento_recente_sem_poke(qt_application,tmp
 
 @pytest.mark.parametrize('mode', ['held', 'sleeping', 'caress', 'airborne', 'impact',
                                  'tonto', 'comemorando', 'birra', 'sacudir', 'preparar_bote',
+                                 'brinquedo_frustrado', 'brinquedo_perseguindo',
                                  'bote_erro', 'brinquedo_susto', 'fingir_trabalho', *QUIRK_SECONDS])
 def test_deformacoes_limitadas_e_sem_movimento_do_centro(mode):
     for frame in range(181):

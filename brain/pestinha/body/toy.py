@@ -116,5 +116,9 @@ def push_from_cursor(ball, cursor, cursor_vel, now, last_push, radius=RADIUS + 6
     norm = math.hypot(ux, uy) or 1.0
     ux, uy = ux / norm, uy / norm
     speed = max(260.0, min(1200.0, speed_in * 0.8))
-    ball.kick(ux * speed, min(-120.0, uy * speed - 120.0))
+    lift = min(-120.0, uy * speed - 120.0)
+    if cursor_vel[1] < -160.0 and dy <= 4.0:
+        # Um toque de baixo para cima levanta o brinquedo de propósito.
+        lift = min(lift, -max(320.0, min(570.0, -cursor_vel[1] * .66)))
+    ball.kick(ux * speed, lift)
     return now

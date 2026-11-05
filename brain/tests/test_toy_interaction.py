@@ -62,7 +62,10 @@ def test_soltar_bravo_encara_ponteiro_apesar_de_glance_e_respeita_sensor(tmp_pat
     game.behavior.tick(.016,clock[0],game.cursor,game.bounds(),game.prof)
     assert game.state.gaze==(-1.,0.)
     clock[0]+=.016;game.tick(.016,clock[0])
-    assert game.state.gaze==((1.,0.) if sensor else (-1.,0.))
+    if sensor:
+        assert game.state.gaze[0] > .999 and -.01 < game.state.gaze[1] < 0.
+    else:
+        assert game.state.gaze == (-1.,0.)
     assert game.body.y>300 and game.body.vy>0
 
 
@@ -163,6 +166,8 @@ def test_proximidade_atencao_e_impulso_com_cooldown_sem_repetir_todo_quadro(tmp_
     game=Game(tmp_path,CONTENT)
     game.configure({'senseCursor':True})
     x0,y0=game.ball.body.x,game.ball.body.y
+    game.cursor=(x0+60,y0)
+    game._sense_toy_cursor(99.9)
     game.cursor=(x0+10,y0)
     game._sense_toy_cursor(100)
     assert game.cursor_toy_near and game.senses.pulse['NOVELTY']==pytest.approx(.35)
@@ -247,8 +252,11 @@ def test_distancia_zero_e_pausa_ou_toggle_nao_usam_velocidade_antiga(tmp_path,mo
     x0,y0=game.ball.body.x,game.ball.body.y
     game.interact(dict(type='cursor',x=x0,y=y0));game._sense_toy_cursor(clock[0])
     assert game.cursor_velocity==(0.,0.)
+    assert game.ball.body.vx==game.ball.body.vy==0.
+    # Passar sobre o centro dá um impulso finito; depois a pausa não re-chuta.
+    clock[0]+=.03;game.interact(dict(type='cursor',x=x0-2,y=y0))
+    clock[0]+=.03;game.interact(dict(type='cursor',x=x0,y=y0));game._sense_toy_cursor(clock[0])
     assert game.ball.body.vx==pytest.approx(260.) and game.ball.body.vy==pytest.approx(-120.)
-    # Mesmo parado exatamente em cima após o cooldown, não re-chuta sem novo movimento do cursor.
     game.ball.body.vx=game.ball.body.vy=0.
     clock[0]+=.4;game._sense_toy_cursor(clock[0])
     assert game.ball.body.vx==game.ball.body.vy==0.
@@ -283,6 +291,8 @@ def test_sinais_de_proximidade_chegam_a_rede_e_impulsionam_brinquedo(tmp_path,mo
     clock=[100.];monkeypatch.setattr(time,'monotonic',lambda:clock[0])
     game=Game(tmp_path,CONTENT)
     game.ball.body.x,game.ball.body.y=game.body.x+30,game.body.y
+    game.cursor=(game.ball.body.x-60,game.ball.body.y)
+    game._sense_toy_cursor(clock[0]-.1)
     game.cursor=(game.ball.body.x-12,game.ball.body.y)
     game._sense_toy_cursor(clock[0])
     clock[0]+=.1;game.think(.1,clock[0])
@@ -310,3 +320,70 @@ def test_play_real_continua_neural_e_gera_reacao_da_tentativa(tmp_path,monkeypat
     if choice=='kick':
         assert game.ball.body.vx>0 and game.ball.body.vy<0
     else:assert vars(game.ball.body)==before
+
+
+def test_bobinho_persegue_irrita_e_devolve_no_contato(tmp_path, monkeypatch):
+    clock = [100.]
+    monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
+    game = Game(tmp_path, CONTENT)
+    game.configure(dict(senseApp=False,senseIdle=False,senseCursor=False,senseWindows=False))
+    game.last_think = 100.
+    pet, toy = game.body, game.ball.body
+    pet.x, pet.y = 420., game.bounds()[3]-pet.half_h
+    pet.grounded, pet.surface = True, game.bounds()[3]
+    game.ball.place(510., pet.y)
+    toy.x, toy.y = game.ball._cx, game.ball._cy
+    def move(kind, x, y):
+        clock[0] += .016
+        game.interact(dict(type=kind,id=game.ball.id,x=x,y=y))
+        game.tick(.016,clock[0])
+    move('drag-start', toy.x, toy.y)
+    move('drag', 750., pet.y)
+    assert pet.vx > 0 and toy.held and toy.vx == toy.vy == 0.
+    assert game.behavior.toy_action == 'chase'
+    assert game.play.teases == 1
+    move('drag', pet.x+90., pet.y)
+    move('drag', pet.x+330., pet.y)
+    assert game.play.teases == 2
+    assert game.play_reaction['kind'] == 'brinquedo_frustrado'
+    assert game.senses.pulse['TOY_TAKEN'] > 0
+    move('drag', pet.x+65., pet.y-67.)
+    assert game.behavior.toy_action == 'hop' and pet.vy < 0 and toy.held
+    move('drag-end', pet.x+52., pet.y-43.)
+    assert toy.vy < -300. and not toy.held
+    assert game.behavior.toy_action == 'return'
+    assert game.play_reaction['kind'] == 'comemorando'
+
+
+def test_toque_de_baixo_para_cima_levanta_brinquedo_e_inicia_brincadeira(tmp_path, monkeypatch):
+    clock = [100.]
+    monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
+    game = Game(tmp_path, CONTENT)
+    x,y = game.ball.body.x,game.ball.body.y
+    game.interact(dict(type='cursor',x=x,y=y+55.))
+    game._sense_toy_cursor(clock[0])
+    clock[0] += .035
+    game.interact(dict(type='cursor',x=x,y=y+14.))
+    game._sense_toy_cursor(clock[0])
+    assert game.ball.body.vy < -300.
+    assert game.play.chase_until > clock[0]
+
+
+def test_olha_mouse_em_movimento_mesmo_com_brinquedo_guardado(tmp_path, monkeypatch):
+    clock = [100.]
+    monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
+    game = Game(tmp_path, CONTENT)
+    game.last_think = clock[0]
+    game.body.x, game.body.y = 500., 350.
+    game.behavior.glance = (300., 350.)
+    game.behavior.next_glance = 1e9
+    game.interact({'type':'ball'})
+    game.interact(dict(type='cursor',x=680.,y=350.))
+    clock[0] += .016
+    game.interact(dict(type='cursor',x=715.,y=350.))
+    game.tick(.016,clock[0])
+    assert game.state.gaze[0] > .99
+    game.configure({'senseCursor':False})
+    clock[0] += .016
+    game.tick(.016,clock[0])
+    assert game.state.gaze[0] < -.99
