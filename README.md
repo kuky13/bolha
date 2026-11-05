@@ -71,6 +71,7 @@ não é necessário instalar Python separadamente.
 | Rodinha | Gira |
 | Menu → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
 | Menu → Brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |
+| Menu → Jogar pingue-pongue (candidata 0.4.2) | Abre uma partida com o brinquedo escolhido |
 | Configurações → Comportamento → Brinquedo | Escolhe amendoim ou bolinha original |
 | Configurações → Aparência | Ajusta o tamanho de cada tipo de objeto |
 | Botão direito no GIF | Mostra informações, origem e opções do objeto |
@@ -87,6 +88,13 @@ Passar o mouse de baixo para cima faz o brinquedo pular.
 A Bolha corre atrás dele e o devolve quando alcança. Se você o tirar do
 alcance repetidamente, ela fica brava. O brinquedo para de rolar quando repousa,
 e as reações online surgem em cantos variados da área útil das telas.
+
+Na candidata 0.4.2, escolha **Jogar pingue-pongue** no menu da Bolha ou da
+bandeja. Com a leitura do cursor ativa, mova o mouse para cima e para baixo
+dentro da quadra para controlar a raquete da direita. Bater com a ponta da
+raquete muda o ângulo da devolução. A partida pausa quando o ponteiro sai
+da quadra e termina quando alguém marca cinco pontos. Escolha **Encerrar
+pingue-pongue** para voltar ao passeio.
 
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.

@@ -85,7 +85,7 @@ class Play:
         self.chase_until = 0.
         self.toy_in_reach = False
 
-    def follow(self, now, body, ball, cursor, tone, emotion):
+    def follow(self, dt, now, body, ball, cursor, tone, emotion):
         """Corre e salta atrás do brinquedo, devolvendo apenas quando o alcança."""
         if (now >= self.chase_until or not ball.isVisible() or self.energy <= .18):
             return None
@@ -110,7 +110,9 @@ class Play:
             return 'return'
         if body.grounded:
             speed = min(430., max(220., tone.speed()*1.7))
-            body.vx = max(-speed, min(speed, dx*5.)) if abs(dx)>reach*.72 else 0.
+            desired = max(-speed, min(speed, dx*5.)) if abs(dx)>reach*.72 else 0.
+            change = 1800.*dt
+            body.vx += max(-change,min(change,desired-body.vx))
             if -160. <= dy < -28. and abs(dx) < reach+90.:
                 body.jump(body.vx, max(-770., min(-440., -tone.hop_power())))
                 return 'hop'

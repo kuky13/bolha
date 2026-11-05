@@ -41,7 +41,7 @@ class PetVisual(QWidget):
         # A transformação comum gira corpo, olhos, orelhas e marcas no mesmo centro.
         draw_character(p,self.width()/2,self.height()/2,scale=scale,
                        angle=angle,emotion=pose['emotion'],
-                       blink=pose['blink'],gaze=pose['gaze'] or game.state.gaze,
+                       blink=pose['blink'],gaze=self.pet.visual_gaze,
                        blink_left=pose['blink_left'],blink_right=pose['blink_right'],
                        ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
                        eye_open=pose['eye_open'],squash=squash,
@@ -68,6 +68,8 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True);self.setFixedSize(256,256)
         self.visual=PetVisual(self)
+        self.visual_gaze=game.state.gaze
+        self.gaze_tick=time.monotonic()
         self.press=None;self.offset=(0.,0.);self.dragging=False
         self.mouse_grab=MouseGrab(self);self.drag_position=None
         self.rubs=deque()
@@ -77,6 +79,10 @@ class PetWindow(QWidget):
     def sync(self):
         now=time.monotonic()
         self.motion.update(self.game,now,self.press[1] if self.press else None)
+        target=self.motion.pose['gaze'] or self.game.state.gaze
+        ease=1-math.exp(-18*max(0.,now-self.gaze_tick))
+        self.visual_gaze=tuple(current+(goal-current)*ease for current,goal in zip(self.visual_gaze,target))
+        self.gaze_tick=now
         x,y=round(self.body.x-self.width()/2),round(self.body.y-self.height()/2)
         self.move(x,y)
         self.visual.move(round(self.body.x-self.visual.width()/2),round(self.body.y-self.visual.height()/2))
@@ -103,6 +109,7 @@ class PetWindow(QWidget):
 
     def mousePressEvent(self,event):
         if event.button()!=Qt.LeftButton or self.press is not None or not self.game.visible():return
+        if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
         self.press=(pos,now);self.offset=(pos.x()-self.body.x,pos.y()-self.body.y)
         self.drag_position=QPointF(pos)
@@ -112,6 +119,7 @@ class PetWindow(QWidget):
         except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
 
     def mouseMoveEvent(self,event):
+        if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
         if self.press is None:
             self.rubs.append((now,pos.x()))

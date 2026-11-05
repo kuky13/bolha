@@ -33,6 +33,7 @@ from pestinha.scene import set_scene, Ball, FloatingThing
 from pestinha.scene import object_scale
 from geometry import fullscreen_monitors
 from intelligence import Intelligence
+from pingpong import PingPong
 
 
 class Game:
@@ -115,6 +116,8 @@ class Game:
         self.inputs = {}
         self.in_flight = False
         self.ball_stored = False
+        self.pingpong = None
+        self._pingpong_origin = None
         self.request_refused = 0.
         self.prev_distance = None
         self.cursor_toy_near = False
@@ -168,6 +171,11 @@ class Game:
         return not self.hidden and not self.panicked and bool(self.available_areas())
 
     def configure(self, prefs):
+        if self.pingpong is not None and any(
+            key in prefs and prefs[key] != self.prefs.get(key)
+            for key in ('senseCursor', 'avatarSize', 'objectScales')
+        ):
+            self.stop_pingpong()
         self.prefs.update(prefs)
         if not self.prefs.get('senseCursor', True):
             self._reset_cursor_motion()
@@ -204,6 +212,8 @@ class Game:
         self.displays = data['areas']
         self.areas = [(a['x'], a['y'], a['x'] + a['width'], a['y'] + a['height']) for a in self.displays]
         self.monitors = [(a.get('monitorX', a['x']), a.get('monitorY', a['y']), a.get('monitorX', a['x']) + a.get('monitorWidth', a['width']), a.get('monitorY', a['y']) + a.get('monitorHeight', a['height'])) for a in self.displays]
+        if self.pingpong is not None and self.pingpong.area not in self.areas:
+            self.stop_pingpong()
         self.blocked.clear()
         self.excluded = set(data.get('exclude', []))
         self.fit(self.body)
@@ -263,6 +273,17 @@ class Game:
     def interact(self, event):
         now = time.monotonic()
         kind = event.get('type')
+        if kind == 'pingpong':
+            if self.pingpong is not None:
+                self.stop_pingpong()
+                return None
+            return self.start_pingpong(now)
+        if self.pingpong is not None:
+            if kind in ('hold-start','drag-start','drag','drag-end','poke','spin'):
+                return
+            if kind in ('panic','hide','sleep','quiet','ball','play','work','notebook',
+                        'corner','mischief','celebrate','reaction-now','reset-memory'):
+                self.stop_pingpong()
         if kind == 'panic':
             self.panicked = not self.panicked
             if self.panicked:self._cancel_holds(now)
@@ -277,7 +298,11 @@ class Game:
             return
         if kind == 'panel':
             self.panel = bool(event.get('value'))
-            if self.panel: self._reset_cursor_motion()
+            if self.panel:
+                self._reset_cursor_motion()
+                if self.pingpong is None:
+                    self.play.stop_chase()
+                    self.play_reaction = {}
             return
         if kind == 'reaction-now':
             visible = self.visible()
@@ -371,6 +396,8 @@ class Game:
             self.intelligence.history.append(dict(decision))
         elif kind == 'spin': self.body.omega += max(-500, min(500, event.get('value', 0)))
         elif kind == 'sleep':
+            self.play.stop_chase()
+            self.play_reaction = {}
             self.drives.energy = .1
             self.sleep.fall_asleep()
             self.state.emotion = 'dormindo';self.behavior.on_emotion('dormindo', now)
@@ -444,6 +471,107 @@ class Game:
         self.body.grounded=False;self.body.platform=None
         self.body.vx=self.body.vy=self.body.omega=0.
         self.conditioning.set_cue('PRESS',True,now)
+
+    def start_pingpong(self, now):
+        """Reserva os dois corpos existentes para uma partida e guarda a posição de passeio."""
+        if self.pingpong is not None:
+            return None
+        if not self.visible():
+            return 'Mostre a Bolha para começar uma partida.'
+        if not self.prefs.get('senseCursor',True):
+            return 'Ative a leitura do cursor nas configurações para usar a raquete.'
+        if self.sleep.asleep or self.drives.energy <= .16:
+            return 'A Bolha está descansando. Tente quando ela estiver acordada.'
+        if self.castigo.dentro or self.body.held or self.ball.dragging:
+            return 'Libere a Bolha e o brinquedo antes de iniciar a partida.'
+        try:
+            match = PingPong(self.bounds(),self.body.half_w,self.ball.body.half_w)
+        except ValueError:
+            return 'A área disponível nesta tela é pequena para jogar pingue-pongue.'
+        self._pingpong_origin = (
+            [(body.x,body.y,body.angle,body.grounded,body.surface,body.platform)
+             for body in (self.body,self.ball.body)],
+            self.ball_stored,self.ball.isVisible(),self.ball.roll_angle,
+        )
+        self.play.stop_chase()
+        self.play_reaction = {}
+        self.release_reaction = {}
+        self.play.requested_action = None
+        self.ball.last_handled = -math.inf
+        self.toy_tracker.away = False
+        self.behavior.drop_carried()
+        self.intelligence.clear_goal()
+        self.behavior.adaptive_goal = None
+        if self.mesa.sentado:
+            self.mesa.levantar_arrancado(now)
+            self.mesa.caderno.set_working(False)
+        self.state.at_desk = False
+        self.state.desk_top = None
+        self.state.emotion = 'atento'
+        self.landing = 0.
+        self.ball_stored = False
+        self.ball.show()
+        self.pingpong = match
+        self._place_pingpong_actors()
+        return None
+
+    def stop_pingpong(self):
+        if self.pingpong is None:
+            return
+        self.pingpong = None
+        poses,self.ball_stored,toy_visible,self.ball.roll_angle = self._pingpong_origin
+        self._pingpong_origin = None
+        for body,pose in zip((self.body,self.ball.body),poses):
+            body.x,body.y,body.angle,body.grounded,body.surface,body.platform = pose
+            body.vx = body.vy = body.omega = 0.
+            self.fit(body,margin=0.)
+        self.ball.setVisible(toy_visible)
+        self.ball.place()
+        self.play_reaction = {}
+        self.state.emotion = self.behavior.emotion = self.emotion.current
+        self._reset_cursor_motion()
+
+    def pingpong_paused(self):
+        if self.pingpong is None or self.pingpong.finished:
+            return False
+        left,top,right,bottom = self.pingpong.court
+        return self.panel or not (left<=self.cursor[0]<=right and top<=self.cursor[1]<=bottom)
+
+    def _place_pingpong_actors(self):
+        match = self.pingpong
+        body,toy = self.body,self.ball.body
+        body.angle = max(-12.,min(12.,(match.pet_y-body.y)*2.))
+        body.x,body.y = match.pet_x,match.pet_y
+        toy.x,toy.y = match.ball_x,match.ball_y
+        for actor in (body,toy):
+            actor.vx = actor.vy = actor.omega = 0.
+            actor.grounded = True
+            actor.platform = None
+        self.ball.place()
+        self._look_at_point((toy.x,toy.y))
+
+    def _tick_pingpong(self, dt, now):
+        match = self.pingpong
+        if self.pingpong_paused() or match.finished:
+            return
+        if now-self.last_think >= .1:
+            self.think(min(.1,now-self.last_think),now)
+            self.last_think = now
+        before = match.ball_x
+        event = match.step(dt,self.cursor,self.state.tone.vigor())
+        self.ball.roll_angle += (match.ball_x-before) / max(1.,self.ball.body.half_w)
+        self._place_pingpong_actors()
+        if event in ('player_hit','pet_hit'):
+            self.senses.kick('NOVELTY',.22)
+            self.drives.stimulate('novelty',.3)
+            self.drives.touched('poke',.2)
+        if event in ('pet_hit','player_point','pet_point'):
+            kind = {'pet_hit':'brinquedo_perseguindo','player_point':'bote_erro','pet_point':'comemorando'}[event]
+            duration = .40 if event == 'pet_hit' else 1.15
+            self.play_reaction = dict(kind=kind,started=now,until=now+duration,intensity=.8)
+        if now-self.last_save >= 30:
+            self.save()
+            self.last_save = now
 
     def _cancel_holds(self,now):
         self._release_hold(now,True)
@@ -545,7 +673,8 @@ class Game:
                                           intensity=min(1.,.70+.10*(self.play.teases-2)+.30*anger))
 
     def _focus_gaze(self, now):
-        if self.panel or self.sleep.asleep or self.state.dizzy(now) or self.state.caressing(now):
+        if (self.panel or self.sleep.asleep or self.state.dizzy(now) or self.state.caressing(now)
+                or self.state.at_desk or self.state.castigo or self.state.protest_stage==3):
             return
         reaction = self.release_reaction
         released_angry = reaction.get('until',0)>now and reaction.get('kind') in ('bravo','birra')
@@ -561,6 +690,9 @@ class Game:
             point = self.cursor
         else:
             return
+        self._look_at_point(point)
+
+    def _look_at_point(self, point):
         dx,dy = point[0]-self.body.x,point[1]-self.body.y
         distance = math.hypot(dx,dy) or 1.
         angle = math.radians(self.body.angle)
@@ -618,7 +750,8 @@ class Game:
         allowed = ['watch', 'rest']
         if self.prefs.get('roaming', True):
             allowed += ['explore']
-            if not self.ball_stored: allowed += ['play']
+            if not self.ball_stored and self.ball.isVisible() and self.drives.energy > .18:
+                allowed += ['play']
             if self.prefs.get('senseCursor', True): allowed += ['attention']
         if not self.mesa.escondido and self.activity in ('PROGRAMMING', 'DESIGNING'): allowed += ['work']
         if self.panel or self.hover or self.body.held or self.sleep.asleep or self.castigo.dentro or self.castigo.fuga or self.protest.stage or self.sad.stage or self.behavior.mission: allowed = []
@@ -694,12 +827,14 @@ class Game:
         self.brain.step(min(100, max(1, round(dt * 1000))))
         self.inputs = inputs
         self.rates = self.brain.motor_activity()
+        self.state.tone.update(self.rates,dt)
+        if self.pingpong is not None:
+            return
         self.sleep.rates = self.rates
         for protest in (self.protest, self.sad):
             protest.rates = self.rates
             protest.energy = self.drives.energy
             protest.contact = self.drives.contact
-        self.state.tone.update(self.rates,dt)
         for controller in (self.protest_ctl,self.sad_ctl):
             change = controller.tick(dt,self.state.tone,self.prof,caressing,now,self.drives.channels()['LONELY'])
             if change: controller.on_stage(*change)
@@ -730,6 +865,7 @@ class Game:
         if not self.panicked and not self.hidden: self.read_context(now)
         frozen = self.panicked or self.hidden or not self.available_areas()
         if frozen:
+            self.stop_pingpong()
             self._cancel_holds(now)
             self._reset_cursor_motion()
             self.play.stop_chase()
@@ -741,6 +877,11 @@ class Game:
             self.memory.deslocar(elapsed)
             self.intelligence.until += elapsed
             self.paused_at = None; self.last_think = now
+        if self.pingpong is not None:
+            if self.pingpong.area in self.available_areas():
+                self._tick_pingpong(dt,now)
+                return
+            self.stop_pingpong()
         self._sense_toy_cursor(now)
         if now - self.last_think >= .1:
             self.think(min(.1,now-self.last_think),now); self.last_think = now
@@ -801,7 +942,9 @@ class Game:
         self.memory.save()
         self.intelligence.habits.save()
         self.protest_ctl.save(); self.sad_ctl.save(); self.castigo.salvar()
-        write_json(self.data_dir / 'position.json',dict(x=self.body.x,y=self.body.y))
+        x,y = (self._pingpong_origin[0][0][:2] if self._pingpong_origin is not None
+               else (self.body.x,self.body.y))
+        write_json(self.data_dir / 'position.json',dict(x=x,y=y))
 
     def snapshot(self):
         now = time.monotonic()

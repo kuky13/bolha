@@ -16,6 +16,7 @@ from .preferences import PreferencesStore
 from .persistence import PersistenceWriter
 from .platform import desktop_layout,PanicHotkey
 from .pet import PetWindow
+from .pingpong_view import PingPongView
 from .scene import NativeScene
 from .character import draw_character
 from game import Game
@@ -77,6 +78,7 @@ class NativeApp:
             start=time.perf_counter();original_think(*args);self.think_times.append((time.perf_counter()-start)*1000);self.first_think=True
         self.game.think=measured_think
         self.pet=PetWindow(self.game);self.scene=NativeScene(self.game,on_scale_change=self.adjust_object_scale)
+        self.pingpong_view = PingPongView()
         qapp.applicationStateChanged.connect(self._application_state_changed)
         self.pet.visual.painted.connect(self._painted)
         self.pet.menu_requested.connect(self.show_menu)
@@ -127,7 +129,10 @@ class NativeApp:
         QTimer.singleShot(100,self.refresh_desktop)
     def refresh_desktop(self,*_):
         exclude=[int(self.pet.winId()),int(self.pet.visual.winId())]+self.scene.ids()+[int(d.winId()) for d in self.dialogs]
+        if self.pingpong_view.isVisible():
+            exclude.append(int(self.pingpong_view.winId()))
         self.game.desktop(desktop_layout(self.qapp,exclude));self.game.last_native=0;self.game.read_context(time.monotonic());self.pet.sync();self.scene.sync()
+        self.sync_pingpong()
     def tick(self):
         if self.quitting or self.updating or self.suspended:
             self.cancel_interactions();return
@@ -138,6 +143,7 @@ class NativeApp:
                 point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()))
             else:self.game.cursor=(self.game.body.x,self.game.body.y)
             self.game.tick(dt,now);self.pet.sync();self.scene.sync()
+            self.sync_pingpong()
             self.game.excluded.update(self.scene.ids())
         except Exception as error:
             self.cancel_interactions();self.frame.stop();self.warn('A rotina foi pausada: '+str(error));log('[erro]',repr(error))
@@ -145,7 +151,10 @@ class NativeApp:
         self.pet.cancel_interaction();self.scene.cancel_interactions()
     def _application_state_changed(self,state):
         self.suspended=state==Qt.ApplicationSuspended
-        if self.suspended:self.cancel_interactions()
+        if self.suspended:
+            self.cancel_interactions()
+            self.game.stop_pingpong()
+            self.sync_pingpong()
         else:self.last_tick=time.monotonic()
     def poll(self):
         test_profile=os.getenv('BOLHA_TEST_USER_DATA')
@@ -178,7 +187,17 @@ class NativeApp:
         self.errors.append(message);log('[aviso]',message)
         if hasattr(self,'tray'):self.tray.showMessage('Bolha',message,QSystemTrayIcon.Warning,7000)
     def interact(self,kind,**kwargs):
-        self.game.interact(dict(type=kind,**kwargs));self.pet.sync();self.scene.sync()
+        result=self.game.interact(dict(type=kind,**kwargs));self.pet.sync();self.scene.sync()
+        return result
+    def sync_pingpong(self):
+        self.pingpong_view.sync(self.game.pingpong,self.game.pingpong_paused())
+        if self.pingpong_view.isVisible():
+            self.game.excluded.add(int(self.pingpong_view.winId()))
+    def toggle_pingpong(self):
+        result=self.interact('pingpong')
+        self.sync_pingpong()
+        if result:
+            self.tray.showMessage('Pingue-pongue',result,QSystemTrayIcon.Information,5000)
     def request_reaction(self):
         before=set(self.game.objects)
         self.interact('reaction-now')
@@ -201,8 +220,13 @@ class NativeApp:
         return self.save_preferences({'objectScales':scales})
     def make_menu(self):
         menu=QMenu()
-        for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Acordar','wake'),('Mostrar / guardar brinquedo','ball'),('Vamos brincar','play'),('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work'),('Comemorar','celebrate'),('Uma travessura','mischief'),('Cantinho / perdão','corner'),('Sossega um pouquinho','quiet')):
-            action=menu.addAction(label);action.triggered.connect(lambda checked=False,k=kind:self.interact(k))
+        for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Acordar','wake'),('Mostrar / guardar brinquedo','ball'),('Vamos brincar','play'),('Jogar pingue-pongue','pingpong'),('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work'),('Comemorar','celebrate'),('Uma travessura','mischief'),('Cantinho / perdão','corner'),('Sossega um pouquinho','quiet')):
+            action=menu.addAction(label)
+            if kind=='pingpong':
+                self.pingpong_action=action
+                action.triggered.connect(self.toggle_pingpong)
+            else:
+                action.triggered.connect(lambda checked=False,k=kind:self.interact(k))
         menu.addSeparator()
         action=menu.addAction('Mostrar uma reação agora');action.triggered.connect(lambda:self.request_reaction())
         action=menu.addAction('Configurações…');action.triggered.connect(self.show_settings)
@@ -214,18 +238,23 @@ class NativeApp:
         action=updates.addAction('Adiar por uma hora');action.triggered.connect(lambda:self.updater.defer())
         menu.addSeparator();action=menu.addAction('Sair');action.triggered.connect(self.quit)
         menu.aboutToShow.connect(self._panel_opened);menu.aboutToHide.connect(self._panel_closed)
+        menu.aboutToShow.connect(lambda:self.pingpong_action.setText(
+            'Encerrar pingue-pongue' if self.game.pingpong else 'Jogar pingue-pongue'))
         return menu
     def show_menu(self,point):self.menu.popup(point)
     def _tray_activated(self,reason):
         if reason==QSystemTrayIcon.DoubleClick:self.show_settings()
-    def _panel_closed(self,*_):self.game.panel=any(dialog.isVisible() for dialog in self.dialogs)
-    def _panel_opened(self):self.cancel_interactions();self.game.panel=True
+    def _panel_closed(self,*_):
+        self.game.interact(dict(type='panel',value=any(dialog.isVisible() for dialog in self.dialogs)))
+    def _panel_opened(self):
+        self.cancel_interactions()
+        self.game.interact(dict(type='panel',value=True))
     def _show_dialog(self,cls):
         self._panel_opened()
         for dialog in self.dialogs:
             if isinstance(dialog,cls):dialog.show();dialog.raise_();dialog.activateWindow();return
         dialog=cls(self);self.dialogs.append(dialog);dialog.finished.connect(self._panel_closed)
-        self.game.panel=True;dialog.show()
+        dialog.show()
     def show_settings(self):
         from .dialogs import SettingsDialog
         self._show_dialog(SettingsDialog)
@@ -267,6 +296,8 @@ class NativeApp:
     def before_install(self):
         from concurrent.futures import Future
         import threading
+        self.game.stop_pingpong()
+        self.sync_pingpong()
         self.game.save();self.writer.retry();future=Future()
         # O snapshot já é texto imutável; esperar disco não bloqueia o desenho.
         def finish():future.set_result(self.writer.flush())
@@ -318,7 +349,7 @@ class NativeApp:
             if not self.writer.close():self.warn('Alguns dados não puderam ser gravados. Os arquivos anteriores foram preservados.')
         finally:
             brain_store.set_dispatcher(None)
-            self.scene.close();self.pet.close();self.tray.hide();self.lock.unlock()
+            self.pingpong_view.close();self.scene.close();self.pet.close();self.tray.hide();self.lock.unlock()
             for dialog in self.dialogs:dialog.close()
             if self.update_dialog:
                 self.update_dialog.rejected.disconnect();self.update_dialog.close()
