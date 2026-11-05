@@ -12,7 +12,7 @@ from .reactions import (
     InMemoryMedia, MAX_TOTAL_MEDIA_BYTES, NEKOS_HOSTS,
     OnlineReactionFetcher, REACTIONGIFS_HOSTS, validate_reaction_url,
 )
-from brain.pestinha.scene import minimum_object_dimensions, object_scale
+from pestinha.scene import minimum_object_dimensions, object_scale
 
 
 def object_dimensions(item, avatar_size=136, object_scales=None, bounds=None):
