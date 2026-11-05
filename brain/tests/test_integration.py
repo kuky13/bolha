@@ -111,7 +111,7 @@ def test_estouro_retorno_e_carinho_alimentam_o_cerebro(tmp_path,monkeypatch):
     assert game.pop_return_at-clock[0]==30.
     assert game.body.vx==game.body.vy==0.
     before=game.brain.time_ms
-    clock[0]+=.7
+    clock[0]+=.8
     game.tick(.016)
     assert game.visible() and not game.pet_visible()
     assert game.brain.time_ms>before

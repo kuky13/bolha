@@ -80,9 +80,13 @@ def test_pop_dissolve_retorno_timido_e_pousos_sao_visuais(tmp_path):
     game=game_at_rest(tmp_path);motion=ExpressionMotion(100.)
     body_before=vars(game.body).copy()
     game.pop_started=100.
-    dissolve=motion.update(game,100.3)
-    gone=motion.update(game,100.61)
-    assert dissolve['effect']=='pop' and dissolve['body_opacity']<1.
+    squeeze=motion.update(game,100.075)
+    swell=motion.update(game,100.125)
+    dissolve=motion.update(game,100.2)
+    gone=motion.update(game,100.7)
+    assert squeeze['squash']>.2 and swell['visual_scale']>1.1
+    assert squeeze['effect_strength']==swell['effect_strength']==0.
+    assert dissolve['effect']=='pop' and 0.<dissolve['body_opacity']<1.
     assert gone['body_opacity'] < .002
     game.pop_started=None
     game.release_reaction=dict(kind='pop_return',started=100.62,until=101.4,intensity=.7)
@@ -95,6 +99,25 @@ def test_pop_dissolve_retorno_timido_e_pousos_sao_visuais(tmp_path):
         assert pose['emotion'] in ('assustado','atento','tonto')
         assert pose['squash'] != 0
     assert vars(game.body)==body_before
+
+
+def test_queda_de_lado_espelha_a_inclinacao_e_transita_para_repouso(tmp_path):
+    game=game_at_rest(tmp_path)
+    game.state.emotion='observando'
+    for side in (-1.,1.):
+        game.body.angle=side*90.
+        game.landing_reaction=dict(kind='pouso_de_lado',started=100.,until=100.9,
+                                   intensity=.8,angle=game.body.angle)
+        motion=ExpressionMotion(100.)
+        contact=motion.update(game,100.)
+        assert contact['angle_offset']*side<0 and contact['squash']>.2
+        settle=motion.update(game,100.89)
+        resting=motion.update(game,100.91)
+        assert motion.mode=='deitada'
+        assert resting['squash']==pytest.approx(settle['squash'],abs=.02)
+        assert resting['eye_open']<contact['eye_open']
+        assert motion.update(game,102.1)['squash']<resting['squash']
+    assert game.body.angle==90.
 
 
 def test_cena_comedia_vem_da_brincadeira_real_e_nao_escolhe_politica_na_view(tmp_path):
@@ -241,4 +264,14 @@ def test_janela_visual_com_geleia_preserva_centro_e_mascara_fisica(qt_applicatio
             assert all(image.pixelColor(x, 0).alpha() == image.pixelColor(x, 319).alpha() == 0 for x in range(320))
             assert all(image.pixelColor(0, y).alpha() == image.pixelColor(319, y).alpha() == 0 for y in range(320))
             assert pet.mask() == mask
+        game.body.angle=90.
+        game.body.surface=game.bounds()[3]
+        game.body.y=game.body.surface-game.body.half_w
+        game.state.emotion='observando'
+        pet.sync()
+        assert pet.motion.mode=='deitada'
+        resting=pet.mask().boundingRect()
+        assert resting.width()>mask.boundingRect().width()
+        assert resting.height()<mask.boundingRect().height()
+        assert resting.bottom()==mask.boundingRect().bottom()
     finally:pet.close()

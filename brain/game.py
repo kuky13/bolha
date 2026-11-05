@@ -36,7 +36,7 @@ from geometry import fullscreen_monitors
 from intelligence import Intelligence
 from pingpong import PingPong
 
-POP_EFFECT_SECONDS = .62
+POP_EFFECT_SECONDS = .75
 POP_RETURN_SECONDS = 30.
 THROW_WINDOW_SECONDS = 60.
 
@@ -687,7 +687,8 @@ class Game:
         orientation = abs(angle)
         kind = ('pouso_em_pe' if orientation<45. else
                 'pouso_de_lado' if orientation<135. else 'pouso_invertido')
-        self.landing_reaction = dict(kind=kind,started=now,until=now+.62,
+        duration = .9 if kind=='pouso_de_lado' else .62
+        self.landing_reaction = dict(kind=kind,started=now,until=now+duration,
                                      intensity=max(.3,min(1.,speed/1050.)),angle=angle)
 
     def _shy_returning(self, now):

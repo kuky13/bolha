@@ -5,7 +5,7 @@ O corpo e o rosto usam o mesmo centro, rotação e deformação. A expressão
 permanece recortada ao interior da esfera em todos os quadros.
 """
 import math
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 
 RADIUS = 49.0
@@ -29,6 +29,29 @@ _ANGER_MARK = QPainterPath()
 for _sx, _sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
     _ANGER_MARK.moveTo(1.7 * _sx, 8. * _sy)
     _ANGER_MARK.quadTo(2.2 * _sx, 2.2 * _sy, 8. * _sx, 1.7 * _sy)
+
+# Recortes fixos preservam a silhueta do estouro de um quadro para o outro.
+_POP_FLASH = QPainterPath(QPointF(0, -1))
+for _x, _y in ((.17, -.19), (.83, -.45), (.36, -.05), (1, .24), (.22, .24),
+               (.30, 1), (-.13, .39), (-.77, .73), (-.44, .07), (-1, -.10), (-.22, -.22)):
+    _POP_FLASH.lineTo(_x, _y)
+_POP_FLASH.closeSubpath()
+
+_POP_DROP = QPainterPath(QPointF(-1.45, 0))
+_POP_DROP.cubicTo(-.51, -.34, .05, -.69, .53, -.57)
+_POP_DROP.cubicTo(1.26, -.41, 1.12, .44, .51, .57)
+_POP_DROP.cubicTo(-.03, .68, -.59, .33, -1.45, 0)
+_POP_DROP.closeSubpath()
+
+_POP_FRAGMENTS = (
+    (-169, 58, 4.5, '#f0b1ff'), (-142, 66, 2.3, '#fff1ba'),
+    (-116, 61, 5.0, '#c0adff'), (-90, 68, 2.5, '#faefff'),
+    (-62, 63, 4.4, '#f6adf0'), (-38, 57, 2.6, '#ffe6a0'),
+    (-19, 66, 3.6, '#b8dbff'), (9, 64, 4.7, '#f0b1ff'),
+    (35, 60, 2.5, '#fff1ba'), (59, 62, 4.2, '#d8b9ff'),
+    (90, 57, 2.1, '#faefff'), (117, 62, 4.8, '#edb8ff'),
+    (145, 65, 2.5, '#ffe6a0'), (163, 57, 3.2, '#b8dbff'),
+)
 
 
 def _clamp(value, low, high):
@@ -294,6 +317,58 @@ def _draw_anger_marks(painter, phase, strength):
         painter.drawLine(QPointF(x*distance, y*distance), QPointF(x*(distance+3.), y*(distance+3.)))
 
 
+def _draw_pop_marks(painter, phase, strength):
+    """O centro pisca, a casca racha e as gotas se afastam antes de apagar."""
+    progress = _clamp(phase/.62, 0., 1.)
+    spread = 1.-(1.-progress)**3.2
+    flash = (1.-_clamp(phase/.14, 0., 1.))**1.6 * strength
+    if flash > 0:
+        glow = QRadialGradient(QPointF(0, 0), 39.)
+        glow.setColorAt(0., _color('#fff2ba', .56*flash))
+        glow.setColorAt(.45, _color('#f4b0ff', .48*flash))
+        glow.setColorAt(1., _color('#e399ff', 0.))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(glow)
+        painter.drawEllipse(QPointF(0, 0), 39., 39.)
+        painter.save()
+        flash_size = 21.+13.*spread
+        painter.scale(flash_size, flash_size)
+        painter.setBrush(_color('#fff5d7', flash))
+        painter.drawPath(_POP_FLASH)
+        painter.restore()
+
+    shell_alpha = (1.-_clamp(phase/.46, 0., 1.))**1.35 * strength
+    radius = 41.+23.*spread
+    shell = QRectF(-radius, -radius, radius*2., radius*2.)
+    painter.setBrush(Qt.NoBrush)
+    for start, arc, color in ((12, 47, '#eed0ff'), (78, 46, '#fff1b7'),
+                              (148, 54, '#b9d4ff'), (225, 54, '#dfa6ff'), (309, 37, '#ffd4fb')):
+        gap = round(11.*spread)
+        painter.setPen(_pen(color, 7.-3.*spread, .24*shell_alpha))
+        painter.drawArc(shell, (start+gap)*16, (arc-gap*2)*16)
+        painter.setPen(_pen(color, 3.4-1.7*spread, shell_alpha))
+        painter.drawArc(shell, (start+gap)*16, (arc-gap*2)*16)
+
+    drop_alpha = (1.-progress**1.65)**1.25 * strength
+    fall = 6.*progress*progress
+    for index, (degrees, reach, size, color) in enumerate(_POP_FRAGMENTS):
+        direction = math.radians(degrees)
+        distance = 35.+(reach-35.)*spread
+        size *= 1.-.55*progress
+        painter.save()
+        painter.translate(math.cos(direction)*distance, math.sin(direction)*distance+fall)
+        painter.rotate(degrees + (index%3-1)*25.*progress)
+        painter.scale(size, size)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(_color(color, .25*drop_alpha))
+        painter.drawEllipse(QPointF(0., 0.), 1.6, 1.)
+        painter.setBrush(_color(color, drop_alpha))
+        painter.drawPath(_POP_DROP)
+        painter.setBrush(_color('#fff9e5', .86*drop_alpha))
+        painter.drawEllipse(QPointF(.47, -.22), .28, .14)
+        painter.restore()
+
+
 def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
                         angle=0.0, squash=0.0, effect_angle=0.0):
     """Marcas decorativas presas à pose do corpo, sem hitbox."""
@@ -302,37 +377,18 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
-    if kind in ('pop','pop_return'):
-        progress = _clamp(phase / (.62 if kind=='pop' else .72),0.,1.)
+    if kind == 'pop':
+        _draw_pop_marks(painter, phase, strength)
+    elif kind == 'pop_return':
+        progress = _clamp(phase / .72,0.,1.)
         fade = (1.-progress) * strength
-        if kind == 'pop':
-            # Anel de gelatina e lascas arredondadas partem do centro e desvanecem.
-            expansion = 1.-(1.-progress)**2.3
-            radius = 12.+48.*expansion
-            painter.setBrush(Qt.NoBrush)
-            painter.setPen(_pen('#d9a8ff',3.2,fade*.82))
-            painter.drawEllipse(QPointF(0,0),radius,radius)
-            painter.setPen(_pen('#fff0bd',1.4,fade))
-            painter.drawEllipse(QPointF(0,0),radius+3,radius+3)
-            for index in range(9):
-                a = index*math.tau/9 + .12*math.sin(phase*12)
-                distance = 18.+43.*expansion
-                x,y=math.cos(a)*distance,math.sin(a)*distance
-                size=2.2+1.5*math.sin(index+phase*7)**2
-                painter.setPen(_pen('#cf8dff',1.4,fade))
-                painter.setBrush(_color('#f1c6ff',fade*.8))
-                shard=QPainterPath(QPointF(x-size,y))
-                shard.quadTo(x,y-size*1.35,x+size,y)
-                shard.quadTo(x,y+size*1.35,x-size,y)
-                painter.drawPath(shard)
-        else:
-            # Halo tímido e pequeno brilho indicam a remontagem do rostinho.
-            painter.setBrush(Qt.NoBrush)
-            painter.setPen(_pen('#d9a8ff',2.2,fade*.62))
-            painter.drawEllipse(QPointF(0,0),42+10*progress,42+10*progress)
-            for x,y in ((-36,-28),(38,-22)):
-                painter.setPen(Qt.NoPen);painter.setBrush(_color('#fff0bd',fade))
-                painter.drawEllipse(QPointF(x,y),2.2,2.2)
+        # Halo tímido e pequeno brilho indicam a remontagem do rostinho.
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(_pen('#d9a8ff',2.2,fade*.62))
+        painter.drawEllipse(QPointF(0,0),42+10*progress,42+10*progress)
+        for x,y in ((-36,-28),(38,-22)):
+            painter.setPen(Qt.NoPen);painter.setBrush(_color('#fff0bd',fade))
+            painter.drawEllipse(QPointF(x,y),2.2,2.2)
     elif kind == 'carinho':
         for index in range(3):
             progress = (phase / 1.8 + index / 3) % 1

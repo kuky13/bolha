@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt,QRect,QPointF,QEvent,Signal
 from PySide6.QtGui import QPainter,QColor,QRegion
 from PySide6.QtWidgets import QWidget
 from .character import draw_character,draw_sleep_marks,draw_reaction_marks
-from .motion import ExpressionMotion
+from .motion import ExpressionMotion,FLOOR_POSES
 from .grab import MouseGrab
 
 FLAGS = Qt.FramelessWindowHint|Qt.Tool|Qt.WindowStaysOnTopHint|Qt.WindowDoesNotAcceptFocus
@@ -40,30 +40,33 @@ class PetVisual(QWidget):
         angle=game.body.angle+pose['angle_offset']
         squash=pose['squash']
         cx,cy=self.width()/2,self.height()/2
-        if (self.pet.motion.mode.startswith('pouso_') and
-                abs(game.body.y+radius-game.body.surface)<12):
-            roll=math.radians(angle)
-            cy+=radius-radius*math.hypot(math.sin(roll)*(1.+squash),math.cos(roll)*(1.-squash))
-        elif self.pet.motion.mode=='pop_return' and game.body.grounded:
-            cy+=radius*(1.-pose.get('visual_scale',1.))
+        floor_squash,shift=self.pet.floor_pose()
+        p.translate(cx,cy+shift)
+        p.scale(1.+floor_squash,1.-floor_squash)
+        if self.pet.motion.mode in FLOOR_POSES:
+            squash=0.
         # A transformação comum gira corpo, olhos, orelhas e marcas no mesmo centro.
-        p.save()
-        p.setOpacity(p.opacity()*pose.get('body_opacity',1.))
-        draw_character(p,cx,cy,scale=scale,
-                       angle=angle,emotion=pose['emotion'],
-                       blink=pose['blink'],gaze=self.pet.visual_gaze,
-                       ear_gaze=self.pet.visual_ear_gaze,
-                       blink_left=pose['blink_left'],blink_right=pose['blink_right'],
-                       ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
-                       eye_open=pose['eye_open'],squash=squash,
-                       body_opacity=game.prefs.get('opacity',1),
-                       anger=pose.get('anger',0.))
-        p.restore()
+        if pose['body_opacity']>0.:
+            p.save()
+            p.setOpacity(p.opacity()*pose['body_opacity'])
+            draw_character(p,0.,0.,scale=scale,
+                           angle=angle,emotion=pose['emotion'],
+                           blink=pose['blink'],gaze=self.pet.visual_gaze,
+                           ear_gaze=self.pet.visual_ear_gaze,
+                           blink_left=pose['blink_left'],blink_right=pose['blink_right'],
+                           ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
+                           eye_open=pose['eye_open'],squash=squash,
+                           body_opacity=game.prefs.get('opacity',1),
+                           anger=pose.get('anger',0.))
+            p.restore()
         if pose['zzz_strength']>0:
-            draw_sleep_marks(p,cx,cy,scale,
+            draw_sleep_marks(p,0.,0.,scale,
                              pose['zzz_phase'],pose['zzz_strength'],angle=angle,squash=squash)
         if pose['effect'] and pose['effect_strength']>0:
-            draw_reaction_marks(p,cx,cy,scale,
+            if pose['effect']=='pop':
+                scale=radius/49
+                squash=0.
+            draw_reaction_marks(p,0.,0.,scale,
                                 pose['effect_phase'],pose['effect'],pose['effect_strength'],
                                 angle=angle,squash=squash,effect_angle=pose.get('effect_angle',0.))
         p.end();self.paint_times.append(now);self.painted.emit()
@@ -89,6 +92,19 @@ class PetWindow(QWidget):
         self.motion=ExpressionMotion(time.monotonic())
         self.sync()
 
+    def floor_pose(self):
+        """Mantém a base do desenho e a máscara no chão durante a deformação."""
+        pose=self.motion.pose
+        radius=self.body.half_w
+        if self.motion.mode in FLOOR_POSES:
+            squash=pose['squash']
+            clearance=max(0.,self.body.surface-self.body.y-radius)
+            contact=max(0.,1.-clearance/24.)
+            return squash,radius*squash*contact
+        if self.motion.mode=='pop_return' and self.body.grounded:
+            return 0.,radius*(1.-pose['visual_scale'])
+        return 0.,0.
+
     def sync(self):
         now=time.monotonic()
         self.motion.update(self.game,now,self.press[1] if self.press else None)
@@ -102,12 +118,14 @@ class PetWindow(QWidget):
         x,y=round(self.body.x-self.width()/2),round(self.body.y-self.height()/2)
         self.move(x,y)
         self.visual.move(round(self.body.x-self.visual.width()/2),round(self.body.y-self.visual.height()/2))
-        r=round(self.body.half_w*self.motion.pose.get('visual_scale',1.))
-        rise=round(self.body.half_w)-r if self.motion.mode=='pop_return' and self.body.grounded else 0
+        radius=self.body.half_w*self.motion.pose['visual_scale']
+        squash,shift=self.floor_pose()
+        rx,ry=round(radius*(1.+squash)),round(radius*(1.-squash))
+        rise=round(shift)
         clip=max(0,min(256,int(self.game.state.desk_top-y))) if self.game.state.desk_top is not None else 256
-        key=(r,rise,clip,self.devicePixelRatioF())
+        key=(rx,ry,rise,clip,self.devicePixelRatioF())
         if key!=getattr(self,'_mask_key',None):
-            mask=QRegion(QRect(128-r,128-r+rise,r*2,r*2),QRegion.Ellipse)
+            mask=QRegion(QRect(128-rx,128-ry+rise,rx*2,ry*2),QRegion.Ellipse)
             if clip<256:mask=mask.intersected(QRegion(0,0,256,clip))
             self.setMask(mask);self._mask_key=key
         visual_show=self.game.pet_visible(now)
