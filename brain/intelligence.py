@@ -3,6 +3,8 @@
 import math
 import random
 import time
+import copy
+from collections import deque
 from datetime import datetime
 from pestinha.store import read_json, write_json
 
@@ -55,7 +57,7 @@ class Intelligence:
     def __init__(self, memory, habits_path, rng=None):
         self.memory = memory
         self.habits = Habits(habits_path)
-        self.rng = rng or random.Random()
+        self.rng = rng or getattr(memory, 'rng', None) or random.Random(1313)
         self.goal = None
         self.until = self.next_choice = self.next_sample = 0.
         self.episode = None
@@ -68,6 +70,10 @@ class Intelligence:
         self.cpu_seconds = 0.
         self.decisions = 0
         self.memory_strikes = 0
+        self.current_decision = None
+        self.history = deque(maxlen=32)
+        self.expression_until = 0.
+        self.next_blink = self.next_quirk = self.next_wink = 0.
 
     def feedback(self, value, now):
         self.last_interaction = now
@@ -83,6 +89,101 @@ class Intelligence:
         self.episode = None
         self.goal = None
         self.until = 0.
+        self.current_decision = None
+
+    def snapshot(self):
+        """Small serializable trace of the policy's real current choice."""
+        return dict(current=copy.deepcopy(self.current_decision), history=copy.deepcopy(list(self.history)))
+
+    def choose(self, action, candidates, *, rates=None, emotion='observando', energy=1., contact=0.,
+               duration=0., source='lif_policy', weights=None):
+        """Shared categorical action selector; keeps the actual alternatives and influences."""
+        if not candidates:
+            return None
+        rates = rates or {}
+        neural = {k: float(v) for k, v in rates.items() if isinstance(v, (int,float))}
+        weights = weights or {}
+        context = f'{action}|{emotion}'
+        values = {str(candidate): float(weights.get(candidate, 0.)) for candidate in candidates}
+        if self.enabled and not self.compatibility:
+            selected = self.memory.choose(context, [str(candidate) for candidate in candidates], .05, values)
+            estimate = self.memory.estimate(context, selected)
+        else:
+            best = max(values.values())
+            selected = self.rng.choice([key for key, score in values.items() if score == best])
+            estimate = 0.
+        self.current_decision = dict(action=str(action), target=selected, intensity=max(0., min(1., values.get(selected, 0.))),
+                                     duration=float(duration), source=source,
+                                     factors=dict(neural=neural, policy_weights=values, emotion=emotion,
+                                                  drives=dict(energy=energy, contact=contact),
+                                                  memory=dict(context=context, action=selected,
+                                                              estimate=estimate)))
+        self.history.append(dict(self.current_decision))
+        return selected
+
+    def sample(self, action, probability, *, rates=None, emotion='observando', energy=1., contact=0.,
+               duration=0., source='lif_policy'):
+        """Policy-owned Bernoulli action for real firing-rate events."""
+        base_probability = max(0., min(1., float(probability)))
+        context = f'{action}|{emotion}'
+        use_memory = self.enabled and not self.compatibility
+        estimate = self.memory.estimate(context, 'act') if use_memory else 0.
+        factor = max(.5, min(1.5, 1. + estimate - .1)) if use_memory else 1.
+        probability = min(1., base_probability * factor)
+        if probability <= 0. or self.rng.random() >= probability:
+            return False
+        neural = {k: float(v) for k,v in (rates or {}).items() if isinstance(v,(int,float))}
+        self.current_decision = dict(action=action, target='act', intensity=probability,
+                                     duration=float(duration), source=source,
+                                     factors=dict(neural=neural, policy_weights={'base_probability':base_probability,
+                                                  'memory_factor':factor,'applied_probability':probability},
+                                                  emotion=emotion, drives=dict(energy=energy,contact=contact),
+                                                  memory=dict(context=context, estimate=estimate)))
+        self.history.append(copy.deepcopy(self.current_decision))
+        return True
+
+    def event(self, action, rate_hz, gain, dt, *, rates=None, emotion='observando', energy=1., contact=0.):
+        """Convert a LIF firing rate to a frame-rate invariant hazard and sample it centrally."""
+        if not all(math.isfinite(float(v)) for v in (rate_hz, gain, dt)) or dt <= 0 or rate_hz <= 0 or gain <= 0:
+            return False
+        probability = -math.expm1(-rate_hz * gain * dt)
+        return self.sample(action, probability, rates=rates, emotion=emotion, energy=energy,
+                           contact=contact, duration=dt, source='lif_hazard')
+
+    def choose_expression(self, candidates, rates, emotion, energy, contact, now):
+        """Choose an optional expression using the same learned, continuous state."""
+        if not candidates or self.compatibility:
+            return None
+        if now < self.expression_until:
+            return None
+        due = []
+        if 'blink' in candidates and now >= self.next_blink: due.append('blink')
+        due.extend(key for key in candidates if key not in ('blink','wink') and now >= self.next_quirk)
+        if 'wink' in candidates and now >= self.next_wink: due.append('wink')
+        if not due: return None
+        neural = {k: float(rates.get(k, 0.)) for k in ('CHEER', 'WATCH', 'DROWSE', 'ANGRY')}
+        normalized = {k: min(1., max(0., value / 30.)) for k,value in neural.items()}
+        factors = dict(neural=neural, emotion=emotion, energy=energy, contact=contact)
+        weights = {name: (normalized['CHEER'] if name in ('wink','stretch','ear_wiggle') else
+                          normalized['DROWSE'] + (1-energy) if name in ('doze','hiccup') else
+                          normalized['WATCH'] if name in ('sneeze','hiccup') else .1)
+                   for name in candidates}
+        context = 'expression|' + emotion
+        if self.enabled:
+            action = self.memory.choose(context, due, .05, weights)
+        else:
+            action = max(due, key=lambda key: weights[key])
+        factors['memory'] = dict(context=context, estimate=self.memory.estimate(context, action) if self.enabled else 0.)
+        factors['policy_weights'] = weights
+        duration = .13 if action == 'blink' else 2.3 if action == 'stretch' else 1.65 if action == 'sneeze' else 1.6 if action == 'hiccup' else 3.3 if action == 'doze' else 1.5 if action == 'ear_wiggle' else 1.81
+        self.expression_until = now + duration
+        if action == 'blink': self.next_blink = now + self.rng.uniform(3.2, 5.2)
+        elif action == 'wink': self.next_wink = now + self.rng.uniform(90, 180)
+        else: self.next_quirk = now + self.rng.uniform(35, 80)
+        self.current_decision = dict(action=action, target=None, intensity=max(.1, weights[action]),
+                                     duration=duration, source='expression_policy', factors=factors)
+        self.history.append(dict(self.current_decision))
+        return action
 
     def budget(self, rss_mib, limit=100_000_000/1048576):
         self.memory_strikes = self.memory_strikes+1 if rss_mib > limit else 0
@@ -108,7 +209,7 @@ class Intelligence:
             self.clear_goal()
             habit = self.habits.tendency(activity, wall) if self.learn_routine else dict(attention=0., rest=0., familiarity=0.)
             neural = lambda key: min(1., max(0., rates.get(key, 0.)/30))
-            bias = dict(explore=.16*neural('ANDA'), play=.18*neural('PULA'), watch=.08,
+            bias = dict(explore=.16*neural('WANDER'), play=.18*neural('CHEER'), watch=.08,
                         rest=.25*(1-energy)+.12*habit['rest'],
                         work=(.2 if activity in ('PROGRAMMING', 'DESIGNING') else 0.)+.1*neural('SENTAR'),
                         attention=.18*lonely+.12*habit['attention'])
@@ -121,10 +222,19 @@ class Intelligence:
             self.goal = action[5:]
             self.repeats = self.repeats+1 if self.last_goal == self.goal else 1
             self.last_goal = self.goal
-            self.until = now+self.rng.uniform(12, 32)
+            duration = self.rng.uniform(12, 32)
+            self.until = now+duration
             self.next_choice = now+1
             self.episode = self.memory.start(ctx, action)
             self.decisions += 1
+            factors = dict(neural={key: float(rates.get(key,0.)) for key in ('WANDER','CHEER','SENTAR')},
+                           emotion=emotion, drives=dict(energy=energy, contact=lonely),
+                           memory=dict(context=ctx, action=action,
+                                       estimate=self.memory.estimate(ctx, action)),
+                           habit=habit)
+            self.current_decision = dict(action=self.goal, target=None, intensity=max(0., min(1., bias.get(self.goal, 0.))),
+                                         duration=duration, source='lif+episodic_policy', factors=factors)
+            self.history.append(dict(self.current_decision))
             return self.goal
         finally:
             self.cpu_seconds += time.process_time()-started

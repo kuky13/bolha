@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Modelo único da Bolha: cérebro, comportamento e física do Pestinha."""
 import math
+import random
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,6 +30,7 @@ from pestinha.sense.senses import ComputerSenses, ActivityTracker, detect_activi
 from pestinha.paths import PetPaths, ConteudoPaths
 from pestinha.store import read_json, write_json, preserve_invalid, clear_protection_after_backup
 from pestinha.scene import set_scene, Ball, FloatingThing
+from pestinha.scene import object_scale
 from geometry import fullscreen_monitors
 from intelligence import Intelligence
 
@@ -75,7 +77,7 @@ class Game:
         self.drives = Drives()
         if not self.drives.load(self.pet_paths.drives,self.prof) and self.pet_paths.drives.exists():
             preserve_invalid(self.pet_paths.drives,'Necessidades inválidas; original preservado e gravação protegida.')
-        self.memory = EpisodicMemory(self.pet_paths.episodes, self.pet_paths.preferences)
+        self.memory = EpisodicMemory(self.pet_paths.episodes, self.pet_paths.preferences, random.Random(1313))
         self.memory.load()
         self.conditioning = Conditioning(self.pet_paths.conditioning, self.prof['cond_rate'])
         self.conditioning.load()
@@ -131,6 +133,15 @@ class Game:
         self.landing = 0.
         self.last_monitor_snapshot = -1.
         self.intelligence = Intelligence(self.memory, self.pet_paths.base / 'habits.json')
+        self.behavior.policy = self.intelligence
+        self.play.policy = self.intelligence
+        self.play.rates = self.rates
+        self.mischief_ctl.policy = self.intelligence
+        self.revolucao.policy = self.intelligence
+        self.festa.policy = self.intelligence
+        self.sleep.policy = self.intelligence
+        self.mischief.policy = self.intelligence
+        self.protest.policy = self.sad.policy = self.intelligence
         self.last_intelligence = self.last_metrics = 0.
         self.app_rss_mib = 0.
         self.brain_array_mib = 0.
@@ -168,7 +179,21 @@ class Game:
             self.intelligence.clear_goal()
             self.behavior.adaptive_goal = None
         size = float(self.prefs.get('avatarSize', 136)) / 2
-        self.body.half_w = self.body.half_h = max(40., min(100., size))
+        self.body.half_w = self.body.half_h = max(24., min(100., size))
+        self.fit(self.ball.body)
+        for item in self.objects.values():
+            if hasattr(item, 'apply_scale'):
+                item.apply_scale(object_scale(item, self.prefs.get('avatarSize', 136), self.prefs.get('objectScales', {})))
+            if hasattr(item, 'body'):
+                self.fit(item.body)
+                item.place(item.body.x, item.body.y)
+            elif hasattr(item, 'place'):
+                area = self.bounds((item._cx, item._cy))
+                item.place(max(area[0]+item.width()/2, min(area[2]-item.width()/2, item._cx)),
+                           max(area[1]+item.height()/2, min(area[3]-item.height()/2, item._cy)))
+        if self.mesa.sentado:
+            self.mesa.ancora = (self.mesa.caderno.x(), self.mesa.caderno.y())
+            self.state.desk_top = self.mesa.caderno.y()
         self.mischief.interval = self.prefs.get('mischiefInterval', 300)
         self.mischief.max_objects = self.prefs.get('maxObjects', 3)
         self.mischief.online_reactions = self.prefs.get('onlineReactions', True)
@@ -255,6 +280,25 @@ class Game:
             self.panel = bool(event.get('value'))
             if self.panel: self._reset_cursor_motion()
             return
+        if kind == 'reaction-now':
+            visible = self.visible()
+            enabled = self.prefs.get('mischiefEnabled', True) and self.prefs.get('onlineReactions', True)
+            allowed = visible and enabled
+            accepted = self.mischief_ctl.request_online_reaction(
+                now, self.state.emotion,
+                enabled=(allowed and not self.body.held))
+            reason = None if accepted else ('hidden_panicked_or_no_active_display' if not visible else
+                      'network_or_mischief_disabled' if not enabled else
+                      'being_dragged' if self.body.held else
+                      'maximum_objects_or_network_unavailable')
+            decision = dict(action='attempt_online_reaction' if accepted else 'request_refused', target=None,
+                            intensity=1., duration=0., source='explicit_user_request',
+                            refusal_reason=reason,
+                            factors=dict(emotion=self.state.emotion, drives=dict(energy=self.drives.energy,
+                            contact=self.drives.contact), neural={k: self.rates.get(k, 0.) for k in ('CHEER','WATCH','DROWSE')}))
+            self.intelligence.current_decision = decision
+            self.intelligence.history.append(dict(decision))
+            return
         if kind == 'hover': self.hover = bool(event.get('value')); return
         if kind == 'reset-memory': self.reset_learning(); return
         if kind == 'cursor':
@@ -317,9 +361,59 @@ class Game:
             self.quiet_until = now+30
             self.behavior.adaptive_goal = 'watch'
             self.behavior.drop_carried()
+            decision = dict(action='watch', target=None, intensity=1., duration=30.,
+                            source='explicit_user_command', factors=dict(reason='quiet command'))
+            self.intelligence.current_decision = decision
+            self.intelligence.history.append(dict(decision))
         elif kind == 'spin': self.body.omega += max(-500, min(500, event.get('value', 0)))
-        elif kind == 'sleep': self.drives.energy = .1
-        elif kind == 'work': self.mesa.pedir(now)
+        elif kind == 'sleep':
+            self.drives.energy = .1
+            self.sleep.fall_asleep()
+            self.state.emotion = 'dormindo';self.behavior.on_emotion('dormindo', now)
+            self.intelligence.current_decision = dict(action='sleep',target='asleep',intensity=1.,duration=0.,source='explicit_user_command',factors={})
+            self.intelligence.history.append(dict(self.intelligence.current_decision))
+        elif kind == 'wake':
+            self.sleep.wake(startled=False)
+            self.state.emotion = self.emotion.current
+            self.behavior.on_emotion(self.state.emotion, now)
+            self.intelligence.current_decision = dict(action='wake',target='awake',intensity=1.,duration=0.,source='explicit_user_command',factors={})
+            self.intelligence.history.append(dict(self.intelligence.current_decision))
+        elif kind == 'work':
+            allowed = (not self.sleep.asleep and self.drives.energy > .25
+                       and self.state.emotion not in ('triste','bravo','dramatico','dormindo'))
+            if allowed: self.mesa.pedir(now)
+            self.intelligence.current_decision = dict(action='work' if allowed else 'request_refused',target='notebook' if allowed else None,
+                    intensity=1.,duration=0.,source='explicit_user_request',
+                    refusal_reason=None if allowed else 'low_energy_or_unwilling_mood',factors=dict(emotion=self.state.emotion,energy=self.drives.energy,neural={'SENTAR':self.rates.get('SENTAR',0.)}))
+            self.intelligence.history.append(dict(self.intelligence.current_decision))
+        elif kind == 'play':
+            distance = math.dist((self.body.x,self.body.y),(self.ball.body.x,self.ball.body.y))
+            allowed = (self.visible() and not self.sleep.asleep and not self.body.held and self.body.grounded
+                       and not self.mesa.sentado and not self.behavior.mission and not self.state.protest_stage and self.drives.energy > .2
+                       and self.body.upright() and not self.state.castigo and not self.behavior.canto
+                       and self.behavior.fuga_alvo is None and not self.state.caressing(now)
+                       and not self.ball_stored and self.ball.isVisible() and not self.ball.dragging and distance <= 220
+                       and self.state.emotion in ('feliz','curioso','contente','bravo'))
+            actions = ['throw'] if self.state.emotion == 'bravo' else ['kick']
+            action = self.intelligence.choose('play_request',actions,rates=self.rates,emotion=self.state.emotion,
+                    energy=self.drives.energy,contact=self.drives.contact,duration=1.,source='explicit_user_request') if allowed else None
+            if action:
+                self.play.requested_action=action;self.play.next_at=0.
+                self.intelligence.clear_goal();self.behavior.adaptive_goal=None;self.quiet_until=0.
+            self.intelligence.current_decision = dict(action='play' if action else 'request_refused',target=action,
+                    intensity=1.,duration=1.,source='explicit_user_request',
+                    refusal_reason=None if action else 'toy_unavailable_or_low_energy_or_unwilling_mood',
+                    factors=dict(emotion=self.state.emotion,energy=self.drives.energy,distance=distance))
+            self.intelligence.history.append(dict(self.intelligence.current_decision))
+        elif kind == 'celebrate':
+            allowed = (self.visible() and not self.sleep.asleep and self.drives.energy > .2
+                       and self.state.emotion in ('feliz','contente') and now >= self.festa.pronto_em)
+            if allowed: self.festa.requested=True
+            self.intelligence.current_decision = dict(action='celebrate' if allowed else 'request_refused',target='fireworks' if allowed else None,
+                    intensity=1.,duration=3.2,source='explicit_user_request',
+                    refusal_reason=None if allowed else 'low_energy_or_unwilling_mood_or_cooldown',
+                    factors=dict(emotion=self.state.emotion,energy=self.drives.energy,neural={'CHEER':self.rates.get('CHEER',0.)}))
+            self.intelligence.history.append(dict(self.intelligence.current_decision))
         elif kind == 'notebook': self.mesa.alternar_notebook()
         elif kind == 'corner': self.castigo.toggle(self.bounds())
         elif kind == 'ball': self.ball_stored = not self.ball_stored; self.ball.setVisible(not self.ball_stored)
@@ -471,16 +565,33 @@ class Game:
             if self.prefs.get('senseCursor', True): allowed += ['attention']
         if not self.mesa.escondido and self.activity in ('PROGRAMMING', 'DESIGNING'): allowed += ['work']
         if self.panel or self.hover or self.body.held or self.sleep.asleep or self.castigo.dentro or self.castigo.fuga or self.protest.stage or self.sad.stage or self.behavior.mission: allowed = []
-        before = self.intelligence.goal
+        decisions_before = self.intelligence.decisions
         try:
             goal = self.intelligence.tick(now, time.time(), self.activity, self.state.emotion, self.rates, self.drives.energy, self.drives.contact, allowed, self.sleep.asleep)
             self.behavior.adaptive_goal = goal
-            if goal and goal != before:
+            if not goal:
+                self.behavior.adaptive_target = None
+            elif self.intelligence.decisions != decisions_before:
                 area = self.bounds()
-                self.behavior.adaptive_target = (area[0]+area[2])/2 if goal == 'explore' else max(area[0]+90, min(area[2]-90, self.cursor[0]+170))
+                decision = self.intelligence.current_decision
+                record = self.intelligence.history[-1]
+                self.behavior.adaptive_target = None
                 if goal == 'explore':
-                    import random
-                    self.behavior.adaptive_target = random.uniform(area[0]+90, area[2]-90)
+                    margin = min(90., (area[2]-area[0])/2)
+                    targets = [round(area[0]+margin+(area[2]-area[0]-2*margin)*i/4, 2) for i in range(5)]
+                    picked = self.intelligence.choose('explore_target', [str(value) for value in targets],
+                                                       rates=self.rates, emotion=self.state.emotion,
+                                                       energy=self.drives.energy, contact=self.drives.contact,
+                                                       duration=decision['duration'], source='lif+episodic_policy')
+                    self.behavior.adaptive_target = float(picked) if picked is not None else targets[2]
+                    decision['target'] = self.behavior.adaptive_target
+                    self.intelligence.current_decision = decision
+                elif goal == 'attention':
+                    self.behavior.adaptive_target = max(area[0]+90, min(area[2]-90, self.cursor[0]+170))
+                    decision['target'] = self.behavior.adaptive_target
+                elif goal in ('play', 'work'):
+                    decision['target'] = 'toy' if goal == 'play' else 'notebook'
+                record['target'] = decision['target']
         except Exception as error:
             self.intelligence.compatibility = f'Autonomia adicional pausada: {type(error).__name__}'
             self.intelligence.clear_goal()
@@ -491,6 +602,14 @@ class Game:
             import numpy as np
             self.brain_array_mib = sum(v.nbytes for v in vars(self.brain).values() if isinstance(v,np.ndarray) and v.base is None)/1048576
             self.last_metrics = now
+
+    def decision_snapshot(self):
+        return self.intelligence.snapshot()
+
+    def choose_expression(self, candidates, now=None):
+        now = time.monotonic() if now is None else now
+        return self.intelligence.choose_expression(candidates, self.rates, self.state.emotion,
+                                                   self.drives.energy, self.drives.contact, now)
 
     def think(self, dt, now):
         moving = min(1., abs(self.body.vx) / 200 + (0 if self.body.grounded else 1))
@@ -518,6 +637,11 @@ class Game:
         self.brain.step(min(100, max(1, round(dt * 1000))))
         self.inputs = inputs
         self.rates = self.brain.motor_activity()
+        self.sleep.rates = self.rates
+        for protest in (self.protest, self.sad):
+            protest.rates = self.rates
+            protest.energy = self.drives.energy
+            protest.contact = self.drives.contact
         self.state.tone.update(self.rates,dt)
         for controller in (self.protest_ctl,self.sad_ctl):
             change = controller.tick(dt,self.state.tone,self.prof,caressing,now,self.drives.channels()['LONELY'])
@@ -535,6 +659,9 @@ class Game:
         self.state.at_desk = self.mesa.sentado
         self.state.desk_top = self.mesa.caderno.y() if self.mesa.sentado else None
         self.behavior.play_pull = pull(self.brain.pool_rates())
+        self.play.rates = self.rates
+        self.play.energy = self.drives.energy
+        self.play.contact = self.drives.contact
         if self.mesa.pop_recusa(): self.request_refused = min(1., .4 + .2 * self.mesa.pedidos_recentes())
         self.sleep.tick(now,self.body,self.in_flight,self.protest.stage,self.behavior.mission)
         if self.sleep.asleep: self.state.emotion = 'dormindo'; self.behavior.on_emotion('dormindo',now)
@@ -563,11 +690,18 @@ class Game:
         areas = self.available_areas()
         monitors = [monitor for i, monitor in enumerate(self.monitors) if i not in self.blocked]
         self.behavior.screen_areas = areas
+        self.behavior.rates = self.rates
+        self.behavior.energy = self.drives.energy
+        self.behavior.contact = self.drives.contact
         self.behavior.toy = (self.ball.body.x,self.ball.body.y) if not self.ball_stored else None
         platforms = getattr(self,'platforms',[]) if self.prefs.get('senseWindows',True) else []
         self.castigo.act(now,self.body,area,self.cursor if self.prefs.get('senseCursor',True) else (1e9,1e9),self.state,self.rates,self.sleep.asleep)
-        resting = self.hover or self.panel or now < self.quiet_until or not self.prefs.get('roaming',True)
+        manual_play = self.play.requested_action is not None
+        resting = (self.hover or self.panel or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
         self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting)
+        if manual_play:
+            # A situação pode mudar entre o clique e o próximo quadro.
+            self.play.requested_action = None
         self._play_expression(now)
         reaction=self.release_reaction
         if (reaction.get('until',0)>now and reaction.get('kind') in ('bravo','birra')
@@ -590,10 +724,19 @@ class Game:
         self.mesa.set_visible(not self.mesa.escondido)
         self.protest_ctl.carry(now,self.sleep.asleep); self.sad_ctl.carry(now,self.sleep.asleep)
         self.mischief.tick(dt,area[3])
+        self.mischief.rates = self.rates
+        self.mischief.energy = self.drives.energy
+        self.mischief.contact = self.drives.contact
         perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
         if not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
+        self.festa.rates = self.rates
+        self.festa.energy = self.drives.energy
+        self.festa.contact = self.drives.contact
         self.festa.tick(now,self.rates,self.state.emotion,self.body,self.visible() and not self.sleep.asleep,dt)
+        self.revolucao.rates = self.rates
+        self.revolucao.energy = self.drives.energy
+        self.revolucao.contact = self.drives.contact
         self.revolucao.tick(now,dt,area,self.cursor,(0,0),self.body,self.visible(),self.protest.stage == 4,[],self.rates.get('PAPEL',0))
         self.memory.tick(now,self.prof["episode_ok"],self.prof["episode_window"])
         if now - self.last_save >= 30: self.save(); self.last_save = now

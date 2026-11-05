@@ -89,7 +89,7 @@ def dismiss_valence(elapsed, patience=30.0):
 
 class EpisodicMemory:
     """Memória de travessuras: lembra o que deu certo em cada situação (atividade + emoção) e escolhe a próxima ação por tentativa e erro."""
-    def __init__(self, episodes_path, prefs_path):
+    def __init__(self, episodes_path, prefs_path, rng=None):
         """Guarda os caminhos dos arquivos de episódios e de preferências."""
         self.episodes_path = episodes_path
         self.prefs_path = prefs_path
@@ -101,6 +101,7 @@ class EpisodicMemory:
         self.ultima_acao = None     # episódio da última travessura, para o castigo ensinar
         self._contador = 0
         self.dirty = False
+        self.rng = rng or random.Random()
 
     # ---------------- escolha ----------------
 
@@ -120,14 +121,14 @@ class EpisodicMemory:
         """Escolhe uma ação permitida: a melhor na maior parte das vezes, e às vezes (epsilon) uma aleatória, para explorar."""
         if not allowed:
             return None
-        if random.random() < epsilon:
-            action = random.choice(allowed)
+        if self.rng.random() < epsilon:
+            action = self.rng.choice(allowed)
             self.last_choice = (ctx, action, "explorando")
             return action
         scored = sorted(((self.estimate(ctx, a) + (bias or {}).get(a, 0), a) for a in allowed), reverse=True)
         best = scored[0][0]
         ties = [a for score, a in scored if score >= best - 1e-9]
-        action = random.choice(ties)
+        action = self.rng.choice(ties)
         self.last_choice = (ctx, action, f"melhor estimativa {best:+.2f}")
         return action
 

@@ -12,7 +12,6 @@ passeio normal; cair, ser segurado ou estar tombado passam na frente de tudo.
 """
 
 import math
-import random
 
 from ..core.physics import CLOSE_BUTTONS, GRAVITY, wrap_angle
 
@@ -34,6 +33,10 @@ class Behavior:
     def __init__(self, body, state, mischief):
         """Guarda o corpo, o estado do pet e a lista de objetos de travessura."""
         self.body = body
+        self.policy = None
+        self.rates = {}
+        self.energy = 1.
+        self.contact = 0.
         self.state = state          # PetState: gaze, shake, tontura, carinho, tom motor
         self.mischief = mischief
         self.target_x = None
@@ -55,6 +58,7 @@ class Behavior:
         self.fuga_alvo = None       # x para onde ele está fugindo do cantinho (None: não está fugindo)
         self.march_dir = 1
         self.next_glance = 0.0
+        self.cursor = (0., 0.)
         self.screen_areas = []      # áreas de todos os monitores, atualizadas pelo app
         self.adaptive_goal = None
         self.adaptive_target = None
@@ -62,6 +66,25 @@ class Behavior:
     def look_at(self, x, y, now):
         """Olha para um ponto da tela por alguns segundos."""
         self.look = (x, y, now + LOOK_SECONDS)
+
+    def _decide(self, name, choices, now, weights=None):
+        if self.policy is None:
+            return choices[0] if choices else None
+        labels = {str(value): value for value in choices}
+        selected = self.policy.choose(name, list(labels), rates=self.rates, emotion=self.emotion,
+                                      energy=self.energy, contact=self.contact, duration=3.,
+                                      weights={str(k): v for k, v in (weights or {}).items()})
+        if name == 'roam_duration' and selected is not None:
+            self.policy.current_decision['duration'] = float(selected)
+        return labels.get(selected)
+
+    def _sample(self, name, probability, now, dt=None):
+        if self.policy is None: return False
+        if dt is None:
+            return self.policy.sample(name, probability, rates=self.rates, emotion=self.emotion,
+                                      energy=self.energy, contact=self.contact)
+        return self.policy.event(name, probability, 1., dt, rates=self.rates,
+                                 emotion=self.emotion, energy=self.energy, contact=self.contact)
 
     def on_emotion(self, emotion, now):
         """Troca de emoção: ajusta o olhar e os gestos de cada emoção."""
@@ -71,9 +94,12 @@ class Behavior:
         self.next_roam = now     # reage na hora
         if emotion == "assustado" and self.body.grounded:
             power = self.tone.startle_power()       # pulo do tamanho do disparo de STARTLE
-            self.body.jump(random.uniform(-150, 150), -power, random.uniform(-200, 200))
+            lateral = self._decide('startle_direction', [-150,0,150], now)
+            spin = self._decide('startle_spin', [-200,0,200], now)
+            self.body.jump(lateral, -power, spin)
         elif emotion == "dramatico" and self.body.grounded:
-            self.body.jump(0.0, -500.0, random.choice((-1, 1)) * 540.0)
+            spin = self._decide('dramatic_spin', [-540,540], now)
+            self.body.jump(0.0, -500.0, spin)
 
     def start_mission(self, plan, bounds, cursor, now):
         """Começa uma missão (levar um objeto para algum lugar), conforme o plano que a rede escolheu."""
@@ -85,8 +111,9 @@ class Behavior:
             self.mission = ("cross", far_x, now + DELIVER_TIMEOUT)
         elif kind == "deliver":
             # leva o objeto até um ponto longe do cursor
-            options = [random.uniform(left + margin, right - margin) for _ in range(6)]
-            x = max(options, key=lambda ox: abs(ox - cursor[0]))
+            options = [round(left+margin+(right-left-2*margin)*i/5, 2) for i in range(6)]
+            x = float(self._decide('deliver_target', [str(value) for value in options], now,
+                                   {str(value):abs(value-cursor[0]) for value in options}))
             direction = 1 if x > self.body.x else -1
             ex, ey = self.body.extents()
             thing.carried = True
@@ -109,6 +136,7 @@ class Behavior:
         """Um passo do comportamento: anda, mexe na bolinha e reage ao cursor, respeitando as plataformas."""
         body = self.body
         st = self.state
+        self.cursor = cursor
 
         # olhar: janela recém-aberta > cursor; virado, olha para "cima" do mundo (indignado)
         if self.look and now > self.look[2]:
@@ -128,8 +156,12 @@ class Behavior:
         elif body.upright():
             if now >= self.next_glance:                 # WATCH alto: fixa o cursor; baixo: olha em volta
                 self.next_glance = now + GLANCE_EVERY
-                self.glance = None if random.random() < self.tone.watch() else (
-                    body.x + random.uniform(-600, 600), body.y + random.uniform(-400, 150))
+                gaze_action = self._sample('gaze_cursor', self.tone.watch(), now)
+                points = [(body.x+dx, body.y+dy) for dx,dy in ((-600,-400),(0,-400),(600,-400),(-600,150),(0,150),(600,150))]
+                self.glance = None if gaze_action else self._decide(
+                    'gaze_point', [str(point) for point in points], now)
+                if self.glance is not None:
+                    self.glance = tuple(float(value.strip()) for value in self.glance.strip('()').split(','))
             point = self.look[:2] if self.look else (self.glance or cursor)
             dx, dy = point[0] - body.x, point[1] - body.y
             dist = math.hypot(dx, dy) or 1.0
@@ -262,8 +294,8 @@ class Behavior:
                 body.vx = 0.
             if self.adaptive_goal == 'explore' and now >= self.next_roam:
                 self.next_roam = now+3
-                if platforms and random.random() < self.tone.climb_chance() and self._jump_to_window(platforms): return
-                if random.random() < self.tone.hop_chance(): body.jump(body.vx, -self.tone.hop_power())
+                if platforms and self._sample('explore_climb', self.tone.climb_chance(), now) and self._jump_to_window(platforms): return
+                if self._sample('explore_hop', self.tone.hop_chance(), now): body.jump(body.vx, -self.tone.hop_power())
             return
 
         # passeio: a emoção escolhe o destino, o tom motor escolhe o jeito
@@ -271,21 +303,22 @@ class Behavior:
         if self.emotion in STILL:
             return
         if now >= self.next_roam and not self.crossing_screen:
-            self.next_roam = now + random.uniform(*prof["roam_interval"]) * tone.roam_scale()
-            self.target_x = self._pick_target(cursor, left, right)
+            interval = self._decide('roam_duration', [str(value) for value in prof['roam_interval']], now)
+            self.next_roam = now + float(interval) * tone.roam_scale()
+            self.target_x = self._pick_target(cursor, left, right, now)
             self.crossing_screen = bool(
                 self.target_x is not None and not (left + 80 <= self.target_x <= right - 80)
             )
-            if platforms and random.random() < tone.climb_chance() and self._jump_to_window(platforms):
+            if platforms and self._sample('roam_climb',tone.climb_chance(),now) and self._jump_to_window(platforms):
                 return
-            if random.random() < tone.hop_chance():
-                spin = random.choice((-1, 1)) * 720.0 if random.random() < tone.spin_chance() else 0.0
-                body.jump(body.vx, -tone.hop_power() * random.uniform(0.85, 1.15), spin)
+            if self._sample('roam_hop',tone.hop_chance(),now):
+                spin = self._decide('spin', [-720,0,720], now, {0:1-tone.spin_chance(),-720:tone.spin_chance()/2,720:tone.spin_chance()/2})
+                body.jump(body.vx, -tone.hop_power(), spin)
                 return
 
         if self.target_x is not None:
             chegou = abs(body.x - self.target_x) < 12
-            hesitou = not self.crossing_screen and random.random() < tone.hesitation() * dt
+            hesitou = not self.crossing_screen and self._sample('hesitate',tone.hesitation(),now,dt)
             if chegou or hesitou:
                 self.target_x = None            # chegou, ou hesitou no meio (curioso com sono)
                 self.crossing_screen = False
@@ -316,14 +349,14 @@ class Behavior:
         if (self.march_dir > 0 and body.x >= edge) or (self.march_dir < 0 and body.x <= edge):
             self.march_dir *= -1
         self._slide_to(right if self.march_dir > 0 else left, 150.0 if stage == 2 else 105.0)
-        if random.random() < dt * (1.4 if stage == 2 else 0.6):
+        if self._sample('protest_hop',1.4 if stage == 2 else .6,now,dt):
             body.jump(body.vx, -330.0 if stage == 2 else -220.0)
 
-    def _pick_target(self, cursor, left, right):
+    def _pick_target(self, cursor, left, right, now=0.):
         """Escolhe um ponto de destino no chão: perto da bolinha se ele está brincando, senão ao acaso."""
         x = self.body.x
         walk_left, walk_right = self._movement_limits(left, right)
-        if self.toy and self.emotion in ("feliz", "curioso", "contente") and random.random() < 0.75:
+        if self.toy and self.emotion in ("feliz", "curioso", "contente") and self._sample('roam_toy',.75,now):
             if abs(self.toy[0] - x) > 40:                  # brincando: vai atrás da bolinha
                 return min(walk_right - 80, max(walk_left + 80, self.toy[0]))
         if self.emotion == "curioso":
@@ -331,14 +364,16 @@ class Behavior:
             return min(walk_right - 80, max(walk_left + 80, cursor[0] + side * CURIOUS_DISTANCE))
         if self.canto:
             return left + 80 if x - left < right - x else right - 80   # cantinho mais perto
-        if self.emotion == "observando" and random.random() < 1.0 - self.tone.drive():
+        if self.emotion == "observando" and self._sample('roam_wait',1.0-self.tone.drive(),now):
             return None                         # às vezes só fica olhando mesmo
         vizinhos = self._lateral_neighbors(left, right)
-        if vizinhos and random.random() < CROSS_SCREEN_CHANCE:
-            v_left, v_right = random.choice(vizinhos)
-            return random.uniform(v_left + 100, v_right - 100)
+        if vizinhos and self._sample('roam_cross_screen',CROSS_SCREEN_CHANCE,now):
+            v_left, v_right = self._decide('roam_monitor', vizinhos, now)
+            candidates = [v_left+100+(v_right-v_left-200)*i/4 for i in range(5)]
+            return float(self._decide('cross_monitor_target', [str(round(v,2)) for v in candidates], 0.))
         reach = 120 + 450 * self.tone.drive()
-        return min(walk_right - 80, max(walk_left + 80, x + random.uniform(-reach, reach)))
+        choices = [min(walk_right-80,max(walk_left+80,x+offset)) for offset in (-reach,-reach/2,0,reach/2,reach)]
+        return float(self._decide('roam_position', [str(round(value,2)) for value in choices], now))
 
     def _movement_limits(self, left, right):
         """Amplia o passeio para monitores encostados à esquerda ou à direita do atual."""
@@ -371,16 +406,19 @@ class Behavior:
             lo, hi = p_left + ex, p_right - CLOSE_BUTTONS - ex
             if hi - lo < 20 or not (-MAX_CLIMB < bottom - p_top < MAX_CLIMB):
                 continue
-            tx = min(hi, max(lo, body.x + random.uniform(-200, 200)))
+            choices = [min(hi,max(lo,body.x+offset)) for offset in (-200,-100,0,100,200)]
+            tx = float(self._decide('window_jump_target', [str(round(value,2)) for value in choices], 0.))
             if abs(tx - body.x) < 1400:
                 options.append((tx, p_top))
         if not options:
             return False
-        tx, p_top = random.choice(options)
+        selected = self._decide('window_jump_target', [str(i) for i in range(len(options))], 0.)
+        tx, p_top = options[int(selected)]
         apex = min(bottom, p_top) - 70
         t_up = math.sqrt(2 * (bottom - apex) / GRAVITY)
         t_down = math.sqrt(2 * (p_top - apex) / GRAVITY)
-        body.jump((tx - body.x) / (t_up + t_down), -GRAVITY * t_up, random.uniform(-90, 90))
+        spin = self._decide('window_jump_spin', [-90,0,90], 0.)
+        body.jump((tx - body.x) / (t_up + t_down), -GRAVITY * t_up, spin)
         return True
 
     def _slide_to(self, target, speed):

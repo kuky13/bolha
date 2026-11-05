@@ -27,7 +27,7 @@ def gold(pixels):
 
 
 def test_every_expression_stays_inside_deformed_rotating_body(qt_application):
-    for radius, squash in ((40, -.25), (68, .25), (100, -.25)):
+    for radius, squash in ((24, -.25), (40, -.25), (68, .25), (100, -.25)):
         scale = radius / 49
         for angle in (0, 45, 135, 270):
             cosine, sine = math.cos(math.radians(angle)), math.sin(math.radians(angle))

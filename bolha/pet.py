@@ -34,7 +34,6 @@ class PetVisual(QWidget):
         p=QPainter(self);p.setRenderHint(QPainter.Antialiasing)
         if game.state.desk_top is not None:
             p.setClipRect(QRect(0,0,self.width(),max(0,int(game.state.desk_top-self.y()))))
-        blink=1.0 if now < self.pet.blink_until else 0.0
         pose=self.pet.motion.pose
         scale=game.body.half_w/49
         angle=game.body.angle+pose['angle_offset']
@@ -42,7 +41,7 @@ class PetVisual(QWidget):
         # A transformação comum gira corpo, olhos, orelhas e marcas no mesmo centro.
         draw_character(p,self.width()/2,self.height()/2,scale=scale,
                        angle=angle,emotion=pose['emotion'],
-                       blink=max(blink,pose['blink']),gaze=pose['gaze'] or game.state.gaze,
+                       blink=pose['blink'],gaze=pose['gaze'] or game.state.gaze,
                        blink_left=pose['blink_left'],blink_right=pose['blink_right'],
                        ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
                        eye_open=pose['eye_open'],squash=squash,
@@ -71,16 +70,13 @@ class PetWindow(QWidget):
         self.visual=PetVisual(self)
         self.press=None;self.offset=(0.,0.);self.dragging=False
         self.mouse_grab=MouseGrab(self);self.drag_position=None
-        self.rubs=deque();self.next_blink=time.monotonic()+3.4;self.blink_until=0.
+        self.rubs=deque()
         self.motion=ExpressionMotion(time.monotonic())
         self.sync()
 
     def sync(self):
         now=time.monotonic()
         self.motion.update(self.game,now,self.press[1] if self.press else None)
-        if self.motion.mode=='wink':self.blink_until=0.
-        elif now>=self.next_blink:
-            self.blink_until=now+.13;self.next_blink=now+3.2+(math.sin(now)*.5+.5)*2
         x,y=round(self.body.x-self.width()/2),round(self.body.y-self.height()/2)
         self.move(x,y)
         self.visual.move(round(self.body.x-self.visual.width()/2),round(self.body.y-self.visual.height()/2))

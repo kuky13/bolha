@@ -12,6 +12,14 @@ from .reactions import (
     InMemoryMedia, MAX_TOTAL_MEDIA_BYTES, NEKOS_HOSTS,
     OnlineReactionFetcher, REACTIONGIFS_HOSTS, validate_reaction_url,
 )
+from pestinha.scene import minimum_object_dimensions, object_scale
+
+
+def object_dimensions(item, avatar_size=136, object_scales=None, bounds=None):
+    """Dimensões proporcionais comuns à física, colisão e janela nativa."""
+    factor=object_scale(item,avatar_size,object_scales,bounds)
+    minimum_w,minimum_h=minimum_object_dimensions(getattr(item,'kind',''))
+    return max(minimum_w,item._base_w*factor),max(minimum_h,item._base_h*factor)
 
 class ObjectWindow(QWidget):
     def __init__(self, scene, item):
@@ -24,18 +32,24 @@ class ObjectWindow(QWidget):
         self.offset=None;self.press_position=None;self.dragged=False
         self.mouse_grab=MouseGrab(self);self.drag_position=None
         self.reaction_media=None;self.reaction_requested=False
+        self.reaction_remaining=0.;self._reaction_tick=time.monotonic();self._context_open=False
         self.resize(round(item.width()),round(item.height()))
         self._sync_mask()
     def _sync_mask(self):
         item=self.item
         if item.kind=='fireworks':return
+        image=self.reaction_media.current_image() if item.kind=='meme' and self.reaction_media is not None else None
         peanut=item.kind=='ball' and getattr(item,'appearance','ball')=='peanut'
         key=(self.width(),self.height(),self.devicePixelRatioF(),item.kind,item.working,
-             getattr(item,'appearance',None),item.roll_angle if peanut else None)
+             getattr(item,'appearance',None),item.roll_angle if peanut else None,
+             image.width() if image is not None else None,image.height() if image is not None else None)
         if key==getattr(self,'_mask_key',None):return
         if peanut:
             path=peanut_shape(self.width()/2,self.height()/2,item.body.half_w,item.roll_angle)
             mask=QRegion(path.toFillPolygon().toPolygon())
+        elif item.kind=='meme':
+            rect=self._media_rect(image) if image is not None and not image.isNull() else QRectF()
+            mask=QRegion(QRect(round(rect.x()),round(rect.y()),max(0,round(rect.width())),max(0,round(rect.height()))))
         elif item.kind in ('ball','paper'):
             radius=item.body.half_w+1
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
@@ -55,13 +69,19 @@ class ObjectWindow(QWidget):
             self.item.provider=cand.provider
             self.item.title=cand.title
             self.item.born=time.monotonic()
+            self.reaction_remaining=15.
+            self._reaction_tick=time.monotonic()
     def release_reaction_media(self):
         if getattr(self,'reaction_media',None) is not None:
             self.reaction_media.release()
             self.reaction_media=None
     def sync(self):
-        self._sync_mask()
         item=self.item;data=item.snapshot()
+        wanted=(max(20,round(item.width())),max(20,round(item.height())))
+        if wanted!=(self.width(),self.height()):
+            self.resize(*wanted)
+            if self.reaction_media is not None:self.reaction_media.set_target_size(max(wanted))
+        self._sync_mask()
         self.move(round(data['x']-self.width()/2),round(data['y']-self.height()/2))
         ready=(self.reaction_media is not None) if item.kind=='meme' else True
         visible=item.isVisible() and self.scene.game.visible() and ready
@@ -156,10 +176,27 @@ class ObjectWindow(QWidget):
     def contextMenuEvent(self,event):
         self.cancel_interaction()
         menu=QMenu(self);action=menu.addAction('Guardar objeto')
+        scale_kind=self.scene.scale_kind(self.item)
+        smaller=larger=reset=None
+        if self.scene.on_scale_change:
+            scale_menu=menu.addMenu('Tamanho')
+            smaller=scale_menu.addAction('Menor')
+            larger=scale_menu.addAction('Maior')
+            reset=scale_menu.addAction('Padrão')
         open_source=None
         if self.item.kind=='meme' and getattr(self.item,'source_url',None):
             open_source=menu.addAction('Abrir origem')
-        chosen=menu.exec(event.globalPos())
+        info=None
+        if self.item.kind=='meme' and self.reaction_media is not None:
+            candidate=self.reaction_media.candidate
+            provider={'reactiongifs':'ReactionGIFs','nekos.best':'Nekos.best'}.get(candidate.provider,candidate.provider)
+            label=' · '.join(part for part in (provider,candidate.title) if part)
+            if label:
+                info=menu.addAction(label)
+                if hasattr(info,'setEnabled'):info.setEnabled(False)
+        self._context_open=True
+        try:chosen=menu.exec(event.globalPos())
+        finally:self._context_open=False
         if chosen==action:
             if self.item.kind=='ball':self.scene.game.interact(dict(type='ball'))
             elif self.item.kind=='notebook':self.scene.game.interact(dict(type='notebook'))
@@ -168,6 +205,10 @@ class ObjectWindow(QWidget):
             else:self.item.hide()
         elif open_source is not None and chosen==open_source:
             self._open_reaction_source()
+        elif chosen is not None and chosen in (smaller,larger,reset):
+            current=float(self.scene.game.prefs.get('objectScales',{}).get(scale_kind,1.))
+            factor=1. if chosen==reset else max(.6,min(1.8,current+(-.1 if chosen==smaller else .1)))
+            if self.scene.on_scale_change:self.scene.on_scale_change(scale_kind,factor)
     def paintEvent(self,event):
         p=QPainter(self);p.setRenderHint(QPainter.Antialiasing);p.setRenderHint(QPainter.SmoothPixmapTransform)
         w,h=self.width(),self.height();kind=self.item.kind
@@ -181,43 +222,66 @@ class ObjectWindow(QWidget):
             paint_notebook(p,QRectF(self.rect()),self.item.working)
         elif kind=='fireworks':
             age=max(0,3.2-(self.item.until-time.monotonic()))
+            scale=min(w/max(1,self.item._base_w),h/max(1,self.item._base_h))
             for burst in range(4):
-                phase=(age+burst*.51)%1.6;r=phase*55;alpha=round(220*(1-phase/1.6))
+                phase=(age+burst*.51)%1.6;r=phase*55*scale;alpha=round(220*(1-phase/1.6))
                 cx=w*(.2+.2*burst);cy=h*(.3+.12*(burst%2))
-                p.setPen(QPen(QColor(255,205,100,alpha),2))
+                p.setPen(QPen(QColor(255,205,100,alpha),max(1.,2*scale)))
                 for ray in range(12):
                     a=ray*math.tau/12+burst;p.drawLine(QPointF(cx+math.cos(a)*r*.6,cy+math.sin(a)*r*.6),QPointF(cx+math.cos(a)*r,cy+math.sin(a)*r))
         elif kind=='meme':
             img=self.reaction_media.current_image() if self.reaction_media is not None else None
             if img is not None and not img.isNull():
-                p.setPen(QPen(QColor('#75658e'),2));p.setBrush(QColor('#181522'))
-                p.drawRoundedRect(QRectF(1,1,w-2,h-2),9,9)
-                footer_h=22
-                pad=6
-                avail_w=max(16,w-pad*2)
-                avail_h=max(16,h-footer_h-pad*2)
-                iw,ih=max(1,img.width()),max(1,img.height())
-                scale=min(avail_w/iw,avail_h/ih)
-                dw,dh=iw*scale,ih*scale
-                dx=(w-dw)/2
-                dy=pad+(avail_h-dh)/2
-                clip=QPainterPath();clip.addRoundedRect(QRectF(pad,pad,avail_w,avail_h),6,6)
-                p.save();p.setClipPath(clip)
-                p.drawImage(QRectF(dx,dy,dw,dh),img)
-                p.restore()
-                label=getattr(self.item,'attribution','') or getattr(self.item,'provider','') or 'Reação online'
-                p.setPen(QColor('#cfc6e6'))
-                p.setFont(QFont('Segoe UI',8))
-                p.drawText(QRectF(8,h-footer_h,w-16,footer_h-3),Qt.AlignCenter|Qt.TextSingleLine,label[:38])
+                p.drawImage(self._media_rect(img),img)
         else:
-            corner=kind=='corner';p.setPen(QPen(QColor('#846c49'),2));p.setBrush(QColor('#e4cfa1' if corner else '#fff0be'));p.drawRoundedRect(QRectF(1,1,w-2,h-2),7,7)
-            p.setPen(QColor('#493b30'));p.setFont(QFont('Segoe UI',10,QFont.Weight.DemiBold));p.drawText(QRectF(10,10,w-20,h-20),Qt.AlignCenter|Qt.TextWordWrap,self.item.text)
+            scale=min(w/max(1,self.item._base_w),h/max(1,self.item._base_h))
+            corner=kind=='corner';p.setPen(QPen(QColor('#846c49'),max(1.,2*scale)));p.setBrush(QColor('#e4cfa1' if corner else '#fff0be'));p.drawRoundedRect(QRectF(1,1,w-2,h-2),7*scale,7*scale)
+            p.setPen(QColor('#493b30'));p.setFont(QFont('Segoe UI',max(9,round(10*scale)),QFont.Weight.DemiBold));pad=max(6,round(10*scale));p.drawText(QRectF(pad,pad,w-pad*2,h-pad*2),Qt.AlignCenter|Qt.TextWordWrap,self.item.text)
         p.end()
 
+    def _media_rect(self,image):
+        scale=min(self.width()/max(1,image.width()),self.height()/max(1,image.height()))
+        width,height=image.width()*scale,image.height()*scale
+        return QRectF((self.width()-width)/2,(self.height()-height)/2,width,height)
+
 class NativeScene:
-    def __init__(self,game,reaction_fetcher=None):
+    def __init__(self,game,reaction_fetcher=None,on_scale_change=None):
         self.game=game;self.windows={}
         self.fetcher=reaction_fetcher or OnlineReactionFetcher()
+        self.on_scale_change=on_scale_change
+        self.reaction_status={}
+        self._reaction_deadlines={}
+    @staticmethod
+    def scale_kind(item):
+        kind=getattr(item,'kind','')
+        return ('toy' if kind in ('ball','paper') else 'notebook' if kind=='notebook' else
+                'reaction' if kind=='meme' else 'note' if kind=='note' else 'sign' if kind=='sign' else
+                'corner' if kind=='corner' else 'effects' if kind=='fireworks' else 'sign')
+    def get_reaction_status(self, ident):
+        return self.reaction_status.get(str(ident), {'state':'idle','reason':''})
+    def _status(self, ident, state, reason=''):
+        ident=str(ident);self.reaction_status.pop(ident,None)
+        self.reaction_status[ident]={'state':state,'reason':str(reason)[:180]}
+        if len(self.reaction_status)>32:
+            self.reaction_status.pop(next(iter(self.reaction_status)))
+    def request_reaction(self, ident):
+        """Dispara uma tentativa imediatamente em objeto meme já criado e visível."""
+        ident=str(ident);item=self.game.objects.get(ident);window=self.windows.get(ident)
+        if item is None or item.kind!='meme' or not item.isVisible() or not self.game.visible():
+            self._status(ident,'canceled','objeto indisponível ou cena pausada');return False
+        if not self.game.prefs.get('mischiefEnabled',True) or not self.game.prefs.get('onlineReactions',True):
+            self._status(ident,'canceled','reações online desativadas');return False
+        if window is None:
+            window=ObjectWindow(self,item);self.windows[ident]=window
+        window.reaction_requested=False
+        return self._start_reaction(ident,item,window)
+    def _start_reaction(self, ident, item, window):
+        if not self.fetcher.submit(ident,getattr(item,'emotion','observando'),getattr(item,'reaction_kind','meme')):
+            self._status(ident,'canceled','fila indisponível ou cheia')
+            self._abort_meme(ident,item)
+            return False
+        window.reaction_requested=True;self._reaction_deadlines[str(ident)]=time.monotonic()+20
+        self._status(ident,'loading','buscando GIF em memória');return True
     def poll_interactions(self):
         for window in list(self.windows.values()):window.poll_interaction()
     def cancel_interactions(self):
@@ -226,6 +290,7 @@ class NativeScene:
         return sum(w.reaction_media.byte_size for w in self.windows.values() if w.reaction_media is not None)
     def _abort_meme(self,ident,item=None):
         self.fetcher.cancel(ident)
+        self._reaction_deadlines.pop(str(ident),None)
         window=self.windows.pop(ident,None)
         if window is not None:window.close()
         target=item or self.game.objects.get(ident)
@@ -244,23 +309,48 @@ class NativeScene:
             item=self.game.objects.get(ident)
             window=self.windows.get(ident)
             if item is None or item.closed or not item.isVisible() or window is None or not self.game.visible():
+                self._status(ident,'canceled','pedido cancelado: objeto oculto ou cena pausada')
                 continue
             if payload is None or error is not None:
+                message=str(error or 'sem resultados')
+                reason='no-results' if 'candidato' in message.lower() or 'resultados' in message.lower() else 'network'
+                self._status(ident,reason,message);self._reaction_deadlines.pop(str(ident),None)
                 self._abort_meme(ident,item)
                 continue
             if self._total_media_bytes()+len(payload.data)>MAX_TOTAL_MEDIA_BYTES:
+                self._status(ident,'memory','limite de RAM para mídia atingido');self._reaction_deadlines.pop(str(ident),None)
                 self._abort_meme(ident,item)
                 continue
             try:
                 media=InMemoryMedia(payload,target_size=max(window.width(),window.height()))
-            except Exception:
+            except Exception as error:
+                self._status(ident,'decode',str(error));self._reaction_deadlines.pop(str(ident),None)
                 self._abort_meme(ident,item)
                 continue
             window.set_reaction_media(media)
+            self._status(ident,'ready','');self._reaction_deadlines.pop(str(ident),None)
     def sync(self):
         self._poll_reactions()
+        now=time.monotonic()
+        for ident,deadline in list(self._reaction_deadlines.items()):
+            if now>=deadline:
+                self.fetcher.cancel(ident);self._reaction_deadlines.pop(ident,None)
+                self._status(ident,'network','tempo máximo da busca excedido')
+                item=self.game.objects.get(ident)
+                if item is not None:self._abort_meme(ident,item)
         online=self.game.prefs.get('onlineReactions',True) and self.game.prefs.get('mischiefEnabled',True)
         for ident,item in list(self.game.objects.items()):
+            area=self.game.bounds((item._cx,item._cy))
+            item.apply_scale(object_scale(item,self.game.prefs.get('avatarSize',136),self.game.prefs.get('objectScales'),area))
+            body=getattr(item,'body',None)
+            held=bool(item.carried or getattr(item,'dragging',False) or getattr(body,'held',False))
+            if not held and body is not None:
+                self.game.fit(body);item.place(body.x,body.y)
+            elif not held:
+                left,top,right,bottom=area;half_w,half_h=math.ceil(item.width()/2),math.ceil(item.height()/2)
+                x=max(left+half_w,min(right-half_w,item._cx))
+                y=max(top+half_h,min(bottom-half_h,item._cy))
+                if (x,y)!=(item._cx,item._cy):item.place(x,y)
             if item.closed:
                 self.fetcher.cancel(ident)
                 if ident in self.windows:self.windows.pop(ident).close()
@@ -275,12 +365,19 @@ class NativeScene:
                     continue
             if ident not in self.windows:self.windows[ident]=ObjectWindow(self,item)
             window=self.windows[ident]
+            if window.reaction_media is not None:
+                tick=time.monotonic()
+                paused=(not window.isVisible() or window.underMouse() or window._context_open
+                        or item.carried or window.offset is not None)
+                if not paused:window.reaction_remaining-=max(0.,tick-window._reaction_tick)
+                window._reaction_tick=tick
+                if window.reaction_remaining<=0:
+                    self._status(ident,'expired','reação exibida por 15 segundos')
+                    self._abort_meme(ident,item)
+                    continue
             if item.kind=='meme' and window.reaction_media is None and not window.reaction_requested:
                 if self.game.visible() and item.isVisible() and online:
-                    window.reaction_requested=True
-                    if not self.fetcher.submit(ident,getattr(item,'emotion','observando'),getattr(item,'reaction_kind','meme')):
-                        self._abort_meme(ident,item)
-                        continue
+                    if not self._start_reaction(ident,item,window):continue
                     self._poll_reactions()
                     if ident not in self.windows:
                         continue
@@ -290,6 +387,7 @@ class NativeScene:
             self.windows.pop(ident).close()
     def close(self):
         self.fetcher.stop()
+        self._reaction_deadlines.clear()
         for window in self.windows.values():window.close()
         self.windows.clear()
     def ids(self):return [int(w.winId()) for w in self.windows.values()]

@@ -6,8 +6,6 @@ frequência das bolinhas (sem rajadas nem pausas fixas). Cada bolinha bate em po
 no cursor, e some depois de 10 s. Há no máximo 40 na tela.
 """
 
-import random
-
 from ..body.bolinha import Ball
 from ..ajustes import GANHO_PAPEL
 from ..body.toy import bounce_off, push_from_cursor
@@ -24,10 +22,18 @@ class RevolucaoController:
         self.sprite = sprite             # foto da bolinha de papel (load_sprite) ou None
         self.papeis = []                 # dicts {bola, nascimento, ultimo_empurrao}
         self.debug = debug
+        self.policy = None
+        self.rates = {}
+        self.energy = 1.
+        self.contact = 0.
 
     def tick(self, now, dt, limites, cursor, vel_cursor, corpo, visivel, revoltado, obstaculos, papel_hz):
         """Atira conforme o disparo do neurônio PAPEL e move as bolinhas que já estão no ar."""
-        if revoltado and len(self.papeis) < MAXIMO_PAPEIS and random.random() < papel_hz * GANHO_PAPEL * dt:
+        fire = False
+        if revoltado and len(self.papeis) < MAXIMO_PAPEIS:
+            fire = self.policy.event('paper_throw', papel_hz, GANHO_PAPEL, dt, rates=self.rates,
+                    emotion='revolta', energy=self.energy, contact=self.contact) if self.policy else False
+        if fire:
             self._atirar(now, cursor, corpo, visivel)
         self._mover(now, dt, limites, cursor, vel_cursor, obstaculos)
 

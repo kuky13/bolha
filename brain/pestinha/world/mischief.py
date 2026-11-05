@@ -9,7 +9,6 @@ O cérebro só decide QUANDO e com que emoção; aqui se decide a FORMA.
 """
 
 import math
-import random
 import time
 
 from ..scene import Signal
@@ -37,6 +36,27 @@ class MischiefEngine:
         self.paths = conteudo                                 # ConteudoPaths: só o conteúdo deste pet e o comum
         self.notes = config.Notes(conteudo.notes)
         self.notes_sad = config.Notes(conteudo.notes_sad)       # bilhetes de quando ele está triste
+        self.policy = None
+        self.rates = {}
+        self.energy = self.contact = 1.
+
+    def _choose(self, action, candidates, emotion='observando', weights=None):
+        """Escolhe uma alternativa real pela política central; sem política, aguarda."""
+        if not candidates or self.policy is None:return None
+        keys=[str(index) for index in range(len(candidates))]
+        policy_weights={key:float((weights or {}).get(key,0.)) for key in keys}
+        selected=self.policy.choose(action,keys,rates=self.rates,emotion=emotion,
+                                    energy=self.energy,contact=self.contact,duration=0.,
+                                    source='mischief_world',weights=policy_weights)
+        try:index=int(selected)
+        except (TypeError,ValueError):return None
+        return candidates[index] if 0<=index<len(candidates) else None
+
+    def _meme_paths(self, emotion, working=False):
+        root=self.paths.memes_trabalho if working else self.paths.memes
+        own=config.list_images(root/'trabalho') if working else config.list_images(root/emotion)
+        if own:return own
+        return [path for label in config.EMOTIONS for path in config.list_images(root/label)]
 
     # ---------------- agenda ----------------
 
@@ -58,14 +78,14 @@ class MischiefEngine:
             return ["bilhete_triste", "nada"] if perms["bilhetes"] and self.notes_sad.has_lines() else []
         online = perms.get("online_reactions", self.online_reactions)
         if working:                                     # programando sem estar sentado: meme de trabalho
-            trabalho = perms["memes"] and online and bool(config.list_images(self.paths.memes_trabalho) or self.paths.memes.exists())
+            trabalho = perms["memes"] and online
             return ["meme_trabalho", "nada"] if trabalho else []
-        memes = perms["memes"] and online and config.meme_for(self.paths.memes, emotion) is not None
-        notes = perms["bilhetes"] and bool(self.notes.lines or self.notes.pick())
+        memes = perms["memes"] and online
+        notes = perms["bilhetes"] and self.notes.has_lines()
         if emotion == "bravo":
             options = ((["meme_canto", "meme"] if memes else []) + (["bilhete_canto"] if notes else []))
             return options + ["nada"] if options else []
-        photos = perms["fotos"] and config.random_photo(self.paths.fotos) is not None
+        photos = perms["fotos"] and bool(config.list_images(self.paths.fotos))
         options = (["meme"] if memes else []) + (["foto"] if photos else []) + (["bilhete"] if notes else [])
         return options + ["atravessar", "nada"] if options else []
 
@@ -92,24 +112,47 @@ class MischiefEngine:
         if kind in ("meme", "meme_trabalho") and not self.online_reactions:
             return None
         if kind == "meme":
-            path = config.meme_for(self.paths.memes, emotion)
-            thing = ImageThing(path, CORNER_MAX if small else MEME_MAX, emotion=emotion, reaction_kind=kind) if path else None
+            paths=self._meme_paths(emotion)
+            candidates=list(paths)+(['online'] if self.online_reactions else [])
+            selected=self._choose('mischief_content',candidates,emotion)
+            if selected is None:return None
+            path=None if selected=='online' else selected
+            thing = ImageThing(path, CORNER_MAX if small else MEME_MAX, emotion=emotion,
+                               reaction_kind='online' if path is None else kind)
         elif kind == "meme_trabalho":
-            options = config.list_images(self.paths.memes_trabalho)
-            path = random.choice(options) if options else config.meme_for(self.paths.memes, emotion)
-            thing = ImageThing(path, MEME_MAX, emotion=emotion, reaction_kind=kind) if path else None
+            paths=self._meme_paths(emotion,working=True) or self._meme_paths(emotion)
+            candidates=list(paths)+(['online'] if self.online_reactions else [])
+            selected=self._choose('mischief_content',candidates,emotion)
+            if selected is None:return None
+            path=None if selected=='online' else selected
+            thing = ImageThing(path, MEME_MAX, emotion=emotion,
+                               reaction_kind='online' if path is None else kind)
         elif kind == "foto":
-            path = config.random_photo(self.paths.fotos)
+            options=config.list_images(self.paths.fotos)
+            path=self._choose('mischief_content',options,emotion)
             thing = ImageThing(path, MEME_MAX, emotion=emotion, reaction_kind=kind) if path else None
         else:
             notes = self.notes_sad if kind == "bilhete_triste" else self.notes
-            text = notes.pick()
+            notes.has_lines()
+            options=[line for line in notes.lines if line!=notes.last] or list(notes.lines)
+            text=self._choose('mischief_note',options,emotion)
+            if text is not None:notes.last=text
             thing = NoteThing(text, small=small) if text else None
         if thing is not None and not getattr(thing, "valida", True):
             thing.deleteLater()                      # imagem ilegível: nada de objeto invisível na tela
             return None
         if thing is not None:
             thing.clicked.connect(self._on_click)
+        return thing
+
+    def create_online_reaction(self, emotion='observando'):
+        """Cria uma reação online sem depender de arquivo ou catálogo local."""
+        if not self.online_reactions or len(self.things) >= self.max_objects:
+            return None
+        thing = ImageThing(None, MEME_MAX, emotion=emotion, reaction_kind='online')
+        thing.valida = True
+        thing.clicked.connect(self._on_click)
+        self._add(thing)
         return thing
 
     # ---------------- colocação ----------------
@@ -132,7 +175,11 @@ class MischiefEngine:
         if not free:
             thing.deleteLater()
             return False
-        thing.place(*random.choice(free))
+        weights={str(index):math.dist(point,cursor) for index,point in enumerate(free)}
+        selected=self._choose('mischief_location',free,getattr(thing,'emotion','observando'),weights)
+        if selected is None:
+            thing.deleteLater();return False
+        thing.place(*selected)
         self._add(thing)
         return True
 

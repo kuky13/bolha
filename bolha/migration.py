@@ -45,7 +45,8 @@ def prepare_data(data_dir):
     marker = root / MARKER
     try:
         saved = read_json(marker)
-        if isinstance(saved, dict) and saved.get('schemaVersion') == SCHEMA:
+        if (isinstance(saved, dict) and saved.get('schemaVersion') == SCHEMA
+                and saved.get('unifiedPolicyBackup') is True):
             return root / 'brain'
     except (FileNotFoundError, ValueError):
         pass
@@ -63,7 +64,7 @@ def prepare_data(data_dir):
     backup = None
     manifest = {}
     if files:
-        backup = root / 'backups' / ('native-0.3.0-'+str(time.time_ns())+'-'+uuid.uuid4().hex[:8])
+        backup = root / 'backups' / ('native-0.4.0-'+str(time.time_ns())+'-'+uuid.uuid4().hex[:8])
         backup.mkdir(parents=True)
         for source in files:
             relative = source.relative_to(root)
@@ -78,6 +79,6 @@ def prepare_data(data_dir):
     # Mantém o caminho do aprendizado: uma recuperação pode reabrir a versão 0.1.
     # O Game lê a pasta original sem converter ou copiar uma memória que possa ficar obsoleta.
     brain.mkdir(exist_ok=True)
-    atomic_json(marker, {'schemaVersion':SCHEMA,'backup':str(backup) if backup else None,
+    atomic_json(marker, {'schemaVersion':SCHEMA,'unifiedPolicyBackup':True,'backup':str(backup) if backup else None,
                          'files':manifest,'completedAt':time.time()})
     return brain

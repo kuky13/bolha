@@ -100,7 +100,7 @@ def test_objeto_parado_nao_repinta_sem_mudanca_mas_invalida_estado_tamanho_dpi(q
     window.sync();window.sync();assert len(calls)==1
     item.place(item._cx+50,item._cy);window.sync();assert len(calls)==2
     item.set_working(True);window.sync();assert len(calls)==3
-    window.resize(window.width()+2,window.height());window.sync();assert len(calls)==4
+    item.apply_scale(.8);window.sync();assert len(calls)==4
     monkeypatch.setattr(window,'devicePixelRatioF',lambda:1.5);window.sync();assert len(calls)==5
     item.hide();window.sync();assert len(calls)==6
     item.show();window.sync();assert len(calls)==7

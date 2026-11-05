@@ -5,6 +5,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
+import numpy as np
 from PySide6.QtCore import QObject, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QSignalSpy, QTest
@@ -40,6 +41,10 @@ class BrainStub:
         self.pos = [((i % 25)/25, (i // 25)/20) for i in range(self.N)]
         self.trace = [(i % 10)/10 for i in range(self.N)]
         self.kind = [i % 4 for i in range(self.N)]
+        self.pools = [dict(name='SENSOR_A', group='sensory', start=0, n=6, center=(.2,.3)),
+                      dict(name='MOTOR_A', group='motor', start=6, n=6, center=(.7,.7))]
+        self.W = np.zeros((self.N, self.N), dtype=float)
+        self.W[0, 6] = .2
         self.reads = 0
 
     def pool_rates(self):
@@ -58,6 +63,8 @@ class ControllerStub:
         self.startup_error = self.save_error = None
         self.saved = []
         self.resets = self.neural_requests = 0
+        self.reaction_requests = 0
+        self._reaction_status = {'message':'Reação exibida pelo controlador.'}
         self.game = SimpleNamespace(
             brain=BrainStub(), state=SimpleNamespace(emotion='feliz'),
             drives=SimpleNamespace(energy=.84, contact=.22, stimulation=.65),
@@ -66,6 +73,10 @@ class ControllerStub:
                 label='Observar com curiosidade', slots=4, episodes=12, decisions=27)),
             app_rss_mib=76.2, brain_array_mib=4.3,
         )
+        self.game.decision_snapshot = lambda: {'current':dict(action='WANDER', target='screen-edge',
+            intensity=.7, duration=1.4, source='policy', factors={'neural':{'WATCH':.4},
+            'emotion':'observando','drives':{'energy':.2}}),
+            'history':[dict(action='WATCH')]}
 
     def startup_enabled(self):
         return self.startup
@@ -95,6 +106,13 @@ class ControllerStub:
 
     def show_neural(self):
         self.neural_requests += 1
+
+    def request_reaction(self):
+        self.reaction_requests += 1
+        return True
+
+    def reaction_status(self):
+        return self._reaction_status
 
 
 @pytest.fixture(scope='session')
@@ -274,7 +292,7 @@ def test_neural_so_consulta_quando_visivel_e_nao_persa_timer_fechado(app):
     assert controller.game.brain.reads == 0 and not dialog.timer.isActive()
     dialog.show()
     assert dialog.timer.interval() == 250 and dialog.timer.isActive()
-    QTest.qWait(290)
+    QTest.qWait(540)
     assert controller.game.brain.reads >= 2
     assert len(dialog.canvas.points) == 470
     assert dialog.drives['energy'].value() == 84
@@ -304,3 +322,87 @@ def test_neural_dados_invalidos_nao_encerram_dialogo_e_aviso_copia_persiste(app)
     dialog.copy_diagnostics()
     QTest.qWait(290)
     assert 'Diagnóstico copiado' in dialog.status.text()
+
+
+def test_neural_grupos_sinapses_decisao_e_reacao_usam_estado_do_controlador(app):
+    controller = ControllerStub()
+    dialog = NeuralDialog(controller)
+    dialog.show()
+    app.processEvents()
+    assert dialog.group_filter.findData('SENSOR_A') > 0
+    assert dialog.decision.text().startswith('Agora: WANDER')
+    assert 'humor observando · sinal neural WATCH 0.40 · energia 0.20' in dialog.decision.text()
+    dialog.group_filter.setCurrentIndex(dialog.group_filter.findData('SENSOR_A'))
+    dialog.refresh()
+    assert dialog.canvas.selected_pool == 'SENSOR_A'
+    assert dialog.canvas.weights is controller.game.brain.W
+    dialog.kind_filter.setCurrentIndex(dialog.kind_filter.findData(0))
+    assert dialog.canvas.filter_kind == 0
+    dialog.request_reaction()
+    assert controller.reaction_requests == 1
+    assert dialog.reaction_status.text() == 'Reação exibida pelo controlador.'
+    controller.game.decision_snapshot = lambda: {'current':dict(action='request_refused',
+        target=None, intensity=0, duration=0, source='explicit_user_request',
+        refusal_reason='Reações desligadas', factors={}), 'history':[]}
+    dialog.refresh()
+    assert 'Motivo: Reações desligadas' in dialog.decision.text()
+
+
+def test_ajuste_de_tamanho_do_avatar_e_objetos_e_editavel_sem_alcas(app):
+    controller = ControllerStub()
+    dialog = SettingsDialog(controller)
+    assert dialog.avatar_size.minimum() == 48
+    assert not hasattr(dialog, 'resize_handles')
+    dialog.object_scales['toy'].setValue(1.3)
+    assert dialog.apply_button.isEnabled()
+    dialog.apply_button.click()
+    assert controller.store.preferences['objectScales']['toy'] == pytest.approx(1.3)
+
+
+def test_canvas_decisao_e_reacao_usa_game_e_matriz_viva_sem_fixture_neural(app, tmp_path):
+    from pathlib import Path
+    from game import Game
+
+    game = Game(tmp_path/'brain-real', Path(__file__).resolve().parents[2]/'assets'/'bolha'/'content')
+    game.configure(defaults())
+
+    class LiveController:
+        def __init__(self): self.game = game
+        def diagnostics_text(self): return 'Diagnóstico local.'
+        def request_reaction(self):
+            game.interact({'type':'reaction-now'})
+            return game.intelligence.current_decision['action'] != 'request_refused'
+        def reaction_status(self): return {}
+
+    controller = LiveController()
+    dialog = NeuralDialog(controller)
+    dialog.show()
+    app.processEvents()
+    assert len(dialog.canvas.points) == game.brain.N == 470
+    assert len(dialog.canvas.pools) == len(game.brain.pools)
+    assert all(len(pool) == 7 for pool in dialog.canvas.pools)
+    next(pool for pool in game.brain.pools if pool['name'] == 'MOTION')
+    dialog.group_filter.setCurrentIndex(dialog.group_filter.findData('MOTION'))
+    dialog.refresh()
+    assert dialog.canvas.selected_pool == 'MOTION'
+    assert dialog.canvas.weights is game.brain.W
+    assert dialog.canvas.edges
+    dialog.request_reaction()
+    snapshot = game.decision_snapshot()
+    assert snapshot['current']['source'] == 'explicit_user_request'
+    assert snapshot['history'][-1]['action'] == snapshot['current']['action']
+    dialog.refresh()
+    assert 'pedido manual' in dialog.decision.text()
+    dialog.close()
+
+
+def test_painel_mostra_ultima_decisao_sem_fingir_que_esta_ativa(app):
+    controller=ControllerStub()
+    controller.game.panel=True
+    controller.game.decision_snapshot=lambda: {'current':None,'history':[
+        dict(action='explore',target=400,intensity=.3,duration=15,source='lif+episodic_policy',factors={'drives':{'energy':.8}})]}
+    dialog=NeuralDialog(controller)
+    dialog.show();dialog.refresh()
+    assert 'Última decisão registrada: explorar' in dialog.decision.text()
+    assert 'Agora: explorar' not in dialog.decision.text()
+    dialog.close()

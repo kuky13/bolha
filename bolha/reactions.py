@@ -328,7 +328,9 @@ class InMemoryMedia:
         self.animated = False
         self.frame_count = 1
         self.dimensions = (0, 0)
+        self._bound = 0
         bound = max(64, min(320, int(target_size)))
+        self._bound = bound
         if kind == 'gif':
             movie = QMovie(self.buffer, b'gif')
             movie.setCacheMode(QMovie.CacheNone)
@@ -393,6 +395,22 @@ class InMemoryMedia:
         if self.movie is not None:
             self.movie.setPaused(bool(paused))
 
+    def set_target_size(self, target_size):
+        """Redimensiona mídia em memória ao mudar escala, sem buscar novamente."""
+        bound=max(64,min(320,int(target_size)))
+        if bound==self._bound:return
+        self._bound=bound
+        width,height=self.dimensions
+        if self.movie is not None and width and height:
+            scale=min(1.,bound/max(width,height))
+            self.movie.setScaledSize(QSize(max(1,round(width*scale)),max(1,round(height*scale))))
+        elif self.image is not None and not self.image.isNull():
+            scale=min(1.,bound/max(width,height,1))
+            if scale<1.:
+                self.image=self.image.scaled(QSize(max(1,round(width*scale)),max(1,round(height*scale))),
+                                             Qt.AspectRatioMode.KeepAspectRatio,
+                                             Qt.TransformationMode.SmoothTransformation)
+
     def release(self):
         if getattr(self, 'movie', None) is not None:
             try:
@@ -424,8 +442,8 @@ def fetch_reaction_payload(intent, kind='meme', transport=None, recent_urls=(), 
     transport = transport or ReactionTransport()
     intent_key, keywords, categories = map_intent(intent, kind)
     keyword_list = [w for w in keywords if w in SAFE_KEYWORDS] or ['happy']
+    # Prioriza o termo primário do mapeamento; mantém a busca curta e repetível.
     ordered_keywords = list(keyword_list)
-    random.shuffle(ordered_keywords)
 
     # 1. ReactionGIFs (busca pública WordPress REST API)
     for keyword in ordered_keywords[:2]:

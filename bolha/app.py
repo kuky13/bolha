@@ -76,7 +76,7 @@ class NativeApp:
         def measured_think(*args):
             start=time.perf_counter();original_think(*args);self.think_times.append((time.perf_counter()-start)*1000);self.first_think=True
         self.game.think=measured_think
-        self.pet=PetWindow(self.game);self.scene=NativeScene(self.game)
+        self.pet=PetWindow(self.game);self.scene=NativeScene(self.game,on_scale_change=self.adjust_object_scale)
         qapp.applicationStateChanged.connect(self._application_state_changed)
         self.pet.visual.painted.connect(self._painted)
         self.pet.menu_requested.connect(self.show_menu)
@@ -179,11 +179,32 @@ class NativeApp:
         if hasattr(self,'tray'):self.tray.showMessage('Bolha',message,QSystemTrayIcon.Warning,7000)
     def interact(self,kind,**kwargs):
         self.game.interact(dict(type=kind,**kwargs));self.pet.sync();self.scene.sync()
+    def request_reaction(self):
+        before=set(self.game.objects)
+        self.interact('reaction-now')
+        if not (set(self.game.objects)-before):
+            if not self.store.preferences.get('onlineReactions',True):reason='Ative as reações online nas configurações.'
+            elif not self.store.preferences.get('mischiefEnabled',True):reason='Ative as travessuras nas configurações.'
+            elif not self.game.visible():reason='Mostre a Bolha e saia do modo de emergência para tentar.'
+            elif self.game.body.held:reason='Solte a Bolha antes de pedir uma reação.'
+            elif self.game.sleep.asleep:reason='Acorde a Bolha antes de pedir uma reação.'
+            else:reason='Não foi possível iniciar: libere um objeto da tela e tente novamente.'
+            self.scene._status('request','canceled',reason)
+        return self.reaction_status()
+    def reaction_status(self):
+        return dict(self.scene.reaction_status)
+    def adjust_object_scale(self,kind,factor=None,reset=False):
+        from .preferences import DEFAULTS
+        if kind not in DEFAULTS['objectScales']:raise ValueError('Tipo de objeto inválido.')
+        scales=dict(self.store.preferences['objectScales'])
+        scales[kind]=1. if reset else factor
+        return self.save_preferences({'objectScales':scales})
     def make_menu(self):
         menu=QMenu()
-        for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Brinquedo','ball'),('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work'),('Uma travessura','mischief'),('Cantinho / perdão','corner'),('Sossega um pouquinho','quiet')):
+        for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Acordar','wake'),('Mostrar / guardar brinquedo','ball'),('Vamos brincar','play'),('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work'),('Comemorar','celebrate'),('Uma travessura','mischief'),('Cantinho / perdão','corner'),('Sossega um pouquinho','quiet')):
             action=menu.addAction(label);action.triggered.connect(lambda checked=False,k=kind:self.interact(k))
         menu.addSeparator()
+        action=menu.addAction('Mostrar uma reação agora');action.triggered.connect(lambda:self.request_reaction())
         action=menu.addAction('Configurações…');action.triggered.connect(self.show_settings)
         action=menu.addAction('Cérebro e emoções…');action.triggered.connect(self.show_neural)
         action=menu.addAction('Mostrar / esconder');action.triggered.connect(lambda:self.interact('hide',value=not self.game.hidden))
@@ -279,7 +300,7 @@ class NativeApp:
                     frameCount=len(self.frame_times),thinkCount=len(self.think_times),uptimeSeconds=round(time.monotonic()-self.started,2),errors=list(self.errors))
     def diagnostics_text(self):
         metrics=self.metrics()
-        return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Avisos: '+'; '.join(self.errors),'Log local (trecho):',local_log_excerpt(self.data_dir)))
+        return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Reações online: '+json.dumps(self.reaction_status(),ensure_ascii=False),'Avisos: '+'; '.join(self.errors),'Log local (trecho):',local_log_excerpt(self.data_dir)))
     def quit(self):
         if self.quitting:return
         self.quitting=True
