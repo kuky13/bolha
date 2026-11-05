@@ -420,7 +420,8 @@ class Game:
             if self.intelligence.enabled: self.intelligence.feedback(.8, now)
             self.state.mark_caress(now); self.drives.touched('caress'); self.memory.on_interaction()
             if self.release_reaction.get('until',0)>now:
-                self.release_reaction['until']=now+(self.release_reaction['until']-now)*.35
+                shortened=now+(self.release_reaction['until']-now)*.35
+                self.release_reaction['until']=max(shortened,self.release_reaction.get('arrives',now))
                 self.release_reaction['intensity']*=.5
         elif kind == 'quiet':
             self.intelligence.feedback(-.8, now)
@@ -516,7 +517,7 @@ class Game:
             return None
         if not self.visible():
             return 'Mostre a Bolha para começar uma partida.'
-        if self.pop_started is not None:
+        if self.pop_started is not None or now<self.release_reaction.get('arrives',0.):
             return 'A Bolha ainda está voltando. Tente daqui a pouco.'
         if not self.prefs.get('senseCursor',True):
             return 'Ative a leitura do cursor nas configurações para usar a raquete.'
@@ -674,7 +675,7 @@ class Game:
         shy = min(1.,max(.4,.58+.27*tone.get('SAD',0.)+.2*anticipation-.16*tone.get('SETTLE',0.)))
         inward = 1. if body.x<(left+right)/2. else -1.
         self.release_reaction = dict(kind='pop_return',started=now,until=now+3.+3.*shy,
-                                     intensity=shy,inward=inward)
+                                     intensity=shy,inward=inward,arrives=now+1.3+.3*shy)
         self.state.emotion = self.behavior.emotion = 'timido'
         self.senses.kick('NOVELTY',.32)
 

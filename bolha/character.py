@@ -373,22 +373,12 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
                         angle=0.0, squash=0.0, effect_angle=0.0):
     """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
-    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida', 'pop', 'pop_return'): return
+    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida', 'pop'): return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
     if kind == 'pop':
         _draw_pop_marks(painter, phase, strength)
-    elif kind == 'pop_return':
-        progress = _clamp(phase / .72,0.,1.)
-        fade = (1.-progress) * strength
-        # Halo tímido e pequeno brilho indicam a remontagem do rostinho.
-        painter.setBrush(Qt.NoBrush)
-        painter.setPen(_pen('#d9a8ff',2.2,fade*.62))
-        painter.drawEllipse(QPointF(0,0),42+10*progress,42+10*progress)
-        for x,y in ((-36,-28),(38,-22)):
-            painter.setPen(Qt.NoPen);painter.setBrush(_color('#fff0bd',fade))
-            painter.drawEllipse(QPointF(x,y),2.2,2.2)
     elif kind == 'carinho':
         for index in range(3):
             progress = (phase / 1.8 + index / 3) % 1

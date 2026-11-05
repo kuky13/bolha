@@ -125,14 +125,9 @@ def animation_pose(mode, seconds, strength=1.):
                     body_opacity=1.-dissolve,visual_scale=1.-.08*squeeze+.15*swell,
                     effect='pop',effect_phase=max(0.,rupture),effect_strength=float(rupture>=0.))
     elif mode == 'pop_return':
-        peek = _ease(t/.52)
-        pose.update(emotion='timido', eye_open=.52+.48*peek-.14*strength,
-                    blink=max(0.,1.-_ease((t-.34)/.13)),
-                    ear_raise=-2.2*(1.-peek)-1.5*strength,
-                    ear_tilt=7.*math.sin(t*15)*(1.-peek),
-                    squash=.08*math.sin(t*10)*math.exp(-t*2),
-                    body_opacity=_ease(t/.26),visual_scale=.62+.38*peek,
-                    effect='pop_return', effect_strength=(1.-_ease(t/.72))*strength)
+        pose.update(emotion='timido',eye_open=.98-.11*strength,
+                    blink=math.exp(-((t-.73)/.095)**2),
+                    ear_raise=-2.*strength,ear_tilt=5.*strength)
     elif mode in LANDING_POSES:
         settle = math.exp(-t*5.2)
         bounce = math.cos(t*20.)*settle
@@ -264,6 +259,8 @@ class ExpressionMotion:
         if state.dizzy(now) or abs(body.omega) > 450:self.dizzy_until = now + .8
         mode = state.emotion;strength = 1.;elapsed = None
         reaction = getattr(game, 'release_reaction', None) or {}
+        returning = reaction.get('kind')=='pop_return'
+        arriving = returning and now<reaction['arrives']
         landing_reaction = getattr(game, 'landing_reaction', None) or {}
         play_reaction = getattr(game, 'play_reaction', None) or {}
         pop_age = game.pop_effect_age(now)
@@ -273,9 +270,11 @@ class ExpressionMotion:
             mode = 'held';elapsed = now - self.held_since
             # A irritação neural acelera o gesto; o relógio só interpola seus quadros.
             strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
+        elif arriving:
+            mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since
         elif state.feliz_fechado(now):mode = 'caress';strength = .5 + .5 * tones['CHEER']
-        elif reaction.get('kind')=='pop_return' and now<reaction['until']:
+        elif returning and now<reaction['until']:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif now < landing_reaction.get('until',0):
             mode=landing_reaction['kind'];elapsed=now-landing_reaction['started'];strength=_unit(landing_reaction['intensity'])
@@ -312,8 +311,17 @@ class ExpressionMotion:
         if mode == 'deitada':
             self.pose['gaze'] = tuple(.65*component for component in state.gaze)
         if mode == 'pop_return':
-            glance = .6+.28*math.sin(elapsed*4.)*math.exp(-elapsed*.65)
-            self.pose['gaze'] = (reaction.get('inward',1.)*glance,.22*strength)
+            inward = reaction['inward']
+            glance = .47+.22*math.sin(elapsed*5.)*math.exp(-elapsed)
+            self.pose['gaze'] = (inward*glance,.13*strength)
+            if arriving:
+                phase = _unit(elapsed/(reaction['arrives']-reaction['started']))
+                peek = _ease(phase/.23)
+                retreat = _ease((phase-.40)/.13)
+                emerge = _ease((phase-.56)/.44)
+                depth = -1.21+.99*peek-(.12+.12*strength)*retreat
+                self.pose['corner_peek'] = (inward,depth,emerge)
+                self.pose['angle_offset'] = inward*10.*peek*(1.-emerge)
         if mode == 'pingpong_rebatida':
             heading = play_reaction.get('heading',0.)
             follow = math.sin(math.pi*_unit(elapsed/.42))

@@ -89,9 +89,11 @@ def test_pop_dissolve_retorno_timido_e_pousos_sao_visuais(tmp_path):
     assert dissolve['effect']=='pop' and 0.<dissolve['body_opacity']<1.
     assert gone['body_opacity'] < .002
     game.pop_started=None
-    game.release_reaction=dict(kind='pop_return',started=100.62,until=101.4,intensity=.7)
+    game.release_reaction=dict(kind='pop_return',started=100.62,arrives=102.1,
+                               until=105.,intensity=.7,inward=1.)
     peek=motion.update(game,100.8)
-    assert peek['emotion']=='timido' and peek['effect']=='pop_return'
+    assert peek['emotion']=='timido' and peek['corner_peek'][0]==1.
+    assert peek['body_opacity']==1. and peek['visual_scale']==1.
     for kind in ('pouso_em_pe','pouso_de_lado','pouso_invertido'):
         game.release_reaction={}
         game.landing_reaction=dict(kind=kind,started=101.,until=101.8,intensity=.8,angle=-1.)
@@ -118,6 +120,45 @@ def test_queda_de_lado_espelha_a_inclinacao_e_transita_para_repouso(tmp_path):
         assert resting['eye_open']<contact['eye_open']
         assert motion.update(game,102.1)['squash']<resting['squash']
     assert game.body.angle==90.
+
+
+@pytest.mark.parametrize('inward',[1.,-1.])
+def test_espiada_recorta_a_borda_e_libera_o_mouse_ao_sair(qt_application,tmp_path,monkeypatch,inward):
+    import numpy as np
+    from PySide6.QtGui import QImage
+    from bolha.pet import PetWindow
+
+    clock=[100.]
+    monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=game_at_rest(tmp_path)
+    game.desktop({'areas':[
+        dict(x=x,y=0,width=900,height=700,id=i,scaleFactor=1.)
+        for i,x in enumerate((-1800,-900,0))
+    ]})
+    game.configure({'avatarSize':200})
+    game.body.x=-450.
+    game.cursor=(-450.+250.*inward,350.)
+    game._return_from_pop(clock[0])
+    arrival=game.release_reaction['arrives']
+    edge=-900 if inward>0 else 0
+    pet=PetWindow(game)
+    try:
+        clock[0]+=.30*(arrival-clock[0])
+        pet.sync()
+        image=pet.visual.grab().toImage().convertToFormat(QImage.Format_RGBA8888)
+        pixels=np.frombuffer(image.bits(),dtype=np.uint8).reshape(image.height(),image.width(),4)
+        cutoff=round((edge-pet.visual.x())*image.devicePixelRatio())
+        hidden,visible=(pixels[:,:cutoff],pixels[:,cutoff:]) if inward>0 else (pixels[:,cutoff:],pixels[:,:cutoff])
+        assert hidden.size and not hidden[:,:,3].any()
+        assert visible[:,:,3].max()==255 and not pet.isVisible()
+        assert game.start_pingpong(clock[0])=='A Bolha ainda está voltando. Tente daqui a pouco.'
+
+        clock[0]=arrival
+        pet.sync()
+        assert pet.isVisible() and 'corner_peek' not in pet.motion.pose
+        assert pet.x()+pet.width()/2==game.body.x
+    finally:
+        pet.close()
 
 
 def test_cena_comedia_vem_da_brincadeira_real_e_nao_escolhe_politica_na_view(tmp_path):

@@ -7,7 +7,7 @@ máscara circular nativa: a região fora do corpo recebe cliques no desktop.
 import math
 import time
 from collections import deque
-from PySide6.QtCore import Qt,QRect,QPointF,QEvent,Signal
+from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent,Signal
 from PySide6.QtGui import QPainter,QColor,QRegion
 from PySide6.QtWidgets import QWidget
 from .character import draw_character,draw_sleep_marks,draw_reaction_marks
@@ -40,6 +40,13 @@ class PetVisual(QWidget):
         angle=game.body.angle+pose['angle_offset']
         squash=pose['squash']
         cx,cy=self.width()/2,self.height()/2
+        if 'corner_peek' in pose:
+            inward,depth,emerge=pose['corner_peek']
+            left,_,right,_=game.bounds()
+            edge=left if inward>0 else right
+            cx+=(edge+inward*radius*depth-game.body.x)*(1.-emerge)
+            # O recorte também esconde a Bolha quando há um monitor vizinho.
+            p.setClipRect(QRectF(left-self.x(),0.,right-left,self.height()),Qt.IntersectClip)
         floor_squash,shift=self.pet.floor_pose()
         p.translate(cx,cy+shift)
         p.scale(1.+floor_squash,1.-floor_squash)
@@ -101,8 +108,6 @@ class PetWindow(QWidget):
             clearance=max(0.,self.body.surface-self.body.y-radius)
             contact=max(0.,1.-clearance/24.)
             return squash,radius*squash*contact
-        if self.motion.mode=='pop_return' and self.body.grounded:
-            return 0.,radius*(1.-pose['visual_scale'])
         return 0.,0.
 
     def sync(self):
@@ -129,7 +134,7 @@ class PetWindow(QWidget):
             if clip<256:mask=mask.intersected(QRegion(0,0,256,clip))
             self.setMask(mask);self._mask_key=key
         visual_show=self.game.pet_visible(now)
-        input_show=self.game.pet_interactive() and self.motion.pose.get('body_opacity',1.)>.35
+        input_show=self.game.pet_interactive() and 'corner_peek' not in self.motion.pose
         if visual_show and not self.visual.isVisible():self.visual.show()
         if not visual_show:self.visual.hide()
         if input_show and not self.isVisible():self.show()
