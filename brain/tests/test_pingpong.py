@@ -126,8 +126,11 @@ def test_desligar_cursor_e_bloquear_tela_encerram_partida(tmp_path):
     assert game.pingpong is None
     game.configure({'senseCursor':True})
     game.interact({'type':'pingpong'})
+    # Simula um bloqueio recém-lido, antes da próxima consulta ao desktop.
+    now=time.monotonic()
+    game.last_native=now
     game.blocked={0}
-    game.tick(.016)
+    game.tick(.016,now)
     assert game.pingpong is None
 
 
