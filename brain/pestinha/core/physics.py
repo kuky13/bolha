@@ -108,6 +108,7 @@ class Body:
         self.platform = None      # hwnd da janela onde está pousado, ou None (chão)
         self.surface = 0.0        # y da superfície onde está apoiado
         self.impacts = []         # velocidades das batidas desde a última leitura (px/s)
+        self.landing_contact = None
         self.held = False         # sendo segurado pelo mouse
 
     def pop_impacts(self):
@@ -138,6 +139,7 @@ class Body:
         areas: áreas de todos os monitores; bordas compartilhadas viram passagens.
         monitors: geometria física das telas, usada para reconhecer vizinhança apesar da barra de tarefas.
         """
+        self.landing_contact = None
         if self.held:
             return
         left, top, right, bottom = bounds
@@ -228,6 +230,7 @@ class Body:
         """Pousa o corpo sobre uma superfície (chão ou janela): para de cair e guarda onde pousou."""
         self.y = surface - ey
         self.surface = surface
+        self.landing_contact = abs(self.vy), wrap_angle(self.angle)
         self.impacts.append(abs(self.vy))
         if self.vy > 260:
             self.vy = -self.vy * RESTITUTION

@@ -298,11 +298,42 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
                         angle=0.0, squash=0.0, effect_angle=0.0):
     """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
-    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida'): return
+    if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida', 'pop', 'pop_return'): return
     phase = _clamp(phase, -1000000000, 1000000000)
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
-    if kind == 'carinho':
+    if kind in ('pop','pop_return'):
+        progress = _clamp(phase / (.62 if kind=='pop' else .72),0.,1.)
+        fade = (1.-progress) * strength
+        if kind == 'pop':
+            # Anel de gelatina e lascas arredondadas partem do centro e desvanecem.
+            expansion = 1.-(1.-progress)**2.3
+            radius = 12.+48.*expansion
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(_pen('#d9a8ff',3.2,fade*.82))
+            painter.drawEllipse(QPointF(0,0),radius,radius)
+            painter.setPen(_pen('#fff0bd',1.4,fade))
+            painter.drawEllipse(QPointF(0,0),radius+3,radius+3)
+            for index in range(9):
+                a = index*math.tau/9 + .12*math.sin(phase*12)
+                distance = 18.+43.*expansion
+                x,y=math.cos(a)*distance,math.sin(a)*distance
+                size=2.2+1.5*math.sin(index+phase*7)**2
+                painter.setPen(_pen('#cf8dff',1.4,fade))
+                painter.setBrush(_color('#f1c6ff',fade*.8))
+                shard=QPainterPath(QPointF(x-size,y))
+                shard.quadTo(x,y-size*1.35,x+size,y)
+                shard.quadTo(x,y+size*1.35,x-size,y)
+                painter.drawPath(shard)
+        else:
+            # Halo tímido e pequeno brilho indicam a remontagem do rostinho.
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(_pen('#d9a8ff',2.2,fade*.62))
+            painter.drawEllipse(QPointF(0,0),42+10*progress,42+10*progress)
+            for x,y in ((-36,-28),(38,-22)):
+                painter.setPen(Qt.NoPen);painter.setBrush(_color('#fff0bd',fade))
+                painter.drawEllipse(QPointF(x,y),2.2,2.2)
+    elif kind == 'carinho':
         for index in range(3):
             progress = (phase / 1.8 + index / 3) % 1
             opacity = min(1, progress / .2, (1-progress) / .3) * strength

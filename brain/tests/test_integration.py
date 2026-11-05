@@ -82,13 +82,92 @@ def test_monitor_neural_somente_quando_solicitado(tmp_path,monkeypatch):
     game.interact({'type':'monitor','value':False})
     assert 'neural' not in game.snapshot()
 
-def test_arremessos_repetidos_nao_escondem_a_bolha(tmp_path):
+def test_arremessos_repetidos_com_estouro_desligado(tmp_path):
     game=Game(tmp_path,CONTENT)
+    game.configure({'popEnabled': False})
     for _ in range(30):
         game.interact(dict(type='drag-start',x=500,y=300))
         game.interact(dict(type='drag-end',x=500,y=300,vx=1800,vy=-1500))
-        assert game.visible()
+        assert game.pet_visible() and game.pet_interactive()
     assert not hasattr(game,'media')
+
+def throw_pet(game, vx=900., **options):
+    game.interact(dict(type='drag-start', x=500, y=300))
+    game.interact(dict(type='drag-end', x=500, y=300, vx=vx, **options))
+
+def test_estouro_retorno_e_carinho_alimentam_o_cerebro(tmp_path,monkeypatch):
+    clock=[100.]
+    monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=Game(tmp_path,CONTENT)
+    game.configure({'senseApp':False, 'senseIdle':False, 'senseCursor':False, 'senseWindows':False})
+    for _ in range(11):
+        throw_pet(game)
+        assert game.pet_interactive()
+        clock[0]+=1.
+
+    throw_pet(game)
+    assert game.pet_visible() and not game.pet_interactive()
+    assert game.senses.pulse['IMPACT']>0.
+    assert game.pop_return_at-clock[0]==30.
+    assert game.body.vx==game.body.vy==0.
+    before=game.brain.time_ms
+    clock[0]+=.7
+    game.tick(.016)
+    assert game.visible() and not game.pet_visible()
+    assert game.brain.time_ms>before
+
+    game.desktop({'areas':[dict(x=-1000,y=-100,width=1000,height=700,id=2,scaleFactor=1.5)]})
+    clock[0]=game.pop_return_at-.02
+    game.tick(.016)
+    assert not game.pet_visible()
+    clock[0]=game.pop_return_at
+    game.tick(.016)
+    assert game.pet_visible() and game.pet_interactive()
+    left,_,right,bottom=game.bounds()
+    assert min(game.body.x-left,right-game.body.x)==game.body.half_w+16.
+    assert game.body.y+game.body.half_h==bottom
+    assert game.release_reaction['kind']=='pop_return'
+    assert game.state.emotion=='timido'
+    end=game.release_reaction['until']
+    game.interact({'type':'caress'})
+    assert game.release_reaction['until']<end
+
+def test_estouro_conta_so_arremessos_fortes_da_bolha_no_ultimo_minuto(tmp_path,monkeypatch):
+    clock=[100.]
+    monkeypatch.setattr(time,'monotonic',lambda:clock[0])
+    game=Game(tmp_path,CONTENT)
+    game.configure({'popThrowLimit':5})
+    for _ in range(4):
+        throw_pet(game)
+    clock[0]+=60.01
+    for _ in range(4):
+        throw_pet(game)
+    throw_pet(game, vx=100.)
+    throw_pet(game, cancelled=True)
+    game.interact(dict(type='drag-end', x=500, y=300, vx=900.))
+    game.interact(dict(type='drag-start', x=500, y=300, id=game.ball.id))
+    game.interact(dict(type='drag-end', x=500, y=300, vx=900., id=game.ball.id))
+    assert game.pet_interactive()
+    throw_pet(game)
+    assert not game.pet_interactive()
+
+@pytest.mark.parametrize(('angle','kind'), [
+    (0, 'pouso_em_pe'), (90, 'pouso_de_lado'), (-90, 'pouso_de_lado'),
+    (180, 'pouso_invertido'),
+])
+def test_pouso_usa_a_orientacao_no_contato_com_o_chao(tmp_path,angle,kind):
+    game=Game(tmp_path,CONTENT)
+    game.configure({'senseApp':False, 'senseIdle':False, 'senseCursor':False, 'senseWindows':False,
+                    'roaming':False, 'mischiefEnabled':False})
+    left,_,right,bottom=game.bounds()
+    game.body.x=(left+right)/2.
+    game.body.y=bottom-game.body.half_h-3.
+    game.body.angle=angle
+    game.body.grounded=False
+    game.body.vy=450.
+    game.tick(.016,time.monotonic())
+    assert game.landing_reaction['kind']==kind
+    assert game.body.vy<0.
 
 def test_cerebro_original_aprende_salva_e_reabre(tmp_path,monkeypatch):
     clock=[100.]

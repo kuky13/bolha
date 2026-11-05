@@ -76,6 +76,27 @@ def test_reacao_de_soltura_vem_do_cerebro_e_carinho_tem_prioridade(tmp_path):
     assert motion.mode == game.state.emotion
 
 
+def test_pop_dissolve_retorno_timido_e_pousos_sao_visuais(tmp_path):
+    game=game_at_rest(tmp_path);motion=ExpressionMotion(100.)
+    body_before=vars(game.body).copy()
+    game.pop_started=100.
+    dissolve=motion.update(game,100.3)
+    gone=motion.update(game,100.61)
+    assert dissolve['effect']=='pop' and dissolve['body_opacity']<1.
+    assert gone['body_opacity'] < .002
+    game.pop_started=None
+    game.release_reaction=dict(kind='pop_return',started=100.62,until=101.4,intensity=.7)
+    peek=motion.update(game,100.8)
+    assert peek['emotion']=='timido' and peek['effect']=='pop_return'
+    for kind in ('pouso_em_pe','pouso_de_lado','pouso_invertido'):
+        game.release_reaction={}
+        game.landing_reaction=dict(kind=kind,started=101.,until=101.8,intensity=.8,angle=-1.)
+        pose=motion.update(game,101.12)
+        assert pose['emotion'] in ('assustado','atento','tonto')
+        assert pose['squash'] != 0
+    assert vars(game.body)==body_before
+
+
 def test_cena_comedia_vem_da_brincadeira_real_e_nao_escolhe_politica_na_view(tmp_path):
     game = game_at_rest(tmp_path);motion = ExpressionMotion(100)
     game.play_reaction = dict(kind='bote_erro', started=100, until=102, intensity=.9)

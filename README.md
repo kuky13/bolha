@@ -95,6 +95,11 @@ rebater, direto no desktop. O gesto muda o ângulo da devolução. A partida
 pausa fora da área útil do monitor em que começou e termina quando alguém
 marca cinco pontos. Escolha **Encerrar pingue-pongue** para voltar ao passeio.
 
+A candidata também tem pousos animados em pé, de lado e de ponta-cabeça.
+Após 12 arremessos fortes em um minuto, a Bolha estoura e volta tímida por um
+canto da tela 30 segundos depois. Carinho ajuda a recuperar a confiança mais
+rápido. O limite e a opção de desligar o estouro ficam em **Comportamento**.
+
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
 

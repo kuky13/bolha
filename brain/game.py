@@ -3,6 +3,7 @@
 import math
 import random
 import time
+from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -34,6 +35,10 @@ from pestinha.scene import object_scale
 from geometry import fullscreen_monitors
 from intelligence import Intelligence
 from pingpong import PingPong
+
+POP_EFFECT_SECONDS = .62
+POP_RETURN_SECONDS = 30.
+THROW_WINDOW_SECONDS = 60.
 
 
 class Game:
@@ -134,6 +139,10 @@ class Game:
         self.native_error = None
         self.quiet_until = 0.
         self.landing = 0.
+        self.landing_reaction = {}
+        self.strong_throws = deque()
+        self.pop_started = None
+        self.pop_return_at = 0.
         self.last_monitor_snapshot = -1.
         self.intelligence = Intelligence(self.memory, self.pet_paths.base / 'habits.json')
         self.behavior.policy = self.intelligence
@@ -170,6 +179,20 @@ class Game:
     def visible(self):
         return not self.hidden and not self.panicked and bool(self.available_areas())
 
+    def pop_effect_age(self, now):
+        if self.pop_started is not None:
+            age = now-self.pop_started
+            if 0 <= age < POP_EFFECT_SECONDS:
+                return age
+        return None
+
+    def pet_visible(self, now=None):
+        now = time.monotonic() if now is None else now
+        return self.visible() and (self.pop_started is None or self.pop_effect_age(now) is not None)
+
+    def pet_interactive(self):
+        return self.visible() and self.pop_started is None
+
     def configure(self, prefs):
         if self.pingpong is not None and any(
             key in prefs and prefs[key] != self.prefs.get(key)
@@ -177,6 +200,10 @@ class Game:
         ):
             self.stop_pingpong()
         self.prefs.update(prefs)
+        if not self.prefs.get('popEnabled',True):
+            self.strong_throws.clear()
+            if self.pop_started is not None:
+                self.pop_return_at = min(self.pop_return_at,time.monotonic())
         if not self.prefs.get('senseCursor', True):
             self._reset_cursor_motion()
         if self.prefs.get('toyAppearance','peanut') in ('peanut','ball'):
@@ -336,11 +363,20 @@ class Game:
             self._release_hold(now,event.get('cancelled',False) or self.panicked or self.hidden)
             return
         if self.panicked or self.hidden: return
+        if self.pop_started is not None and (
+            kind in ('hold-start','poke','spin','caress','sleep','wake','work','play','celebrate','corner')
+            or kind in ('drag-start','drag','drag-end') and event.get('id') is None
+        ):
+            return
         self.last_input = now
         if kind == 'hold-start':
             self._start_hold(now)
         elif kind in ('drag-start', 'drag', 'drag-end'):
-            target = self.objects.get(str(event.get('id'))) if event.get('id') else None
+            item_id = event.get('id')
+            target = self.objects.get(str(item_id)) if item_id is not None else None
+            if item_id is not None and target is None:
+                return
+            pet_was_held = target is None and self.held_since is not None
             body = target.body if target and hasattr(target, 'body') else self.body
             if target and not hasattr(target, 'body'):
                 self.scene_dragging = kind != 'drag-end'
@@ -375,6 +411,8 @@ class Game:
                         self.senses.thrown(min(1.,speed/2000.))
                         self.drives.stimulate('throw');self.drives.touched('throw')
                         self.in_flight=True
+                        if pet_was_held:
+                            self._record_strong_throw(now)
         elif kind == 'poke':
             self.senses.poke(); self.drives.touched('poke'); self.drives.stimulate('poke'); self.memory.on_interaction(); self.conditioning.outcome(now)
             if self.sleep.asleep: self.sleep.wake(True)
@@ -478,6 +516,8 @@ class Game:
             return None
         if not self.visible():
             return 'Mostre a Bolha para começar uma partida.'
+        if self.pop_started is not None:
+            return 'A Bolha ainda está voltando. Tente daqui a pouco.'
         if not self.prefs.get('senseCursor',True):
             return 'Ative a leitura do cursor nas configurações para usar a raquete.'
         if self.sleep.asleep or self.drives.energy <= .16:
@@ -589,6 +629,70 @@ class Game:
                 item.body.vx=item.body.vy=item.body.omega=0.
                 item.body.grounded=False;item.body.platform=None
 
+    def _record_strong_throw(self, now):
+        """Só solturas fortes da personagem entram na janela móvel de um minuto."""
+        if not self.prefs.get('popEnabled',True):
+            return
+        while self.strong_throws and now-self.strong_throws[0] >= THROW_WINDOW_SECONDS:
+            self.strong_throws.popleft()
+        self.strong_throws.append(now)
+        if len(self.strong_throws) < self.prefs.get('popThrowLimit',12):
+            return
+        self.strong_throws.clear()
+        self.pop_started = now
+        self.pop_return_at = now+POP_RETURN_SECONDS
+        self.body.vx = self.body.vy = self.body.omega = 0.
+        self.body.grounded = False
+        self.in_flight = False
+        self.landing = 0.
+        self.landing_reaction = {}
+        self.release_reaction = {}
+        self.play_reaction = {}
+        self.play.stop_chase()
+        self.behavior.drop_carried()
+        self.behavior.adaptive_goal = None
+        self.intelligence.clear_goal()
+        if self.sleep.asleep:
+            self.sleep.wake(startled=False)
+        self.senses.impact(.85)
+
+    def _return_from_pop(self, now):
+        left,top,right,bottom = self.bounds()
+        body = self.body
+        inset = min((right-left)/2.,body.half_w+16.)
+        anchor = self.cursor[0] if self.prefs.get('senseCursor',True) else body.x
+        body.x = left+inset if anchor>(left+right)/2. else right-inset
+        body.y = max(top+body.half_h,bottom-body.half_h)
+        body.angle = 0.
+        body.grounded = True
+        body.surface = bottom
+        body.platform = None
+        self.pop_started = None
+        self.pop_return_at = 0.
+        anticipation = self.conditioning.V.get('PRESS',0.)
+        tone = self.state.tone.r
+        shy = min(1.,max(.4,.58+.27*tone.get('SAD',0.)+.2*anticipation-.16*tone.get('SETTLE',0.)))
+        inward = 1. if body.x<(left+right)/2. else -1.
+        self.release_reaction = dict(kind='pop_return',started=now,until=now+3.+3.*shy,
+                                     intensity=shy,inward=inward)
+        self.state.emotion = self.behavior.emotion = 'timido'
+        self.senses.kick('NOVELTY',.32)
+
+    def _track_landing(self, now):
+        if self.body.landing_contact is None:
+            return
+        speed,angle = self.body.landing_contact
+        if speed < 125.:
+            return
+        orientation = abs(angle)
+        kind = ('pouso_em_pe' if orientation<45. else
+                'pouso_de_lado' if orientation<135. else 'pouso_invertido')
+        self.landing_reaction = dict(kind=kind,started=now,until=now+.62,
+                                     intensity=max(.3,min(1.,speed/1050.)),angle=angle)
+
+    def _shy_returning(self, now):
+        return self.release_reaction.get('kind')=='pop_return' and now<self.release_reaction['until']
+
     def _release_hold(self,now,cancelled=False):
         started=self.held_since
         if self.body.held or started is not None:
@@ -669,7 +773,8 @@ class Game:
     def _notice_toy_move(self, now):
         if (not self.prefs.get('roaming',True) or not self.visible() or self.panel
                 or self.ball_stored or not self.ball.isVisible() or self.sleep.asleep
-                or self.body.held or self.castigo.dentro or now < self.quiet_until):
+                or self.body.held or self.castigo.dentro or now < self.quiet_until
+                or self.pop_started is not None or self._shy_returning(now)):
             return
         reaction = self.play.notice_toy_move(now, self.body, self.ball)
         if reaction == 'taken':
@@ -835,7 +940,7 @@ class Game:
         self.inputs = inputs
         self.rates = self.brain.motor_activity()
         self.state.tone.update(self.rates,dt)
-        if self.pingpong is not None:
+        if self.pingpong is not None or self.pop_started is not None or self._shy_returning(now):
             return
         self.sleep.rates = self.rates
         for protest in (self.protest, self.sad):
@@ -884,6 +989,19 @@ class Game:
             self.memory.deslocar(elapsed)
             self.intelligence.until += elapsed
             self.paused_at = None; self.last_think = now
+        if self.pop_started is not None:
+            if now >= self.pop_return_at:
+                self._return_from_pop(now)
+            else:
+                if now-self.last_think >= .1:
+                    self.think(min(.1,now-self.last_think),now)
+                    self.last_think = now
+                if not self.ball_stored:
+                    self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),
+                                   self.available_areas(),
+                                   [monitor for i,monitor in enumerate(self.monitors) if i not in self.blocked],
+                                   [display for i,display in enumerate(self.displays) if i not in self.blocked])
+                return
         if self.pingpong is not None:
             if self.pingpong.area in self.available_areas():
                 self._tick_pingpong(dt,now)
@@ -903,7 +1021,8 @@ class Game:
         platforms = getattr(self,'platforms',[]) if self.prefs.get('senseWindows',True) else []
         self.castigo.act(now,self.body,area,self.cursor if self.prefs.get('senseCursor',True) else (1e9,1e9),self.state,self.rates,self.sleep.asleep)
         manual_play = self.play.requested_action is not None
-        resting = (self.hover or self.panel or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
+        shy_return = self._shy_returning(now)
+        resting = (self.hover or self.panel or shy_return or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
         self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
                            self.prefs.get('senseCursor',True))
         if manual_play:
@@ -911,6 +1030,7 @@ class Game:
             self.play.requested_action = None
         self._play_expression(now)
         self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
+        self._track_landing(now)
         if self.body.grounded:self.in_flight=False
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
@@ -928,12 +1048,12 @@ class Game:
         self.mischief.energy = self.drives.energy
         self.mischief.contact = self.drives.contact
         perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
-        if not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
+        if not shy_return and not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.rates = self.rates
         self.festa.energy = self.drives.energy
         self.festa.contact = self.drives.contact
-        self.festa.tick(now,self.rates,self.state.emotion,self.body,self.visible() and not self.sleep.asleep,dt)
+        self.festa.tick(now,self.rates,self.state.emotion,self.body,not shy_return and self.visible() and not self.sleep.asleep,dt)
         self.revolucao.rates = self.rates
         self.revolucao.energy = self.drives.energy
         self.revolucao.contact = self.drives.contact
