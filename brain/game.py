@@ -534,8 +534,8 @@ class Game:
     def pingpong_paused(self):
         if self.pingpong is None or self.pingpong.finished:
             return False
-        left,top,right,bottom = self.pingpong.court
-        return self.panel or not (left<=self.cursor[0]<=right and top<=self.cursor[1]<=bottom)
+        left,top,right,bottom = self.pingpong.area
+        return self.panel or not (left<=self.cursor[0]<right and top<=self.cursor[1]<bottom)
 
     def _place_pingpong_actors(self):
         match = self.pingpong
@@ -552,7 +552,10 @@ class Game:
 
     def _tick_pingpong(self, dt, now):
         match = self.pingpong
-        if self.pingpong_paused() or match.finished:
+        if self.pingpong_paused():
+            match.clear_pointer()
+            return
+        if match.finished:
             return
         if now-self.last_think >= .1:
             self.think(min(.1,now-self.last_think),now)

@@ -8,7 +8,7 @@ from bolha.pingpong_view import PingPongView
 from game import Game
 
 
-def test_menu_inicia_e_fecha_quadra_transparente(qt_application,tmp_path):
+def test_menu_inicia_e_fecha_placar_transparente(qt_application,tmp_path):
     game = Game(tmp_path, Path(__file__).resolve().parents[2]/'assets/bolha/content')
     game.desktop({'areas':[dict(x=-1000,y=-50,width=1000,height=620)]})
     view = PingPongView()
@@ -22,9 +22,7 @@ def test_menu_inicia_e_fecha_quadra_transparente(qt_application,tmp_path):
     try:
         app.pingpong_action.trigger()
         assert game.pingpong is not None and view.isVisible()
-        left,top,right,bottom=game.pingpong.court
-        assert -1000 <= view.x() < left and -50 <= view.y() < top
-        assert right < view.x()+view.width() <= 0 and bottom < view.y()+view.height() <= 570
+        assert view.geometry().getRect()==(-680,-38,360,64)
         assert view.windowFlags() & Qt.WindowTransparentForInput
         assert view.testAttribute(Qt.WA_ShowWithoutActivating)
         assert not view.grab().isNull()

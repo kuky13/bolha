@@ -90,11 +90,10 @@ alcance repetidamente, ela fica brava. O brinquedo para de rolar quando repousa,
 e as reações online surgem em cantos variados da área útil das telas.
 
 Na candidata 0.4.2, escolha **Jogar pingue-pongue** no menu da Bolha ou da
-bandeja. Com a leitura do cursor ativa, mova o mouse para cima e para baixo
-dentro da quadra para controlar a raquete da direita. Bater com a ponta da
-raquete muda o ângulo da devolução. A partida pausa quando o ponteiro sai
-da quadra e termina quando alguém marca cinco pontos. Escolha **Encerrar
-pingue-pongue** para voltar ao passeio.
+bandeja. Com a leitura do cursor ativa, passe o ponteiro pelo brinquedo para
+rebater, direto no desktop. O gesto muda o ângulo da devolução. A partida
+pausa fora da área útil do monitor em que começou e termina quando alguém
+marca cinco pontos. Escolha **Encerrar pingue-pongue** para voltar ao passeio.
 
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.

@@ -6,17 +6,7 @@ import math
 
 
 class PingPong:
-    """Single-player rally model in desktop coordinates.
-
-    ``area`` is the usable monitor rectangle ``(left, top, right, bottom)``.
-    The ball is modeled as a circle; paddles are vertical segments with a small
-    fixed width. ``cursor`` may be an ``(x, y)`` pair or a y coordinate.
-    """
-    HUD_TOP = 75.0
-    HUD_BOTTOM = 40.0
-    MIN_COURT_WIDTH = 220.0
-    MIN_COURT_HEIGHT = 170.0
-    PADDLE_WIDTH = 12.0
+    """A área útil da tela é a mesa, e o ponteiro rebate pelo contato."""
 
     def __init__(self, area, pet_radius, toy_radius):
         if len(area) != 4:
@@ -25,21 +15,15 @@ class PingPong:
         left, top, right, bottom = self.area
         self.pet_radius = max(1.0, float(pet_radius))
         self.toy_radius = max(2.0, float(toy_radius))
-        # Keep the playfield useful for unusually large avatar artwork.
-        margin = max(18.0, self.pet_radius + 10.0)
-        inset_x = max(margin, (right-left-1080.)/2)
-        inset_y = max(0., (bottom-top-self.HUD_TOP-self.HUD_BOTTOM-600.)/2)
-        self.court = (left + inset_x, top + self.HUD_TOP + inset_y,
-                      right - inset_x, bottom - self.HUD_BOTTOM - inset_y)
-        l, t, r, b = self.court
-        if right <= left or bottom <= top or r - l < self.MIN_COURT_WIDTH or b - t < self.MIN_COURT_HEIGHT:
+        width, height = right-left, bottom-top
+        if width < max(320.,4*self.pet_radius) or height < max(220.,2*self.pet_radius+24.):
             raise ValueError("usable area is too small for ping-pong")
-        self.player_half = max(25.0, min(self.pet_radius * .72, (b - t) * .24))
-        self.player_x = r - self.PADDLE_WIDTH / 2
-        self.pet_x = l + self.PADDLE_WIDTH / 2
-        self.player_y = self.pet_y = (t + b) / 2
-        self.ball_x = (l + r) / 2
-        self.ball_y = (t + b) / 2
+        self.speed_scale = self._clamp(width/1100.,.82,2.)
+        self.cursor_radius = self.toy_radius + 11.
+        self.pet_x = left + self.pet_radius + 12.
+        self.pet_y = (top+bottom)/2
+        self.ball_x = (left+right)/2
+        self.ball_y = (top+bottom)/2
         self.vx = self.vy = 0.0
         self.player_score = self.pet_score = self.rally = self.best = 0
         self.serve_delay = .65
@@ -47,20 +31,21 @@ class PingPong:
         self.winner = None
         self._serve_sign = 1
         self._reaction_delay = 0.
+        self._last_cursor = None
+
+    def clear_pointer(self):
+        """Retomar uma partida começa com a posição atual do ponteiro."""
+        self._last_cursor = None
 
     def step(self, dt, cursor, vigor):
         """Advance by dt seconds and return a hit/point event, if one occurred."""
         if self.finished:
             return None
         dt = max(0.0, min(float(dt), .12))
-        l, t, r, b = self.court
+        l, t, r, b = self.area
         vigor = max(0.0, min(1.0, float(vigor)))
-        cy = cursor[1] if isinstance(cursor, (tuple, list)) else cursor
-        try:
-            cy = float(cy)
-        except (TypeError, ValueError):
-            cy = self.player_y
-        self.player_y = self._clamp(cy, t + self.player_half, b - self.player_half)
+        cursor_start = self._last_cursor or cursor
+        self._last_cursor = cursor
         if self.serve_delay > 0:
             self.serve_delay = max(0.0, self.serve_delay - dt)
             if self.serve_delay == 0:
@@ -68,6 +53,9 @@ class PingPong:
             return None
         if dt == 0:
             return None
+        mouse_dx = cursor[0]-cursor_start[0]
+        mouse_dy = cursor[1]-cursor_start[1]
+        swing = self._clamp(mouse_dy/dt/850.,-1.,1.)
 
         # A Bolha volta ao centro e só tenta interceptar quando o brinquedo se aproxima.
         ai_speed = (145.0 + 125.0 * vigor) * min(1., (b-t)/600.)
@@ -91,9 +79,8 @@ class PingPong:
         n = max(1, int(math.ceil(math.hypot(self.vx, self.vy) * dt / max_step)))
         h = dt / n
         event = None
-        player_line = self.player_x - self.PADDLE_WIDTH / 2 - self.toy_radius
-        for _ in range(n):
-            previous_x = self.ball_x
+        for substep in range(n):
+            previous_x, previous_y = self.ball_x,self.ball_y
             self.ball_x += self.vx * h
             self.ball_y += self.vy * h
             if self.ball_y - self.toy_radius < t:
@@ -102,10 +89,20 @@ class PingPong:
             elif self.ball_y + self.toy_radius > b:
                 self.ball_y = 2 * (b - self.toy_radius) - self.ball_y
                 self.vy = -abs(self.vy)
-            if (self.vx > 0 and previous_x <= player_line < self.ball_x
-                    and abs(self.ball_y-self.player_y) <= self.player_half+self.toy_radius):
-                self.ball_x = player_line
-                self._bounce_from(self.player_y, self.player_half, -1)
+            strike = None
+            if self.vx > 0 and self.ball_x >= contact_x+self.cursor_radius:
+                fraction = substep/n
+                strike = self._cursor_contact(
+                    previous_x-cursor_start[0]-mouse_dx*fraction,
+                    previous_y-cursor_start[1]-mouse_dy*fraction,
+                    self.ball_x-previous_x-mouse_dx/n,
+                    self.ball_y-previous_y-mouse_dy/n,
+                )
+            if strike is not None:
+                fraction, offset = strike
+                self.ball_x = previous_x+(self.ball_x-previous_x)*fraction
+                self.ball_y = previous_y+(self.ball_y-previous_y)*fraction
+                self._bounce_from(.7*offset+.55*swing,-1)
                 self.rally += 1
                 self.best = max(self.best, self.rally)
                 self._reaction_delay = .24 - .12 * vigor
@@ -115,20 +112,34 @@ class PingPong:
                 radius = self.pet_radius+self.toy_radius
                 dy = self.ball_y-self.pet_y
                 self.ball_x = self.pet_x + math.sqrt(max(0., radius**2-dy**2))
-                self._bounce_from(self.pet_y, self.pet_radius, 1)
+                self._bounce_from(dy/self.pet_radius,1)
                 self.rally += 1
                 self.best = max(self.best, self.rally)
                 event = 'pet_hit'
-            if self.ball_x - self.toy_radius > r:
+            if self.ball_x + self.toy_radius >= r:
                 return self._point('pet_point')
-            if self.ball_x + self.toy_radius < l:
+            if self.ball_x - self.toy_radius <= l:
                 return self._point('player_point')
         return event
 
-    def _bounce_from(self, center, half, direction):
-        offset = self._clamp((self.ball_y - center) / max(1.0, half), -1.0, 1.0)
-        speed = min(780.0, max(310.0, math.hypot(self.vx, self.vy) * 1.035))
-        angle = offset * 0.92
+    def _cursor_contact(self, x, y, dx, dy):
+        """Encontra o primeiro contato entre os dois movimentos no quadro."""
+        distance = x*x + y*y - self.cursor_radius**2
+        if distance <= 0.:
+            return 0.,y/self.cursor_radius
+        travel = dx*dx + dy*dy
+        approach = x*dx + y*dy
+        discriminant = approach*approach-travel*distance
+        if not travel or approach >= 0. or discriminant < 0.:
+            return None
+        fraction = (-approach-math.sqrt(discriminant))/travel
+        if 0. <= fraction <= 1.:
+            return fraction,(y+dy*fraction)/self.cursor_radius
+        return None
+
+    def _bounce_from(self, offset, direction):
+        speed = self._clamp(math.hypot(self.vx,self.vy)*1.035,310.*self.speed_scale,780.*self.speed_scale)
+        angle = self._clamp(offset,-1.,1.)*.92
         self.vx = direction * speed * math.cos(angle)
         self.vy = speed * math.sin(angle)
 
@@ -140,8 +151,8 @@ class PingPong:
             self.pet_score += 1
             self._serve_sign = 1
         self.rally = 0
-        self.ball_x = (self.court[0] + self.court[2]) / 2
-        self.ball_y = (self.court[1] + self.court[3]) / 2
+        self.ball_x = (self.area[0] + self.area[2]) / 2
+        self.ball_y = (self.area[1] + self.area[3]) / 2
         self.vx = self.vy = 0.0
         self._reaction_delay = 0.
         if max(self.player_score, self.pet_score) >= 5:
@@ -152,9 +163,9 @@ class PingPong:
         return event
 
     def _start_serve(self):
-        self.ball_x = (self.court[0] + self.court[2]) / 2
-        self.ball_y = (self.court[1] + self.court[3]) / 2
-        self.vx = self._serve_sign * 330.0
+        self.ball_x = (self.area[0] + self.area[2]) / 2
+        self.ball_y = (self.area[1] + self.area[3]) / 2
+        self.vx = self._serve_sign * 330.0*self.speed_scale
         self.vy = 90.0 if (self.player_score+self.pet_score) % 2 == 0 else -90.0
 
     @staticmethod
