@@ -1,28 +1,23 @@
-# Bolha 0.3.3
+# Bolha 0.4.0
 
-Bolha 0.3.3 para Windows x64 reúne irritação vermelha e efeitos presos ao corpo,
-reação física do brinquedo à aproximação do cursor, pega firme e arremesso com
-o impulso recente do mouse. GIFs e imagens online são opcionais e permanecem
-em RAM durante a exibição.
+A Bolha exibe GIFs sem moldura, legenda ou rodapé. A reação desaparece após
+15 segundos de exibição sem interação. Título e origem aparecem no botão
+direito, e o arquivo fica em RAM.
+
+- O painel neural mostra os 470 neurônios, as conexões do grupo selecionado e
+  os fatores da decisão.
+- A personagem, o brinquedo, o notebook e os demais tipos de objeto têm
+  controles de tamanho separados.
+- Os sinais do Pestinha, as necessidades e a memória orientam as ações
+  voluntárias. O comando “Vamos brincar” move o brinquedo quando aceito.
 
 ## Validação
 
-- CI Windows: **363 testes** e **10 cenários nativos**; o pacote inclui
-  `qgif.dll`.
-- Notebook Windows: instalação limpa e atualização real **0.3.2 → 0.3.3**;
-  **10 cenários** do controlador nativo passaram.
-- Quatro probes de gesto passaram: arremesso da personagem, soltura após pausa,
-  segurada contínua e arremesso do amendoim. A tentativa de perda forçada de
-  captura ficou **inconclusiva** e não conta como aprovação desse caso.
-- Uso prolongado, GIFs com rede real no notebook e validação com dois monitores
-  físicos seguem pendentes.
+O CI Windows aprovou **382 testes**, **10 cenários nativos** e as migrações
+da 0.1.0 e da 0.2.1. No notebook Windows, a atualização **0.3.3 → 0.4.0**
+passou por 10 cenários em um perfil isolado. O teste de GIF nesse notebook
+usou a aplicação executada a partir do código, com rede real.
+[Execução de validação](https://github.com/kuky13/bolha/actions/runs/42090449128).
 
-## Pacote
-
-- Fonte: `37a8fcabb98919314e1259c9720493d261dff238`
-- CI: [run 41872434530](https://github.com/kuky13/bolha/actions/runs/41872434530)
-- Instalador `Bolha-Setup-0.3.3-x64.exe`: 34.821.370 bytes
-- SHA-256: `4d79acc0542ae92ce8a29fd1cf0449a76d978a5e24fbbe53004a3606ef7bb94d`
-- O instalador **não possui assinatura digital**.
-
-Consulte [o relatório detalhado de validação](https://github.com/kuky13/bolha/blob/main/docs/VALIDATION-0.3.3.md).
+O instalador Windows x64 não tem assinatura digital. O SHA-256 do arquivo
+`Bolha-Setup-0.4.0-x64.exe` é `784cc68dc40ca22a7e2dfb7f359fb7ec6f8ce56befe48402f8fa8bf6314b3763`.

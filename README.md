@@ -5,27 +5,15 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Bolha · Windows x64.** O instalador público é o **0.3.3**. Este código
-prepara a [versão 0.4.0](docs/VALIDATION-0.4.0.md).
+**Bolha 0.4.0 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.0).
 
-[Versões no GitHub](https://github.com/kuky13/bolha/releases) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A versão **0.3.3** traz irritação vermelha com efeitos ancorados ao corpo,
-brinquedos que reagem à aproximação do cursor, pega firme e arremesso pela
-velocidade recente do mouse, além de GIFs e imagens online opcionais mantidos
-em RAM.
-
-O [CI Windows](https://github.com/kuky13/bolha/actions/runs/41872434530) aprovou
-**363 testes e 10 cenários nativos**. No notebook físico, passaram a instalação
-isolada e os **10 cenários** de instalação/atualização real 0.3.2 → 0.3.3. Quatro
-ensaios de gesto passaram; a perda forçada de captura ficou inconclusiva. Uso
-prolongado, GIFs com rede real no notebook e dois monitores físicos continuam
-pendentes. Veja [a validação da 0.3.3](docs/VALIDATION-0.3.3.md); os históricos
-da [0.3.2](docs/VALIDATION-GRAB.md) e da
-[0.3.1](docs/VALIDATION-EXPRESSIONS.md) permanecem separados. O instalador não
-possui assinatura digital.
+A 0.4.0 mostra GIFs sem moldura, explica decisões no painel neural e permite
+ajustar o tamanho dos objetos separadamente. O instalador passou pelos testes
+de atualização e recuperação no CI Windows e no notebook físico.
+[Validação da 0.4.0](docs/VALIDATION-0.4.0.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
