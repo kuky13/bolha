@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Expressões visuais no relógio já existente; nunca modifica o corpo físico."""
 import math
-import random
 from .character import WINK_DURATION, wink_state
 
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
@@ -163,13 +162,11 @@ def animation_pose(mode, seconds, strength=1.):
 
 class ExpressionMotion:
     """Seleciona a expressão a partir do cérebro e dos gestos, sem outra física."""
-    def __init__(self, now, rng=None):
-        self.random = rng or random
+    def __init__(self, now):
         self.mode = 'observando';self.started = now;self.held_since = None;self.sleep_since = None
         self.last_landing = 0.;self.impact_since = -1e9;self.dizzy_until = 0.
         self.quirk = None;self.quirk_since = now;self.last_quirk = None
-        self.next_quirk = now + self.random.uniform(35, 75)
-        self.next_wink = now + self.random.uniform(90, 180)
+        self.blink_until = 0.
         self.pose = animation_pose(self.mode, 0)
 
     def update(self, game, now, press_since=None):
@@ -207,18 +204,17 @@ class ExpressionMotion:
         eligible = (game.visible() and body.grounded and not held and not game.hover and not game.panel
                     and mode in ('observando', 'contente', 'curioso', 'feliz', 'entediado'))
         if self.quirk is not None and (not eligible or now - self.quirk_since >= QUIRK_SECONDS[self.quirk]):
-            self.quirk = None;self.next_quirk = now + self.random.uniform(35, 80)
-        if eligible and self.quirk is None:
-            if now >= self.next_wink and self.last_quirk != 'wink':
-                self.quirk = 'wink';self.next_wink = now + self.random.uniform(90, 180)
-            elif now >= self.next_quirk:
-                choices = [key for key in QUIRK_SECONDS if key not in ('wink', self.last_quirk)]
-                weights = [1 + (3 * tones['DROWSE'] if key == 'doze' else
-                                2 * tones['SETTLE'] if key == 'stretch' else
-                                2 * tones['WATCH'] if key == 'ear_wiggle' else 0) for key in choices]
-                self.quirk = self.random.choices(choices, weights=weights)[0]
-            if self.quirk is not None:self.quirk_since = now;self.last_quirk = self.quirk
+            self.quirk = None
+        if eligible:
+            choices = ['blink'] if self.quirk is not None else [key for key in (*QUIRK_SECONDS, 'blink') if key != self.last_quirk]
+            choice = game.choose_expression(choices, now)
+            if choice == 'blink':
+                self.blink_until = now + .13
+            elif choice in QUIRK_SECONDS:
+                self.quirk = choice
+                self.quirk_since = now;self.last_quirk = choice
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         return self.pose

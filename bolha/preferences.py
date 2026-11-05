@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Preferências locais: contrato compatível com config.json da versão Electron."""
 import math
+import copy
 from pathlib import Path
 from .migration import atomic_json, prepare_data, read_json
 
+OBJECT_SCALE_TYPES = ('toy','notebook','reaction','note','sign','corner','effects')
 DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
+                objectScales={key:1. for key in OBJECT_SCALE_TYPES},
                 toyAppearance='peanut',
                 mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
@@ -15,7 +18,7 @@ SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 
 
 def defaults():
-    return dict(DEFAULTS)
+    return copy.deepcopy(DEFAULTS)
 
 
 def number(value):
@@ -23,12 +26,18 @@ def number(value):
 
 
 def sanitize(patch, previous=None):
-    result = dict(previous if previous is not None else DEFAULTS)
+    result = copy.deepcopy(previous if previous is not None else DEFAULTS)
     if not isinstance(patch,dict): return result
     if patch.get('toyAppearance') in ('peanut','ball'):result['toyAppearance']=patch['toyAppearance']
     for key in BOOLEAN_KEYS:
         if type(patch.get(key)) is bool: result[key]=patch[key]
-    for key,low,high in (('avatarSize',80,200),('mischiefInterval',60,1800),('maxObjects',1,5)):
+    if isinstance(patch.get('objectScales'),dict):
+        scales=dict(result.get('objectScales',{}))
+        for key in OBJECT_SCALE_TYPES:
+            value=patch['objectScales'].get(key)
+            if number(value):scales[key]=max(.6,min(1.8,float(value)))
+        result['objectScales']=scales
+    for key,low,high in (('avatarSize',48,200),('mischiefInterval',60,1800),('maxObjects',1,5)):
         if number(patch.get(key)):result[key]=math.floor(max(low,min(high,patch[key]))+.5)
     if number(patch.get('opacity')): result['opacity']=max(.2,min(1.,patch['opacity']))
     if 'position' in patch:

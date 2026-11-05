@@ -23,6 +23,11 @@ class FestaController:
         self.euforia = 0.0
         self.pronto_em = 0.0
         self.debug = debug
+        self.policy = None
+        self.rates = {}
+        self.energy = 1.
+        self.contact = 0.
+        self.requested = False
 
     def tick(self, now, motor, emocao, corpo, pode_soltar, dt=0.1):
         """Acumula euforia e solta um fogo quando ela enche. Devolve True se soltou."""
@@ -30,7 +35,12 @@ class FestaController:
         passos = dt / 0.1                            # o ritmo foi calibrado para ciclos de 0,1 s
         self.euforia += passos * (RITMO_EUFORIA * alegria / ALEGRIA_PARA_CHEIO - RITMO_EUFORIA * DESCANSO_EUFORIA)
         self.euforia = max(0.0, min(EUFORIA_MAXIMA, self.euforia))
-        if self.euforia >= 1.0 and emocao == "feliz" and now >= self.pronto_em and pode_soltar:
+        eligible = ((self.euforia >= 1.0 and emocao == "feliz") or self.requested) and now >= self.pronto_em and pode_soltar
+        action = 'fireworks' if self.requested and eligible else self.policy.choose('celebration', ['fireworks','wait'], rates=self.rates,
+                    emotion=emocao, energy=self.energy, contact=self.contact,
+                    weights={'fireworks': max(0., min(1., motor['CHEER']/30.))}) if self.policy and eligible else None
+        if eligible and action == 'fireworks':
+            self.requested = False
             self.fogos.launch(corpo.x, corpo.y - 30)
             self.euforia = 0.0
             self.pronto_em = now + ESPERA_FOGOS

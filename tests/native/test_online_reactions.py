@@ -247,6 +247,8 @@ def test_janela_meme_exibe_midia_online_abre_origem_e_nao_desenha_placa_antiga(q
     canvas.fill(0)
     window.render(canvas)
     assert not drawn_character
+    assert window.mask().boundingRect().width()==window.width()  # GIF ocupa a janela sem moldura ou rodapé
+    assert canvas.pixelColor(0,0).alpha()>0
 
     # Snapshot do Game não vaza bytes de mídia
     snap = game.snapshot()
@@ -268,7 +270,8 @@ def test_janela_meme_exibe_midia_online_abre_origem_e_nao_desenha_placa_antiga(q
         def exec(self, point):
             assert 'Guardar objeto' in self.actions
             assert 'Abrir origem' in self.actions
-            assert len(self.actions) == 2
+            assert 'ReactionGIFs · Fuming Angry' in self.actions
+            assert len(self.actions) == 3
             return self.actions['Abrir origem']
 
     monkeypatch.setattr(scene_module, 'QMenu', OpenSourceMenu)

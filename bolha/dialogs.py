@@ -19,10 +19,10 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
     QScrollArea, QSpinBox, QTabWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView, QVBoxLayout, QWidget,
+    QHeaderView, QAbstractItemView, QVBoxLayout, QWidget, QDoubleSpinBox,
 )
 from . import VERSION
-from .preferences import DEFAULTS
+from .preferences import DEFAULTS, OBJECT_SCALE_TYPES
 
 
 def _label(text=''):
@@ -133,11 +133,25 @@ class SettingsDialog(QDialog):
         layout = self._tab('Aparência')
         layout.addWidget(_label('Ajuste o tamanho e a transparência da Bolha.'))
         form = QFormLayout()
-        self.avatar_size = self._spin(80, 200, ' px', 'Tamanho da Bolha')
+        self.avatar_size = self._spin(48, 200, ' px', 'Tamanho da Bolha')
         self.opacity = self._spin(20, 100, ' %', 'Opacidade da Bolha')
         form.addRow('&Tamanho:', self.avatar_size)
         form.addRow('&Opacidade:', self.opacity)
         layout.addLayout(form)
+        self.object_scales = {}
+        object_names = {'toy':'Brinquedo', 'notebook':'Caderno', 'reaction':'Reações',
+                        'note':'Bilhetes', 'sign':'Placas', 'corner':'Cantinho', 'effects':'Efeitos'}
+        layout.addWidget(_label('Tamanho dos objetos acompanha o tamanho da Bolha; ajuste cada tipo quando quiser.'))
+        for kind in OBJECT_SCALE_TYPES:
+            control = QDoubleSpinBox()
+            control.setRange(.6, 1.8)
+            control.setSingleStep(.1)
+            control.setDecimals(1)
+            control.setSuffix('×')
+            control.setAccessibleName(f'Tamanho: {object_names[kind]}')
+            control.valueChanged.connect(self._dirty)
+            self.object_scales[kind] = control
+            form.addRow(f'{object_names[kind]}:', control)
         self._check('roaming', 'Passear pela tela', layout,
                     'O passeio pausa durante o arrasto, o carinho e o uso dos painéis.')
         layout.addWidget(_button('Restaurar aparência', self.reset_appearance))
@@ -212,6 +226,7 @@ class SettingsDialog(QDialog):
     def _values(self):
         return dict({key: control.isChecked() for key, control in self.checks.items()},
                     avatarSize=self.avatar_size.value(), opacity=self.opacity.value()/100,
+                    objectScales={key: control.value() for key, control in self.object_scales.items()},
                     toyAppearance=self.toy_appearance.currentData(),
                     mischiefInterval=self.interval.value()*60, maxObjects=self.object_limit.value())
 
@@ -221,6 +236,9 @@ class SettingsDialog(QDialog):
         values = dict(DEFAULTS, **preferences)
         self.avatar_size.setValue(int(values['avatarSize']))
         self.opacity.setValue(round(values['opacity']*100))
+        scales = dict(DEFAULTS.get('objectScales', {}), **values.get('objectScales', {}))
+        for key, control in self.object_scales.items():
+            control.setValue(float(scales.get(key, 1.0)))
         if not appearance_only:
             self.toy_appearance.setCurrentIndex(self.toy_appearance.findData(values['toyAppearance']))
             self.interval.setValue(max(1, round(values['mischiefInterval']/60)))
@@ -340,16 +358,38 @@ class SettingsDialog(QDialog):
 
 
 class NeuralCanvas(QWidget):
-    """Pontos reais da rede; brilho representa o rastro, sem conexões inventadas."""
-    COLORS = ('#f0c96c', '#9bcaef', '#cda9ec', '#9ed5b3')
+    """Rede LIF real agrupada por pool; arestas vêm da matriz sináptica real."""
+    COLORS = ('#ffd166', '#75c8ff', '#d1a5ff', '#8ee0b0')
+    POOL_LABELS = {
+        'MOTION':'Movimento', 'TYPING':'Teclado', 'NOVELTY':'Novidade', 'SILENCE':'Silêncio',
+        'WORK':'Trabalho', 'PLAY':'Jogo', 'SOUND':'Som', 'SOCIAL':'Conversa', 'WEB':'Navegador',
+        'FATIGUE':'Cansaço', 'POKE':'Cutucada', 'DRAG':'Arrasto', 'DISMISS':'Dispensa',
+        'LONELY':'Carência', 'CARESS':'Carinho', 'ANTICIPATE':'Antecipação', 'TOY_NEAR':'Brinquedo perto',
+        'TOY_TAKEN':'Brinquedo levado', 'THROW':'Arremesso', 'IMPACT':'Impacto', 'BOREDOM':'Tédio',
+        'PEDIDO':'Pedido', 'PRESO':'Preso', 'LEMBRA_FUGA':'Lembra fuga', 'RECUSA':'Recusa',
+        'PLACA':'Placa', 'ANTECIPA_PLACA':'Prevê placa', 'VISITA':'Visita', 'RECEIO':'Receio',
+        'RANCOR':'Rancor', 'ALERT':'Alerta', 'FOCUS':'Foco', 'CURIOUS':'Curiosidade',
+        'PLAYFUL':'Brincadeira', 'CALM':'Calma', 'TIRED':'Cansaço', 'QUIET':'Inibição suave',
+        'INHIB':'Inibição', 'FRUSTRATION':'Frustração', 'GLOOM':'Tristeza', 'STARTLE':'Susto',
+        'WATCH':'Observar', 'WANDER':'Passear', 'CHEER':'Animar', 'SETTLE':'Acalmar',
+        'DROWSE':'Dormir', 'ANGRY':'Irritação', 'SAD':'Tristeza', 'SENTAR':'Sentar',
+        'FUGIR':'Fugir', 'CARTAZ':'Cartaz', 'CANTO':'Cantinho', 'TRAVESSURA':'Travessura',
+        'PAPEL':'Bolinha de papel', 'ACEITAR':'Aceitar',
+    }
 
     def __init__(self):
         super().__init__()
         self.points = []
+        self.pools = []
+        self.weights = None
+        self.selected_pool = None
+        self.filter_kind = None
+        self._edge_token = None
+        self.edges = []
         self.setMinimumSize(280, 180)
         self.setAccessibleName('Atividade dos neurônios da Bolha')
 
-    def set_network(self, positions, trace, kind):
+    def set_network(self, positions, trace, kind, pools=(), weights=None):
         points = []
         for position, activity, category in zip(positions, trace, kind):
             if len(position) < 2:
@@ -357,8 +397,78 @@ class NeuralCanvas(QWidget):
             x, y = _number(position[0], .5), _number(position[1], .5)
             points.append((max(0., min(1., x)), max(0., min(1., y)),
                            max(0., min(1., _number(activity))), int(_number(category)) % 4))
+        raw_pools = [(str(pool.get('name', 'Grupo')), int(pool.get('start', 0)),
+                      int(pool.get('n', 0)), str(pool.get('group', 'inter')),
+                      str(pool.get('kind', 'exc')))
+                      for pool in pools if isinstance(pool, dict)]
+        # Brain positions are clipped at the canvas boundary by the model. Lay
+        # out existing indices by their real pool/type so overlaps are not shown
+        # as if they were spatial anatomy. This changes display coordinates only.
+        ranks = {}
+        totals = {}
+        sensory_index = 0
+        pool_columns = {}
+        for name, _, _, group, kind in raw_pools:
+            if group == 'sensory':
+                column = 'sensory_a' if sensory_index < 15 else 'sensory_b'
+                sensory_index += 1
+            else:
+                column = 'motor' if group == 'motor' else 'inhib' if kind == 'inh' else 'exc'
+            pool_columns[name] = column
+            ranks[name] = totals.get(column, 0)
+            totals[column] = ranks[name] + 1
+        columns = {'sensory_a':.20, 'sensory_b':.40, 'exc':.60, 'inhib':.80, 'motor':.99}
+        for name, start, count, group, kind in raw_pools:
+            column = pool_columns[name]
+            cy = .12 + (ranks[name] / max(1, totals[column]-1))*.76
+            cx = columns[column]
+            cols = min(4, max(1, int(math.ceil(math.sqrt(max(1, count))))))
+            rows = int(math.ceil(count / cols))
+            for offset in range(count):
+                index = start + offset
+                if index >= len(points):
+                    break
+                col, row = offset % cols, offset // cols
+                points[index] = (max(.01, min(.99, cx + (col-(cols-1)/2)*.012)),
+                                 max(.015, min(.985, cy + .025 + (row-(rows-1)/2)*.012)),
+                                 points[index][2], points[index][3])
         self.points = points
+        self.pools = [(name, start, count, group, kind,
+                       columns[pool_columns[name]],
+                       .12 + (ranks[name] / max(1, totals[pool_columns[name]]-1))*.76)
+                      for name, start, count, group, kind in raw_pools]
+        self.weights = weights
+        self._pool_rank_cache = None
+        self._prepare_edges()
         self.update()
+
+    def set_selection(self, pool=None, kind=None):
+        self.selected_pool, self.filter_kind = pool, kind
+        self._prepare_edges()
+        self.update()
+
+    def _prepare_edges(self):
+        pool = next((item for item in self.pools if item[0] == self.selected_pool), None)
+        token = (id(self.weights), self.selected_pool, len(self.points))
+        if token == self._edge_token:
+            return
+        self._edge_token = token
+        self.edges = []
+        if pool is None or self.weights is None:
+            return
+        _, start, count, _, _, _, _ = pool
+        try:
+            candidates = []
+            for source in range(start, min(start + count, len(self.points))):
+                for target, weight in enumerate(self.weights[source]):
+                    weight = _number(weight)
+                    if abs(weight) >= .06 and target < len(self.points):
+                        candidates.append((abs(weight), source, target, weight))
+            candidates.sort(reverse=True)
+            self.edges = [(self.points[source][:2], self.points[target][:2], weight)
+                          for _, source, target, weight in candidates[:70]]
+        except (IndexError, TypeError, ValueError):
+            self.edges = []
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -366,9 +476,40 @@ class NeuralCanvas(QWidget):
         painter.fillRect(self.rect(), self.palette().base())
         painter.setPen(Qt.NoPen)
         bounds = QRectF(self.rect()).adjusted(14, 14, -14, -14)
-        for x, y, activity, category in self.points:
+        from PySide6.QtGui import QPen, QFont
+        painter.setFont(QFont(self.font().family(), 8))
+        painter.setPen(self.palette().text().color())
+        painter.drawText(QPointF(bounds.left()+bounds.width()*.27, bounds.top()+12), 'Sensores')
+        painter.drawText(QPointF(bounds.left()+bounds.width()*.53, bounds.top()+12), 'Excitação')
+        painter.drawText(QPointF(bounds.left()+bounds.width()*.73, bounds.top()+12), 'Inibição')
+        painter.drawText(QPointF(bounds.left()+bounds.width()*.90, bounds.top()+12), 'Ações')
+        painter.setFont(QFont(self.font().family(), 8))
+        for name, start, count, group, kind, x, y in self.pools:
+            selected = self.selected_pool == name
+            label = self.POOL_LABELS.get(name, name)
+            px, py = bounds.left()+x*bounds.width(), bounds.top()+y*bounds.height()
+            painter.setPen(QPen(QColor('#f3f0f8' if selected else '#aaa5b7'), 1,
+                                Qt.SolidLine if selected else Qt.DotLine))
+            painter.drawText(QRectF(px-130, py-10, 102, 15), Qt.AlignRight | Qt.AlignVCenter, label)
+            if selected:
+                painter.setPen(QPen(self.palette().text().color(), 1, Qt.DotLine))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawEllipse(QPointF(px, py+7), 22, 10)
+        for a, b, weight in self.edges:
+            color = QColor('#67c7f2' if weight > 0 else '#e092c4')
+            color.setAlpha(115)
+            painter.setPen(QPen(color, min(2.2, .7 + abs(weight)*7)))
+            painter.drawLine(QPointF(bounds.left()+a[0]*bounds.width(), bounds.top()+a[1]*bounds.height()),
+                             QPointF(bounds.left()+b[0]*bounds.width(), bounds.top()+b[1]*bounds.height()))
+        for index, (x, y, activity, category) in enumerate(self.points):
+            if self.filter_kind is not None and category != self.filter_kind:
+                continue
             color = QColor(self.COLORS[category])
-            color.setAlphaF(.25 + .75*activity)
+            in_selected = self.selected_pool is None or any(
+                name == self.selected_pool and start <= index < start + count
+                for name, start, count, *_ in self.pools)
+            color.setAlphaF((.25 + .75*activity) if in_selected else .18)
+            painter.setPen(Qt.NoPen)
             painter.setBrush(color)
             radius = 1.8 + activity*1.8
             painter.drawEllipse(QPointF(bounds.left()+x*bounds.width(), bounds.top()+y*bounds.height()), radius, radius)
@@ -403,12 +544,27 @@ class NeuralDialog(QDialog):
         layout.addWidget(self.tabs, 1)
         activity = QWidget()
         activity_layout = QVBoxLayout(activity)
+        controls = QHBoxLayout()
+        self.group_filter = QComboBox()
+        self.group_filter.setAccessibleName('Selecionar grupo neural')
+        self.group_filter.addItem('Toda a rede', None)
+        self.group_filter.currentIndexChanged.connect(self._selection_changed)
+        self.kind_filter = QComboBox()
+        self.kind_filter.setAccessibleName('Filtrar tipo de neurônio')
+        self.kind_filter.addItem('Todos os tipos', None)
+        for kind, name in enumerate(('Sensor', 'Excitação', 'Inibição', 'Ação')):
+            self.kind_filter.addItem(name, kind)
+        self.kind_filter.currentIndexChanged.connect(self._selection_changed)
+        controls.addWidget(self.group_filter)
+        controls.addWidget(self.kind_filter)
+        activity_layout.addLayout(controls)
         self.network_title = _label()
         activity_layout.addWidget(self.network_title)
         self.canvas = NeuralCanvas()
+        self.canvas.setToolTip('A posição agrupa pools por tipo para facilitar a leitura. Não representa localização anatômica. Pontos, rastros e sinapses são do brain ativo.')
         activity_layout.addWidget(self.canvas, 1)
         activity_layout.addWidget(_label('Cada ponto é um neurônio. O brilho mostra seu rastro de atividade.'))
-        activity_layout.addWidget(_label('Amarelo: sensores · Azul: excitação · Roxo: inibição · Verde: ação'))
+        activity_layout.addWidget(_label('Amarelo: sensores · Azul: excitação · Roxo: inibição · Verde: ação. O arranjo visual separa pools; não é anatômico.'))
         self.rates = _label()
         activity_layout.addWidget(self.rates)
         self.tabs.addTab(activity, 'Atividade')
@@ -421,18 +577,27 @@ class NeuralDialog(QDialog):
         self.pools.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.pools.verticalHeader().hide()
         self.pools.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.pools.cellClicked.connect(self._pool_row_selected)
         groups_layout.addWidget(self.pools)
         self.tabs.addTab(groups, 'Grupos')
         self.learning = QPlainTextEdit()
         self.learning.setReadOnly(True)
         self.learning.setAccessibleName('Objetivos, hábitos e associações aprendidas')
         self.tabs.addTab(self.learning, 'Aprendizado')
+        self.decision = _label('Aguardando uma decisão real do cérebro…')
+        self.decision.setAccessibleName('Decisão e fatores do cérebro')
+        activity_layout.addWidget(self.decision)
         diagnostics = QWidget()
         diagnostics_layout = QVBoxLayout(diagnostics)
         self.metrics = _label()
         diagnostics_layout.addWidget(self.metrics)
         diagnostics_layout.addWidget(_label('RSS mede este aplicativo inteiro. A estimativa dos arrays inclui seus buffers NumPy, sem objetos e bibliotecas. Os arrays já fazem parte do RSS: não some essas medidas.'))
         diagnostics_layout.addWidget(_button('Copiar diagnóstico local', self.copy_diagnostics))
+        self.reaction_button = _button('Mostrar uma reação agora', self.request_reaction)
+        diagnostics_layout.addWidget(self.reaction_button)
+        self.reaction_status = _label('Nenhum pedido de reação enviado.')
+        self.reaction_status.setAccessibleName('Resultado do pedido de reação')
+        diagnostics_layout.addWidget(self.reaction_status)
         diagnostics_layout.addStretch()
         self.tabs.addTab(diagnostics, 'Diagnóstico')
         self.status = _label()
@@ -445,7 +610,7 @@ class NeuralDialog(QDialog):
         self.timer = QTimer(self)
         self.timer.setInterval(250)
         self.timer.timeout.connect(self.refresh)
-        _fit(self, 700, 590)
+        _fit(self, 800, 700)
 
     @staticmethod
     def _rates(values, limit=8):
@@ -458,7 +623,18 @@ class NeuralDialog(QDialog):
         try:
             game = self.controller.game
             brain = game.brain
-            self.canvas.set_network(brain.pos, brain.trace, brain.kind)
+            self.canvas.set_network(brain.pos, brain.trace, brain.kind,
+                                    getattr(brain, 'pools', ()), getattr(brain, 'W', None))
+            if self.group_filter.count() != len(self.canvas.pools) + 1:
+                selected = self.group_filter.currentData()
+                self.group_filter.blockSignals(True)
+                self.group_filter.clear()
+                self.group_filter.addItem('Toda a rede', None)
+                for name, *_ in self.canvas.pools:
+                    self.group_filter.addItem(self.canvas.POOL_LABELS.get(name, name), name)
+                self.group_filter.setCurrentIndex(max(0, self.group_filter.findData(selected)))
+                self.group_filter.blockSignals(False)
+            self._selection_changed()
             emotion = dict(curioso='Curiosa', bravo='Brava', assustado='Assustada',
                            dramatico='Dramática', dormindo='Dormindo', sonolento='Sonolenta',
                            timido='Tímida', atento='Atenta', entediado='Entediada',
@@ -474,13 +650,91 @@ class NeuralDialog(QDialog):
             rates = self._rates(brain.pool_rates())
             self.pools.setRowCount(len(rates))
             for row, (name, value) in enumerate(rates):
-                for col, text in enumerate((name, f'{value:.1f}')):
+                display_name = NeuralCanvas.POOL_LABELS.get(name, name)
+                for col, text in enumerate((display_name, f'{value:.1f}')):
                     item = self.pools.item(row, col)
                     if item is None:
-                        self.pools.setItem(row, col, QTableWidgetItem(text))
+                        item = QTableWidgetItem(text)
+                        if col == 0:
+                            item.setData(Qt.UserRole, name)
+                        self.pools.setItem(row, col, item)
                     elif item.text() != text:
                         item.setText(text)
             summary = game.intelligence.summary(game.activity, time.time())
+            snapshot_fn = getattr(game, 'decision_snapshot', None)
+            snapshot = snapshot_fn() if callable(snapshot_fn) else {}
+            current = snapshot.get('current') if isinstance(snapshot, dict) else None
+            previous_decision = False
+            history = snapshot.get('history', []) if isinstance(snapshot, dict) else []
+            if not isinstance(current, dict) and history and isinstance(history[-1], dict):
+                current = history[-1]
+                previous_decision = True
+            if isinstance(current, dict):
+                factors = current.get('factors', {})
+                action_names = {'watch':'observar', 'explore':'explorar', 'attention':'pedir atenção',
+                                'rest':'descansar', 'play':'brincar', 'work':'trabalhar',
+                                'request_refused':'pedido recusado', 'attempt_online_reaction':'pedir uma reação online',
+                                'blink':'piscar', 'wink':'piscadinha', 'stretch':'espreguiçar',
+                                'sneeze':'espirrar', 'hiccup':'soluçar', 'doze':'cochilar', 'ear_wiggle':'sacudir orelhas',
+                                'roam_move':'movimento do passeio', 'roam_target':'destino do passeio',
+                                'roam_duration':'pausa do passeio', 'gaze_target':'direção do olhar',
+                                'gaze_point':'ponto observado', 'continue_roam':'continuar o passeio',
+                                'celebration':'comemorar', 'toy_play':'brincar com o brinquedo',
+                                'sleep_cycle':'sono', 'mischief':'travessura', 'paper_throw':'jogar papel',
+                                'punishment_sign':'mostrar cartaz', 'punishment_sign_text':'texto do cartaz',
+                                'accept_punishment':'aceitar o perdão', 'escape_punishment':'fugir do castigo'}
+                source_names = {'lif+episodic_policy':'rede e memória de experiências',
+                                'lif_policy':'atividade neural', 'expression_policy':'expressão atual',
+                                'explicit_user_request':'pedido manual', 'lif_hazard':'atividade neural',
+                                'user_feedback':'interação com você'}
+                action = str(current.get('action') or 'Sem ação registrada')
+                target = current.get('target')
+                if isinstance(target, (int, float)):
+                    target = f'posição {target:.0f} px'
+                elif target is None:
+                    target = 'nenhum'
+                labels = {'energy':'energia', 'contact':'carência', 'emotion':'emoção',
+                          'memory':'memória', 'habit':'hábito', 'estimate':'previsão aprendida',
+                          'familiarity':'familiaridade', 'attention':'busca de atenção', 'rest':'descanso'}
+                influences = []
+                mood = None
+                if isinstance(factors, dict):
+                    if isinstance(factors.get('emotion'), str):
+                        mood = 'humor ' + factors['emotion']
+                    for group in ('drives', 'memory', 'habit', 'neural'):
+                        values = factors.get(group)
+                        if not isinstance(values, dict):
+                            continue
+                        for key, value in values.items():
+                            if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                                title = labels.get(key, f'sinal neural {key}' if group == 'neural' else str(key))
+                                influences.append((abs(float(value)), f'{title} {_number(value):.2f}'))
+                influences = sorted((item for item in influences if isinstance(item, tuple)), reverse=True)[:3]
+                influence_text = ' · '.join(([mood] if mood else []) + [text for _, text in influences])
+                title = 'Última decisão registrada' if previous_decision else 'Agora'
+                lines = [f"{title}: {action_names.get(action, action)}",
+                         f"Alvo: {target} · Decidido por: {source_names.get(str(current.get('source')), 'cérebro da Bolha')}",
+                         f"Intensidade {_number(current.get('intensity')):.2f} · duração {_number(current.get('duration')):.1f} s",
+                         'Sinais associados: ' + (influence_text or 'nenhum fator numérico registrado.')]
+                blocked = current.get('refusal_reason') or current.get('blocked_reason')
+                if not blocked and current.get('action') == 'request_refused':
+                    blocked = 'A recusa ainda não tem um motivo registrado.'
+                if blocked:
+                    reasons = {'network_or_mischief_disabled':'Reações online ou travessuras estão desligadas.',
+                               'hidden_or_panicked':'A Bolha está escondida ou em modo de emergência.',
+                               'hidden_panicked_or_no_active_display':'A Bolha está escondida, em emergência ou sem uma tela disponível.',
+                               'sleeping':'A Bolha está dormindo.',
+                               'being_dragged':'A Bolha está sendo arrastada.',
+                               'maximum_objects_or_network_unavailable':'Limite de objetos atingido ou rede indisponível.'}
+                    lines.append('Motivo: ' + reasons.get(str(blocked), str(blocked)))
+                history = snapshot.get('history', [])
+                if history:
+                    previous = [action_names.get(str(record.get('action', '')), str(record.get('action', '')))
+                                for record in history[-3:] if isinstance(record, dict)]
+                    lines.extend(('', 'Decisões recentes: ' + ' · '.join(previous)))
+                self.decision.setText('\n'.join(lines))
+            else:
+                self.decision.setText('As decisões aparecerão aqui conforme a Bolha interagir.')
             lines = [f"Objetivo: {summary.get('label', 'Seguindo os impulsos da rede')}",
                      'Objetivos adaptativos: ' + ('ativos' if summary.get('enabled') else 'pausados'),
                      f"Hábitos por horário: {summary.get('slots', 0)} registros",
@@ -511,6 +765,40 @@ class NeuralDialog(QDialog):
             return
         self.status.setText('Diagnóstico copiado. Nenhum envio automático.')
         self._notice_until = time.monotonic()+5
+
+    def _selection_changed(self, *_):
+        self.canvas.set_selection(self.group_filter.currentData(), self.kind_filter.currentData())
+
+    def request_reaction(self):
+        try:
+            result = self.controller.request_reaction()
+            status = self.controller.reaction_status()
+            if isinstance(status, dict):
+                if 'state' in status:
+                    rows = [value for value in status.values() if isinstance(value, dict)]
+                    latest = rows[-1] if rows else {}
+                    labels = {'loading':'Carregando a reação…', 'network':'Aguardando a rede…',
+                              'no-results':'A busca não encontrou reações.', 'decode':'Não foi possível abrir a reação.',
+                              'memory':'A reação não coube na memória disponível.', 'canceled':'Busca cancelada.',
+                              'ready':'Reação pronta para exibição.'}
+                    state = latest.get('state', 'pending')
+                    message = labels.get(state, 'Pedido enviado à cena.')
+                    if latest.get('reason'):
+                        message += ' ' + str(latest['reason'])
+                else:
+                    message = status.get('message') or status.get('reason') or ('Pedido aceito.' if result else 'Pedido recusado.')
+            else:
+                message = str(status or ('Pedido aceito.' if result else 'Pedido recusado.'))
+            self.reaction_status.setText(str(message))
+        except (AttributeError, OSError, ValueError) as error:
+            self.reaction_status.setText(f'Não foi possível pedir a reação: {error}')
+
+    def _pool_row_selected(self, row, _column):
+        item = self.pools.item(row, 0)
+        if item is not None:
+            index = self.group_filter.findData(item.data(Qt.UserRole))
+            if index >= 0:
+                self.group_filter.setCurrentIndex(index)
 
     def showEvent(self, event):
         super().showEvent(event)

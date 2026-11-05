@@ -4,7 +4,6 @@ PROTESTO - a insatisfação do pet e o estágio em que ele está. Só estado e r
 Os cartazes e a bandeira são desenhados em world/cartazes.py.
 """
 
-import random
 import time
 
 from ..ajustes import (
@@ -72,6 +71,10 @@ class Protesto:
     def __init__(self, signs_path, state_path, kind="raiva"):
         """Carrega os cartazes e o estado salvo; `kind` diz se é raiva ou tristeza."""
         self.kind = kind                # "raiva" (protesto) ou "tristeza" (abandono)
+        self.policy = None
+        self.rates = {}
+        self.energy = 1.
+        self.contact = 0.
         self.signs = load_signs(signs_path)
         self.signs_path = signs_path
         self.state_path = state_path
@@ -135,7 +138,13 @@ class Protesto:
     def pick(self, section):
         """Uma frase ao acaso da seção pedida (relendo o arquivo, para editar com o pet aberto)."""
         self.signs = load_signs(self.signs_path)       # relê: dá para editar com ele rodando
-        return random.choice(self.signs.get(section) or DEFAULT_SIGNS[section])
+        options = self.signs.get(section) or DEFAULT_SIGNS[section]
+        if self.policy:
+            picked = self.policy.choose('protest_sign', [str(i) for i in range(len(options))],
+                        rates=self.rates, emotion=self.kind, energy=self.energy, contact=self.contact,
+                        weights={str(i): 1. for i in range(len(options))})
+            return options[int(picked)]
+        return options[0]
 
     def escolher_cartaz(self, fim_por_carinho=None):
         """

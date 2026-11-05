@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Expressões reais respeitam cérebro, relógio e a única autoridade física."""
 from pathlib import Path
-import random
 import pytest
 from game import Game
 from bolha.motion import animation_pose, ExpressionMotion, QUIRK_SECONDS
@@ -47,23 +46,18 @@ def test_adormecer_fecha_olhos_gradualmente_respira_e_so_entao_soltar_zzz(tmp_pa
     assert held['zzz_strength'] == 0 and motion.mode == 'held'
 
 
-def test_manias_variadas_tem_pausa_sem_repetir_e_cedem_as_interacoes(tmp_path):
-    game = game_at_rest(tmp_path);motion = ExpressionMotion(100, random.Random(17))
-    motion.next_wink = 1e9;seen = []
-    for index in range(20):
-        now = 100 + index * 10
-        motion.next_quirk = now
-        motion.update(game, now);seen.append(motion.mode)
-        assert motion.mode in QUIRK_SECONDS
-        motion.update(game, now + QUIRK_SECONDS[motion.mode] + .01)
-        assert motion.quirk is None and motion.next_quirk > now + 30
-    assert len(set(seen)) == len(QUIRK_SECONDS) - 1
-    assert all(left != right for left, right in zip(seen, seen[1:]))
-    motion.next_quirk = 500;motion.update(game, 500)
-    assert motion.quirk is not None
-    motion.update(game, 500.1, 500.1)
+def test_manias_and_blink_are_selected_and_traced_by_policy(tmp_path):
+    game = game_at_rest(tmp_path);motion = ExpressionMotion(100)
+    game.intelligence.enabled = False
+    game.rates.update(CHEER=30., WATCH=0., DROWSE=0., ANGRY=0.)
+    for now in (100., 110., 200.):
+        motion.update(game, now)
+        choice = game.decision_snapshot()['current']
+        assert choice and choice['source'] == 'expression_policy'
+        assert choice['action'] in (*QUIRK_SECONDS, 'blink')
+    motion.update(game, 500, 500)
     assert motion.quirk is None and motion.mode == 'held'
-    game.panel = True;motion.next_quirk = 501;motion.update(game, 501)
+    game.panel = True;motion.update(game, 501)
     assert motion.quirk is None
 
 

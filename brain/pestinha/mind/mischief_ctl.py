@@ -35,11 +35,31 @@ class MischiefController:
         self.penalty_until = 0.0
         self.pedido_forcado = False     # "fazer uma travessura agora": ignora o sorteio uma vez
         self.forcado_ate = 0.0
+        self.policy = None
+
+    def _decide(self, name, choices, rates, emotion, duration, weights=None):
+        if self.policy is None:
+            return None
+        return self.policy.choose(name, choices, rates=rates, emotion=emotion,
+                                  energy=self.drives.energy, contact=self.drives.contact,
+                                  duration=duration, weights=weights)
 
     def pedir(self, now):
         """O comando do menu: a próxima tentativa acontece, se as regras permitirem, nos próximos segundos."""
         self.pedido_forcado = True
         self.forcado_ate = now + VALIDADE_PEDIDO_S
+
+    def request_online_reaction(self, now, emotion, enabled=True):
+        """Honor an explicit reaction request, subject only to current safety/settings."""
+        if not enabled or not self.engine.online_reactions:
+            return False
+        thing = self.engine.create_online_reaction(emotion)
+        if thing is None:
+            return False
+        ctx = self.memory.context('explicit_request', emotion)
+        self.memory.start(ctx, 'online_reaction', thing)
+        self.drives.stimulate('mischief')
+        return True
 
     def penalty_active(self, now):
         """Diz se ainda está valendo a penalidade por ter sido dispensado (ele não apronta de novo logo)."""
@@ -53,8 +73,11 @@ class MischiefController:
         """
         if self.pedido_forcado and now > self.forcado_ate:
             self.pedido_forcado = False                # o pedido do menu venceu sem dar certo
-        if not self.pedido_forcado and random.random() >= motores.get("TRAVESSURA", 0.0) * GANHO_TRAVESSURA * dt:
-            return None
+        if not self.pedido_forcado:
+            if self.policy is None or not self.policy.event('mischief_attempt', motores.get('TRAVESSURA',0.),
+                    GANHO_TRAVESSURA, dt, rates=motores, emotion=emotion,
+                    energy=self.drives.energy, contact=self.drives.contact):
+                return None
         if body.held or not body.grounded or self.behavior.mission:
             return None
         if asleep or protest_stage == 3 or not self.engine.allowed(perms, prof, fullscreen):   # greve para tudo; reclamação/manifestação não param os post-its
@@ -69,17 +92,13 @@ class MischiefController:
                 return None
             action = "meme"
         else:
-            action = self.memory.choose(ctx, options, prof["explore"])
+            action = self._decide('mischief_action', options, motores, emotion, 1.,
+                                  {option: 1.8 if self.postit_weight > 0 and option.startswith('bilhete') and emotion == 'feliz' else
+                                           .5 * self.postit_weight if self.postit_weight > 0 and option.startswith('bilhete') else 0.
+                                   for option in options})
         if action is None or action not in options:
             return None
         self.pedido_forcado = False
-        # pet 'postit' prefere colar post-its quando pode
-        boost = 1.8 if emotion == "feliz" else 1.0     # feliz cola mais post-its
-        if self.postit_weight > 0 and random.random() < 0.5 * self.postit_weight * boost:
-            for cand in (("bilhete_canto", "bilhete") if emotion == "bravo" else ("bilhete",)):
-                if cand in options:
-                    action = cand
-                    break
         if self.debug() and self.memory.last_choice:
             log(f"[escolha] {ctx} -> {action} ({self.memory.last_choice[2]})")
 

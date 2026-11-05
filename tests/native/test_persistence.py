@@ -172,3 +172,24 @@ def test_failed_native_startup_preserves_legacy_path_and_retry_reads_new_learnin
     assert not (brain/'bolha').exists()
     backups=list((tmp_path/'backups').glob('*/brain/drippy/nervous.json'))
     assert len(backups)==1 and backups[0].read_bytes()==before['nervous.json']
+
+
+def test_040_backup_also_covers_already_migrated_native_profile(tmp_path):
+    """A 0.3 já tinha marcador: a primeira 0.4 deve preservar outro snapshot."""
+    old = {'schemaVersion':1,'preferences':dict(senseApp=False,senseIdle=False,senseCursor=False,senseWindows=False,avatarSize=80)}
+    (tmp_path/'config.json').write_text(json.dumps(old),encoding='utf-8')
+    memory=tmp_path/'brain/bolha';memory.mkdir(parents=True)
+    learned=b'{"seed":1313,"learned":{"PRESO":{"CALM":0.06}}}'
+    (memory/'nervous.json').write_bytes(learned)
+    (tmp_path/'native-migration.json').write_text('{"schemaVersion":1,"backup":null}')
+    store=PreferencesStore(tmp_path)
+    marker=read_json(tmp_path/'native-migration.json')
+    assert marker['unifiedPolicyBackup'] is True
+    backup=Path(marker['backup'])
+    assert read_json(backup/'config.json')==old
+    assert (backup/'brain/bolha/nervous.json').read_bytes()==learned
+    assert not any(store.preferences[key] for key in SENSOR_KEYS)
+    assert store.preferences['objectScales']['toy']==1.
+    assert (memory/'nervous.json').read_bytes()==learned
+    PreferencesStore(tmp_path)
+    assert len(list((tmp_path/'backups').iterdir()))==1

@@ -14,7 +14,6 @@ Na revolução, além da bolinha, ele arremessa bolinhas de papel no cursor.
 """
 
 import math
-import random
 
 from ..core.physics import GRAVITY
 from ..ajustes import (
@@ -47,6 +46,11 @@ class Play:
         self.w = weights_of(weights)
         self.next_at = 0.0
         self.next_paper = 0.0
+        self.policy = None
+        self.rates = {}
+        self.energy = 1.
+        self.contact = 0.
+        self.requested_action = None
 
     def weight(self, key):
         """Peso de uma brincadeira pelo nome (0 se não existir)."""
@@ -58,23 +62,42 @@ class Play:
         pull (0..1): quanto a rede quer brincar agora (distração acima do foco). Zero, ele trabalha.
         """
         happy = emotion == "feliz"
-        if ball is None or not ball.isVisible() or now < self.next_at or pull <= 0.0:
+        if ball is None or not ball.isVisible() or now < self.next_at:
             return None
         if getattr(ball, "dragging", False):      # a bolinha está na mão do usuário: não é dele
             return None
         if math.hypot(ball.body.x - body.x, ball.body.y - body.y) > REACH * (1.4 if happy else 1.0):
             return None
+        if self.requested_action:
+            action, self.requested_action = self.requested_action, None
+            self.next_at = now + (PLAY_EVERY[0]+PLAY_EVERY[1])/2
+            if action == 'kick':
+                side = 1 if ball.body.x >= body.x else -1
+                ball.kick(side * 500., -410.)
+                return 'kick'
+            if action == 'throw':
+                return self.throw_at(ball, cursor, FLIGHT_TIME, ball.body.x, ball.body.y) and 'throw'
+        if pull <= 0.0:
+            return None
+        choices = ['kick'] if emotion in ("feliz", "curioso", "contente") and self.weight("bola") > 0 else []
+        if emotion == 'bravo' and self.weight('arremesso') > 0: choices.append('throw')
+        choices.append('wait')
+        weights = {'kick': .7*self.weight('bola')*pull, 'throw': .6*self.weight('arremesso')*pull, 'wait': .15}
+        if self.policy:
+            action = self.policy.choose('toy_play', choices, rates=self.rates, emotion=emotion,
+                                        energy=self.energy, contact=self.contact,
+                                        duration=(PLAY_EVERY[0]+PLAY_EVERY[1])/2, weights=weights)
+        else:
+            action = 'wait'
         lo, hi = PLAY_EVERY
-        self.next_at = now + random.uniform(lo * 0.5, hi * 0.5) if happy else now + random.uniform(lo, hi)
+        self.next_at = now + ((lo+hi)/2 if happy else (lo+hi))
 
-        if emotion in ("feliz", "curioso", "contente") and self.weight("bola") > 0 \
-                and random.random() < 0.7 * self.weight("bola"):
+        if action == 'kick':
             side = 1 if ball.body.x >= body.x else -1          # chuta para o lado oposto a ele
-            ball.kick(side * random.uniform(380.0, 620.0), -random.uniform(300.0, 520.0))
+            ball.kick(side * 500.0, -410.0)
             return "kick"
 
-        if emotion == "bravo" and self.weight("arremesso") > 0 \
-                and random.random() < 0.6 * self.weight("arremesso"):
+        if action == 'throw':
             return self.throw_at(ball, cursor, FLIGHT_TIME, ball.body.x, ball.body.y) and "throw"
         return None
 

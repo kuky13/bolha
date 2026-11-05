@@ -5,7 +5,8 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Bolha 0.3.3 · Windows x64.**
+**Bolha · Windows x64.** O instalador público é o **0.3.3**. Este código
+prepara a [versão 0.4.0](docs/VALIDATION-0.4.0.md).
 
 [Versões no GitHub](https://github.com/kuky13/bolha/releases) ·
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
@@ -51,13 +52,18 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 - Reações online de memes e GIFs (ReactionGIFs e fallback Nekos.best) carregadas
   apenas em memória conforme o que a Bolha quer expressar, além de bilhetes: no
   máximo uma travessura a cada cinco minutos, até três objetos na tela; tudo
-  configurável e podendo desligar as reações online.
-- Painel com atividade neural, humor, necessidades e associações aprendidas.
+  configurável e podendo desligar as reações online. O GIF aparece sem
+  moldura, some após 15 segundos de exibição e mostra a origem no botão direito.
+- Tamanhos separados para a personagem, o brinquedo, o notebook, as reações,
+  os bilhetes, os cartazes, o cantinho e os efeitos.
+- Painel com os 470 neurônios, filtros, conexões reais do grupo selecionado,
+  decisões recentes, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
   contexto. Carinho reforça preferências; ausência de resposta é neutra.
 - Opções para desligar o comportamento adaptativo e apagar todo o aprendizado.
 
-Veja [a implementação da inteligência e seu orçamento](docs/INTELLIGENCE.md).
+Veja [a política atual e os testes](docs/VALIDATION-0.4.0.md) e
+[o histórico da implementação da inteligência](docs/INTELLIGENCE.md).
 O aplicativo agora usa Qt e o cérebro no mesmo processo. O diagnóstico mede
 a memória total e o tamanho dos arrays neurais separadamente; a meta do cérebro
 não desliga recursos com base no consumo da interface.
@@ -79,6 +85,8 @@ não é necessário instalar Python separadamente.
 | Menu → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
 | Menu → Brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |
 | Configurações → Comportamento → Brinquedo | Escolhe amendoim ou bolinha original |
+| Configurações → Aparência | Ajusta o tamanho de cada tipo de objeto |
+| Botão direito no GIF | Mostra informações, origem e opções do objeto |
 | Botão direito | Abre configurações e atividades |
 | Menu → Cérebro e emoções | Abre o painel do cérebro |
 | Ícone perto do relógio | Mostrar, esconder, pausar e sair |
@@ -110,8 +118,9 @@ no GitHub e, quando a opção de reações online está ativa nas configuraçõe
 busca sem chave de memes/GIFs públicos (ReactionGIFs e Nekos.best) usando
 somente palavras-chave genéricas de humor em inglês; os bytes de mídia ficam
 apenas em memória RAM (nunca em disco), têm a animação pausada quando a janela
-fica oculta e são descartados ao fechar/remover a janela ou ao desativar a
-opção.
+fica oculta. Os bytes são descartados ao terminar a exibição, guardar o GIF
+ou desativar a opção. O tempo de exibição pausa durante o arrasto, quando o
+ponteiro está sobre o GIF ou quando o menu dele está aberto.
 O cérebro e a interface usam o mesmo processo Python, sem abrir portas locais
 ou enviar sua memória, programas ativos, coordenadas ou arquivos para servidores.
 

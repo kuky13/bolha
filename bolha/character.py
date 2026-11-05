@@ -100,14 +100,14 @@ def _body(p, anger=0.0):
 
 
 def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0,
-              blink_left=None, blink_right=None, anger=0.0):
+              blink_left=None, blink_right=None, anger=0.0, detail=1.0):
     """Desenha somente olhos e orelhas. A metade inferior do rosto fica vazia."""
     clip = QPainterPath()
     clip.addEllipse(QPointF(0, 0), FACE_RADIUS, FACE_RADIUS)
     p.save()
     p.setClipPath(clip, Qt.IntersectClip)
     p.setBrush(Qt.NoBrush)
-    p.setPen(_pen())
+    p.setPen(_pen(width=2.5*detail))
     # Os ângulos das orelhas são espelhados, e os olhos mantêm formato idêntico.
     profiles = {
         'observando': (5.2, 6.4, 0.0, 0.0, 0.0),
@@ -128,6 +128,8 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
         'comemorando':(6.4, 7.2, -.3, 7.0, 2.0),
     }
     rx, ry, eye_y, tilt, raise_units = profiles[emotion]
+    rx *= 1 + .2*(detail-1)
+    ry *= 1 + .2*(detail-1)
     tilt = _clamp(tilt + ear_tilt, -35, 35)
     raise_units = _clamp(raise_units + ear_raise, -5, 5)
     for side in (-1, 1):
@@ -153,14 +155,14 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
             eye = QPainterPath(QPointF(x - 5.3, y + (2 if happy else -1)))
             eye.quadTo(x, y + (-5 if happy else 3), x + 5.3, y + (2 if happy else -1))
             p.setBrush(Qt.NoBrush)
-            p.setPen(_pen())
+            p.setPen(_pen(width=2.5*detail))
             p.drawPath(eye)
         elif emotion == 'tonto':
             p.save()
             p.translate(x, y)
             p.scale(1, max(.12, (1 - closing_eye) * opening))
             p.setBrush(Qt.NoBrush)
-            p.setPen(_pen(width=1.9))
+            p.setPen(_pen(width=1.9*detail))
             p.drawPath(_DIZZY_EYE)
             p.restore()
         elif emotion == 'comemorando':
@@ -222,7 +224,7 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
     painter.restore()
     _features(painter, emotion, _clamp(blink, 0, 1), gaze,
               _clamp(ear_tilt, -35, 35), _clamp(ear_raise, -5, 5), _clamp(eye_open, 0, 1.3),
-              blink_left, blink_right, anger)
+              blink_left, blink_right, anger, detail=max(1., min(1.3, .7/max(.05, scale))))
     painter.restore()
 
 

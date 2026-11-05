@@ -94,6 +94,47 @@ def test_desligar_rotina_remove_influencia_do_horario(tmp_path):
     assert not mind.habits.slots
     assert mind.episode['contexto'] == 'objetivo|PROGRAMMING|feliz'
 
+def test_decisao_usa_motores_lif_reais_e_explica_a_escolha(tmp_path, monkeypatch):
+    mind=Intelligence(memory_at(tmp_path), tmp_path/'habits.json', random.Random(1))
+    captured={}
+    def choose(ctx, actions, epsilon, bias):
+        captured.update(bias)
+        return 'goal:explore'
+    monkeypatch.setattr(mind.memory, 'choose', choose)
+    mind.tick(100,WALL,'IDLE','curioso',{'WANDER':15,'CHEER':9,'SENTAR':3},.8,.2,['explore','play'])
+    assert captured['goal:explore'] > captured['goal:play']
+    decision=mind.snapshot()['current']
+    assert decision['factors']['neural'] == {'WANDER':15.,'CHEER':9.,'SENTAR':3.}
+    assert decision['source'] == 'lif+episodic_policy'
+
+def test_painel_mostra_apenas_o_destino_real_do_objetivo(tmp_path, monkeypatch):
+    game=Game(tmp_path,Path(__file__).resolve().parents[2]/'assets/bolha/content')
+    mind=game.intelligence
+    choice=['goal:watch']
+    def choose(context, actions, epsilon, bias):
+        return choice[0] if choice[0] in actions else actions[-1]
+    monkeypatch.setattr(mind.memory,'choose',choose)
+    game.adapt(100.)
+    watch=game.decision_snapshot()['current']
+    assert watch['action']=='watch' and watch['target'] is None
+    choice[0]='goal:explore'
+    game.adapt(mind.until+1.)
+    snapshot=game.decision_snapshot()
+    explore=snapshot['current']
+    assert explore['action']=='explore'
+    assert explore['target']==game.behavior.adaptive_target
+    assert explore['factors']['memory']['action']=='goal:explore'
+    assert any(row['action']=='explore_target' for row in snapshot['history'])
+
+def test_eventos_de_motor_sao_invariantes_a_frequencia_do_tick(tmp_path):
+    slower=Intelligence(memory_at(tmp_path/'slow'),tmp_path/'slow-habits.json',random.Random(1313))
+    faster=Intelligence(memory_at(tmp_path/'fast'),tmp_path/'fast-habits.json',random.Random(1313))
+    slow_count=sum(slower.event('probe',1.,1.,.1) for _ in range(1000))
+    fast_count=sum(faster.event('probe',1.,1.,.016) for _ in range(6250))
+    assert 55 <= slow_count <= 145
+    assert 55 <= fast_count <= 145
+    assert abs(slow_count-fast_count) <= 35
+
 def test_episodios_ilegivel_e_linha_grande_sao_tolerados(tmp_path,monkeypatch):
     memory=memory_at(tmp_path)
     record=dict(id='1',quando='2026',contexto='IDLE|feliz',acao='meme',resultado='sem resposta',valencia=0.)
@@ -150,3 +191,14 @@ def test_apagar_todo_aprendizado_preserva_preferencias(tmp_path):
     assert not game.brain.learned.any()
     assert not game.intelligence.habits.slots and not game.memory.recent
     assert not backup.exists()
+
+def test_comandos_sono_acordar_e_sossego_tem_origem_real(tmp_path):
+    content=Path(__file__).resolve().parents[2]/'assets/bolha/content'
+    game=Game(tmp_path,content)
+    game.interact({'type':'sleep'})
+    assert game.sleep.asleep and game.decision_snapshot()['current']['source']=='explicit_user_command'
+    game.interact({'type':'wake'})
+    assert not game.sleep.asleep and game.decision_snapshot()['current']['action']=='wake'
+    game.interact({'type':'quiet'})
+    decision=game.decision_snapshot()['current']
+    assert decision['action']=='watch' and decision['source']=='explicit_user_command'

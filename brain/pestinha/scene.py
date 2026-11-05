@@ -42,6 +42,7 @@ class Item:
         self.id = str(self.app.next_id)
         self.app.next_id += 1
         self.kind, self._w, self._h, self.text = kind, width, height, text
+        self._base_w, self._base_h = width, height
         self._cx = self._cy = 0.0
         self.visible = False
         self.closed = False
@@ -55,6 +56,21 @@ class Item:
         self.working = False
         self.image = None
         self.app.objects[self.id] = self
+        self._applied_scale = None
+
+    def apply_scale(self, scale):
+        """Aplica escala visual/física preservando o centro e os limites mínimos legíveis."""
+        scale = max(.3, min(3., float(scale)))
+        if self._applied_scale==scale:return
+        self._applied_scale=scale
+        min_w,min_h=minimum_object_dimensions(self.kind)
+        self._w, self._h = max(min_w, self._base_w*scale), max(min_h, self._base_h*scale)
+        if hasattr(self, 'body'):
+            if not hasattr(self,'_base_body_half_w'):
+                self._base_body_half_w,self._base_body_half_h=self.body.half_w,self.body.half_h
+            self.body.half_w = max(10.,self._base_body_half_w*scale)
+            self.body.half_h = max(10.,self._base_body_half_h*scale)
+
 
     def width(self): return self._w
     def height(self): return self._h
@@ -88,6 +104,37 @@ class Item:
                     text=self.text, image=self.image, angle=self.tilt, working=self.working, carried=self.carried)
 
 
+def object_scale(item, avatar_size=136, object_scales=None, bounds=None):
+    """Escala única por tipo, relativa ao avatar base de 136 px."""
+    kind = getattr(item, 'kind', '')
+    if kind in ('ball','paper'): key='toy'
+    elif kind=='notebook': key='notebook'
+    elif kind=='meme': key='reaction'
+    elif kind=='note': key='note'
+    elif kind=='sign': key='sign'
+    elif kind=='corner': key='corner'
+    elif kind=='fireworks': key='effects'
+    else: key='sign'
+    scales = object_scales if isinstance(object_scales, dict) else {}
+    value=scales.get(key,1.)
+    value=value if type(value) in (int,float) and math.isfinite(value) else 1.
+    scale=max(.3,min(3.,float(avatar_size)/136.*max(.6,min(1.8,value))))
+    if bounds is not None and len(bounds)==4:
+        width=max(1.,float(bounds[2])-float(bounds[0])-16.)
+        height=max(1.,float(bounds[3])-float(bounds[1])-16.)
+        scale=min(scale,width/max(1.,item._base_w),height/max(1.,item._base_h))
+    return max(.01,scale)
+
+
+def minimum_object_dimensions(kind):
+    if kind in ('ball','paper'):return (48.,48.)
+    if kind in ('meme',):return (96.,72.)
+    if kind in ('note','corner'):return (96.,72.)
+    if kind=='notebook':return (80.,50.)
+    if kind in ('sign','fireworks'):return (96.,60.)
+    return (20.,20.)
+
+
 class ObjectThing(Item):
     @property
     def x(self): return self._cx
@@ -103,7 +150,7 @@ class FloatingThing(Item):
 class ImageThing(ObjectThing):
     def __init__(self, path, max_side, emotion=None, reaction_kind='meme'):
         super().__init__('meme', min(240, max_side), min(240, max_side))
-        self.valida = bool(path and Path(path).is_file())
+        self.valida = bool(path is None or Path(path).is_file())
         self.image = Path(path).stem if path else None
         self.emotion = str(emotion or (Path(path).parent.name if path else 'observando'))
         self.reaction_kind = str(reaction_kind or 'meme')
@@ -111,7 +158,7 @@ class ImageThing(ObjectThing):
         self.attribution = ''
         self.provider = ''
         self.title='';self.subtitle=''
-        if self.valida and Path(path).suffix.lower()=='.svg':
+        if path and self.valida and Path(path).suffix.lower()=='.svg':
             import xml.etree.ElementTree as ET
             try:
                 root=ET.fromstring(Path(path).read_text(encoding='utf-8'))

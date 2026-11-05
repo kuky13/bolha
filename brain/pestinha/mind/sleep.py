@@ -19,6 +19,9 @@ class SleepController:
         self.memory = memory
         self.debug = debug          # função -> bool: imprime no terminal só no modo teste
         self.asleep = False
+        self.policy = None
+        self.rates = {}
+        self.next_decision = 0.
 
     def can_sleep(self, body, in_flight, protest_stage, mission):
         """Diz se ele pode dormir agora (cansado, no chão, sem ser segurado, sem protesto forte e sem missão)."""
@@ -29,12 +32,20 @@ class SleepController:
     def tick(self, now, body, in_flight, protest_stage, mission):
         """Um passo: dorme quando pode e acorda quando está descansado."""
         if self.asleep:
-            if self.drives.rested():
+            action = self.policy.choose('sleep_cycle', ['wake','stay'], rates=self.rates,
+                        emotion=self.emotion.current, energy=self.drives.energy, contact=self.drives.contact,
+                        weights={'wake': max(0., (self.drives.energy-.5)*2)}) if self.policy and self.drives.rested() and now >= self.next_decision else 'stay'
+            if self.policy and self.drives.rested() and now >= self.next_decision: self.next_decision = now+3.
+            if action == 'wake':
                 self.wake(startled=False)
             else:
                 self.emotion.force("dormindo", 0.3, now, PRIORITY["dormindo"])
-        elif self.can_sleep(body, in_flight, protest_stage, mission):
-            self.fall_asleep()
+        elif self.can_sleep(body, in_flight, protest_stage, mission) and now >= self.next_decision:
+            action = self.policy.choose('sleep_cycle', ['sleep','stay'], rates=self.rates,
+                        emotion=self.emotion.current, energy=self.drives.energy, contact=self.drives.contact,
+                        weights={'sleep': 1.-self.drives.energy}) if self.policy else None
+            self.next_decision = now+3.
+            if action == 'sleep': self.fall_asleep()
 
     def fall_asleep(self):
         """Adormece e consolida: refaz as preferências a partir dos episódios."""

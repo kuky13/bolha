@@ -12,7 +12,6 @@ ou desligar a opção no menu devolve ele à tela normal.
 """
 
 import math
-import random
 
 
 from ..core.protesto import load_signs
@@ -290,18 +289,30 @@ class CastigoController:
         Perdão: ACEITAR acima do limiar, ele sai sozinho (sem contar fuga) e o rancor cai pela metade.
         Cartaz: sorteio com a frequência do disparo de CARTAZ. Fuga: quando FUGIR passa do limiar.
         """
-        if motores.get("ACEITAR", 0.0) >= LIMIAR_PERDAO_HZ:
+        policy = getattr(self.app, 'intelligence', None)
+        forgive = motores.get('ACEITAR', 0.0) >= LIMIAR_PERDAO_HZ
+        if forgive and policy:
+            forgive = policy.choose('accept_punishment', ['forgive','stay'], rates=motores,
+                        emotion=self.estado.emotion, energy=self.app.drives.energy,
+                        contact=self.app.drives.contact, weights={'forgive':motores.get('ACEITAR',0.)/30}) == 'forgive'
+        if forgive:
             self.rancor *= 0.5
             self._soltar(self.estado)
             if self.debug():
                 log(f"[castigo] aceitou e saiu (ACEITAR {motores['ACEITAR']:.1f} Hz)")
             return
         cartaz_novo = self.cartaz is None or now - self.cartaz_desde >= CARTAZ_MIN_S
-        if cartaz_novo and random.random() < motores.get("CARTAZ", 0.0) * GANHO_CARTAZ * dt:
+        publicar = policy.event('punishment_sign', motores.get('CARTAZ',0.), GANHO_CARTAZ, dt, rates=motores,
+                    emotion=self.estado.emotion, energy=self.app.drives.energy,
+                    contact=self.app.drives.contact) if policy else False
+        if cartaz_novo and publicar:
             self._soltar_cartaz()
             bravo = motores.get("ANGRY", 0.0) >= COSTAS_HZ
-            textos = self.xingamentos if bravo and random.random() < 0.7 else self.cartazes + self.xingamentos[:2]
-            self.cartaz = SignThing(random.choice(textos), "castigo")
+            textos = self.xingamentos + self.cartazes[:2] if bravo else self.cartazes + self.xingamentos[:2]
+            texto = policy.choose('punishment_sign_text', textos, rates=motores, emotion=self.estado.emotion,
+                                  energy=self.app.drives.energy, contact=self.app.drives.contact,
+                                  weights={text: (1. if text in self.xingamentos and bravo else 0.) for text in textos}) if policy else textos[0]
+            self.cartaz = SignThing(texto, "castigo")
             self._posicionar_cartaz(body)              # já nasce em cima dele
             self.cartaz_desde = now
             self.cartaz.show()
@@ -309,7 +320,12 @@ class CastigoController:
                 log("[castigo] colou um cartaz")
         fugir = motores.get("FUGIR", 0.0)
         self.vontade_fuga = max(0.0, self.vontade_fuga + dt * (fugir - LIMIAR_FUGA_HZ) / CARGA_FUGA_HZ_S)
-        if self.vontade_fuga >= 1.0:                   # vontade sustentada, não um pico
+        escape = self.vontade_fuga >= 1.0
+        if escape and policy:
+            escape = policy.choose('escape_punishment', ['escape','stay'], rates=motores,
+                        emotion=self.estado.emotion, energy=self.app.drives.energy,
+                        contact=self.app.drives.contact, weights={'escape':fugir/30}) == 'escape'
+        if escape:                   # vontade sustentada, não um pico
             if self.debug():
                 log(f"[castigo] tentou fugir (FUGIR {fugir:.1f} Hz, vontade cheia)")
             self._iniciar_fuga(now, bounds)

@@ -96,6 +96,25 @@ def test_aparencia_do_brinquedo_nao_substitui_corpo_ou_aprendizado(tmp_path):
     assert game.brain.learned[0,0]==pytest.approx(.04)
 
 
+def test_pedido_para_brincar_move_o_brinquedo_sem_impulso_neural_espontaneo(tmp_path,monkeypatch):
+    clock = 100.
+    monkeypatch.setattr(time, 'monotonic', lambda: clock)
+    game = Game(tmp_path, CONTENT)
+    game.configure({'senseApp':False,'senseIdle':False,'senseCursor':False,'senseWindows':False})
+    game.last_think = clock
+    game.state.emotion = game.behavior.emotion = 'contente'
+    game.body.grounded = True
+    game.ball_stored = False
+    game.ball.show()
+    game.ball.body.x, game.ball.body.y = game.body.x + 75, game.body.y
+    assert game.behavior.play_pull == 0.
+    game.interact({'type':'play'})
+    assert game.decision_snapshot()['current']['action'] == 'play'
+    game.tick(.016, clock + .016)
+    assert game.ball.body.vx > 0 and game.ball.body.vy < 0
+    assert game.play.requested_action is None
+
+
 @pytest.mark.parametrize('target',[None,'toy'])
 @pytest.mark.parametrize('velocity',[(0,0),(1800,-1500)])
 def test_soltar_substitui_velocidade_antiga_pelo_gesto_recente(tmp_path,target,velocity,monkeypatch):
@@ -272,11 +291,10 @@ def test_sinais_de_proximidade_chegam_a_rede_e_impulsionam_brinquedo(tmp_path,mo
     assert game.ball.body.vx>0 and game.ball.body.vy<0
 
 
-@pytest.mark.parametrize('random_value,expected',[(0.,'comemorando'),(1.,'bote_erro')])
-def test_play_real_continua_neural_e_gera_reacao_da_tentativa(tmp_path,monkeypatch,random_value,expected):
-    import pestinha.body.brincadeira as play_module
-    monkeypatch.setattr(play_module.random,'random',lambda:random_value)
+@pytest.mark.parametrize('choice,expected',[('kick','comemorando'),('wait','bote_erro')])
+def test_play_real_continua_neural_e_gera_reacao_da_tentativa(tmp_path,monkeypatch,choice,expected):
     game=Game(tmp_path,CONTENT)
+    monkeypatch.setattr(game.intelligence,'choose',lambda action,candidates,**kwargs:choice)
     game.body.x,game.body.y=600,400;game.body.grounded=True
     game.ball.body.x,game.ball.body.y=650,400
     game.behavior.emotion='feliz';game.behavior.play_pull=0
@@ -289,6 +307,6 @@ def test_play_real_continua_neural_e_gera_reacao_da_tentativa(tmp_path,monkeypat
     assert game.behavior.last_play['started']==101
     game._play_expression(101)
     assert game.play_reaction['kind']==expected
-    if random_value==0:
+    if choice=='kick':
         assert game.ball.body.vx>0 and game.ball.body.vy<0
     else:assert vars(game.ball.body)==before
