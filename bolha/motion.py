@@ -74,7 +74,7 @@ def animation_pose(mode, seconds, strength=1.):
                     squash=.2 * math.sin(t * 15) * envelope * strength,
                     angle_offset=12 * math.sin(t * 16) * envelope * strength,
                     effect='bravo' if mode == 'birra' else None,
-                    effect_strength=strength if mode == 'birra' else 0.,
+                    effect_strength=strength * envelope if mode == 'birra' else 0.,
                     anger=_unit((.45 + .55 * strength) * envelope * pulse) if mode == 'birra' else 0.)
     elif mode == 'preparar_bote':
         crouch = _ease(t / .8)
@@ -83,15 +83,16 @@ def animation_pose(mode, seconds, strength=1.):
                     squash=.19 * crouch, angle_offset=4 * math.sin(t * 11) * crouch)
     elif mode == 'brinquedo_frustrado':
         # O abalo cresce com a intensidade, mas a esfera continua no mesmo centro.
-        rage = _ease(t / .32) * (.72 + .28 * strength)
-        pulse = .82 + .18 * math.sin(t * 21)
+        cooldown = 1. - _ease((t-2.05) / .75)
+        rage = _ease(t / .24) * (.72 + .28 * strength) * cooldown
+        pulse = .89 + .11 * math.sin(t * 9)
         pose.update(emotion='bravo', eye_open=.46 - .08 * rage,
                     ear_raise=-2.8 - 1.1 * rage,
                     ear_tilt=12 * math.sin(t * 22) * rage,
                     squash=.07 * math.sin(t * 19) * rage,
                     angle_offset=6.5 * math.sin(t * 20) * rage,
                     effect='bravo', effect_strength=_unit(rage * strength),
-                    anger=_unit((.72 + .28 * strength) * pulse))
+                    anger=_unit(rage * pulse))
     elif mode == 'brinquedo_perseguindo':
         dash = .5 + .5 * math.sin(t * 15)
         pose.update(emotion='atento', eye_open=1.16,

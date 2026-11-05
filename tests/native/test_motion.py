@@ -94,6 +94,8 @@ def test_reacoes_a_perseguir_e_keep_away_sao_visuais_sem_alterar_a_fisica(tmp_pa
     assert frustrated['emotion'] == 'bravo'
     assert frustrated['anger'] > .6 and frustrated['effect'] == 'bravo'
     assert frustrated['ear_raise'] < -3 and frustrated['eye_open'] < .5
+    cooling = animation_pose('brinquedo_frustrado', 2.7, .9)
+    assert cooling['anger'] < .15 and cooling['effect_strength'] < .15
     game.play_reaction = dict(kind='brinquedo_perseguindo', started=101, until=103,
                               intensity=.8)
     chase = motion.update(game, 101.4)
