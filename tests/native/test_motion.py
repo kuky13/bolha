@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Expressões reais respeitam cérebro, relógio e a única autoridade física."""
 from pathlib import Path
+import math
 import time
 import pytest
 from game import Game
@@ -106,6 +107,8 @@ def test_rebatida_real_do_pingpong_comprime_estica_e_fecha_o_efeito(tmp_path,mon
     settled=motion.update(game,100.38)
     assert impact['squash']<-.1 and impact['effect']=='rebatida'
     assert stretch['squash']>.1 and stretch['ear_raise']>0.
+    local = math.degrees(math.atan2(stretch['gaze'][1],stretch['gaze'][0]))
+    assert local+game.body.angle+stretch['angle_offset']==pytest.approx(game.play_reaction['heading'])
     assert settled['squash']==0. and settled['effect_strength']==0.
     assert motion.update(game,100.5)['effect'] is None
 

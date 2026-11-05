@@ -53,6 +53,26 @@ def test_angry_and_sad_eyes_have_opposite_readable_lids(qt_application):
     assert slopes['triste'] < -.03
 
 
+def test_olhos_e_orelhas_apontam_para_o_lado_do_olhar(qt_application):
+    left = gold(render(draw_character,emotion='atento',gaze=(-1.,0.)))
+    right = gold(render(draw_character,emotion='atento',gaze=(1.,0.)))
+    for region, displacement in ((slice(125,145),6.),(slice(147,174),12.)):
+        left_x = np.nonzero(left[region])[1].mean()
+        right_x = np.nonzero(right[region])[1].mean()
+        assert right_x-left_x>displacement
+
+
+@pytest.mark.parametrize('heading,angle,squash', [(-42.,28.,.20),(38.,-24.,-.20),(95.,64.,.12)])
+def test_arco_da_rebatida_mantem_direcao_apos_deformar(qt_application,heading,angle,squash):
+    effect=render(draw_reaction_marks,kind='rebatida',phase=.12,angle=angle,squash=squash,
+                  effect_angle=heading-angle)
+    ys,xs=np.nonzero(effect[:,:,3])
+    weights=effect[ys,xs,3].astype(float)
+    x=np.average(xs+.5-160,weights=weights)
+    y=np.average(ys+.5-160,weights=weights)
+    assert math.degrees(math.atan2(y,x))==pytest.approx(heading,abs=1.)
+
+
 @pytest.mark.parametrize('kind', ['carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida'])
 def test_reaction_marks_move_fade_and_fit_visual_window(qt_application, kind):
     assert not render(draw_reaction_marks, kind=kind, strength=0).any()

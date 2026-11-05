@@ -106,7 +106,7 @@ def _body(p, anger=0.0):
 
 
 def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0,
-              blink_left=None, blink_right=None, anger=0.0, detail=1.0):
+              blink_left=None, blink_right=None, anger=0.0, detail=1.0, ear_gaze=None):
     """Desenha somente olhos e orelhas. A metade inferior do rosto fica vazia."""
     clip = QPainterPath()
     clip.addEllipse(QPointF(0, 0), FACE_RADIUS, FACE_RADIUS)
@@ -114,7 +114,7 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     p.setClipPath(clip, Qt.IntersectClip)
     p.setBrush(Qt.NoBrush)
     p.setPen(_pen(width=2.5*detail))
-    # Os ângulos das orelhas são espelhados, e os olhos mantêm formato idêntico.
+    # O rosto frontal é simétrico. Ao olhar de lado, o olho mais próximo se abre um pouco.
     profiles = {
         'observando': (5.2, 6.4, 0.0, 0.0, 0.0),
         'contente':   (5.2, 6.0, 0.0, 2.0, .4),
@@ -138,16 +138,19 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     ry *= 1 + .2*(detail-1)
     tilt = _clamp(tilt + ear_tilt, -35, 35)
     raise_units = _clamp(raise_units + ear_raise, -5, 5)
+    gx,gy = gaze
+    ex,ey = gaze if ear_gaze is None else ear_gaze
+    if emotion == 'dormindo':
+        gx = gy = ex = ey = 0.
     for side in (-1, 1):
         p.save()
-        p.translate(side * 18, -19 - raise_units)
-        p.rotate(side * tilt)
+        p.translate(side*17.5 + ex*4.4, -18.-raise_units+ey*2.8-side*ex*1.2)
+        p.rotate(side*tilt+ex*14.)
         ear = QPainterPath(QPointF(-4.8, -2))
         ear.quadTo(-1, -12, 0, -12)
         ear.quadTo(1, -12, 4.8, -2)
         p.drawPath(ear)
         p.restore()
-    gx, gy = gaze
     opening = _clamp(eye_open, 0, 1.3)
     if emotion == 'dormindo': blink = 1.0
     closing = max(blink, 1 - min(1, opening))
@@ -155,7 +158,9 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     for side in (-1, 1):
         individual = blink_left if side < 0 else blink_right
         closing_eye = closing if individual is None else max(closing,_clamp(individual,0,1))
-        x, y = side * 18 + gx * 1.6, eye_y + gy * .9
+        turn = side*gx
+        x = side*18*(1.-.12*abs(gx))+gx*7.1
+        y = eye_y+gy*3.6+.65*turn*gy
         if closing_eye > .94 or emotion == 'feliz' and not intentional:
             happy = emotion == 'feliz' and closing_eye <= .94
             eye = QPainterPath(QPointF(x - 5.3, y + (2 if happy else -1)))
@@ -181,29 +186,31 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
             p.setBrush(QColor(GOLD))
             p.drawPath(eye)
         else:
-            height = ry * (1 - closing_eye) * max(1.0, opening) + .7 * closing_eye
+            width = rx*(1.+.16*turn)
+            height = (ry * (1 - closing_eye) * max(1.0, opening) + .7 * closing_eye)*(1.+.07*turn)
             eye = QPainterPath()
-            eye.addEllipse(QPointF(x, y), rx, height)
+            eye.addEllipse(QPointF(x, y), width, height)
             if emotion in ('bravo', 'triste', 'entediado', 'sonolento', 'travesso'):
                 # As pálpebras fazem parte dos olhos, sem acrescentar boca ou sobrancelhas.
                 slope = side * ((-.43 - .14 * anger) if emotion == 'bravo' else .26 if emotion == 'triste' else 0)
                 lid_y = y - height * ((.14 - .12 * anger) if emotion == 'bravo' else .30 if emotion == 'triste' else .48)
-                lid = QPainterPath(QPointF(x-rx-1, lid_y + slope*(-rx-1)))
-                lid.lineTo(x+rx+1, lid_y + slope*(rx+1))
-                lid.lineTo(x+rx+1, y+height+1)
-                lid.lineTo(x-rx-1, y+height+1)
+                edge = width+1.
+                lid = QPainterPath(QPointF(x-edge,lid_y-slope*edge))
+                lid.lineTo(x+edge,lid_y+slope*edge)
+                lid.lineTo(x+edge,y+height+1)
+                lid.lineTo(x-edge,y+height+1)
                 lid.closeSubpath()
                 eye = eye.intersected(lid)
             p.setPen(Qt.NoPen)
             p.setBrush(_color(GOLD, .12))
-            p.drawEllipse(QPointF(x, y), rx + 1.0, height + 1.0)
+            p.drawEllipse(QPointF(x, y), width+1., height+1.)
             p.setBrush(QColor(GOLD))
             p.drawPath(eye)
             if height > 3:
                 p.save()
                 p.setClipPath(eye, Qt.IntersectClip)
                 p.setBrush(QColor('#fff4cf'))
-                p.drawEllipse(QPointF(x - 1.2 + gx * .2, y - 2.0), 1.05, 1.05)
+                p.drawEllipse(QPointF(x-1.2+gx*1.45,y-2.+gy*1.1),1.05,1.05)
                 p.restore()
     p.restore()
 
@@ -211,7 +218,7 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
 def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
                    blink=0.0, gaze=(0.0, 0.0), squash=0.0,
                    ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, body_opacity=1.0,
-                   blink_left=None, blink_right=None, anger=None):
+                   blink_left=None, blink_right=None, anger=None, ear_gaze=None):
     """Pinta Bolha somente com olhos e orelhas: nunca desenha boca.
 
     ``blink``: 0 aberto, 1 fechado; ``eye_open``: abertura 0..1.3;
@@ -222,6 +229,8 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
     emotion = emotion if emotion in EMOTIONS else 'observando'
     anger = (.75 if emotion == 'bravo' else 0.0) if anger is None else _clamp(anger, 0.0, 1.0)
     gaze = (_clamp(gaze[0], -1, 1), _clamp(gaze[1], -1, 1))
+    if ear_gaze is not None:
+        ear_gaze = (_clamp(ear_gaze[0],-1,1),_clamp(ear_gaze[1],-1,1))
     painter.save()
     _apply_pose_transform(painter, cx, cy, scale, angle, squash)
     painter.save()
@@ -230,7 +239,7 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
     painter.restore()
     _features(painter, emotion, _clamp(blink, 0, 1), gaze,
               _clamp(ear_tilt, -35, 35), _clamp(ear_raise, -5, 5), _clamp(eye_open, 0, 1.3),
-              blink_left, blink_right, anger, detail=max(1., min(1.3, .7/max(.05, scale))))
+              blink_left,blink_right,anger,detail=max(1.,min(1.3,.7/max(.05,scale))),ear_gaze=ear_gaze)
     painter.restore()
 
 
@@ -349,7 +358,11 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
     elif kind == 'bravo':
         _draw_anger_marks(painter, phase, strength)
     elif kind == 'rebatida':
-        painter.rotate(_clamp(effect_angle,-180.,180.))
+        direction = math.radians(_clamp(effect_angle,-180.,180.))
+        deformation = _clamp(squash,-.25,.25)
+        # Corrige a direção antes de deformar, para o arco manter o rumo do brinquedo.
+        painter.rotate(math.degrees(math.atan2(math.sin(direction)/(1.-deformation),
+                                               math.cos(direction)/(1.+deformation))))
         progress = _clamp(phase/.24,0.,1.)
         x, height = 47.+6.*progress, 7.+4.*progress
         arc = QPainterPath(QPointF(x-2.,-height))

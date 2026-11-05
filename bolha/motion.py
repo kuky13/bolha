@@ -245,6 +245,12 @@ class ExpressionMotion:
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
         if mode == 'pingpong_rebatida':
-            self.pose['effect_angle'] = play_reaction.get('heading',0.)-body.angle-self.pose['angle_offset']
+            heading = play_reaction.get('heading',0.)
+            follow = math.sin(math.pi*_unit(elapsed/.42))
+            self.pose['angle_offset'] += 10.*math.sin(math.radians(heading))*follow
+            local_angle = heading-body.angle-self.pose['angle_offset']
+            self.pose['effect_angle'] = local_angle
+            aim = math.radians(local_angle)
+            self.pose['gaze'] = math.cos(aim),math.sin(aim)
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         return self.pose

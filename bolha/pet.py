@@ -42,6 +42,7 @@ class PetVisual(QWidget):
         draw_character(p,self.width()/2,self.height()/2,scale=scale,
                        angle=angle,emotion=pose['emotion'],
                        blink=pose['blink'],gaze=self.pet.visual_gaze,
+                       ear_gaze=self.pet.visual_ear_gaze,
                        blink_left=pose['blink_left'],blink_right=pose['blink_right'],
                        ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
                        eye_open=pose['eye_open'],squash=squash,
@@ -69,6 +70,7 @@ class PetWindow(QWidget):
         self.setMouseTracking(True);self.setFixedSize(256,256)
         self.visual=PetVisual(self)
         self.visual_gaze=game.state.gaze
+        self.visual_ear_gaze=game.state.gaze
         self.gaze_tick=time.monotonic()
         self.press=None;self.offset=(0.,0.);self.dragging=False
         self.mouse_grab=MouseGrab(self);self.drag_position=None
@@ -80,8 +82,11 @@ class PetWindow(QWidget):
         now=time.monotonic()
         self.motion.update(self.game,now,self.press[1] if self.press else None)
         target=self.motion.pose['gaze'] or self.game.state.gaze
-        ease=1-math.exp(-18*max(0.,now-self.gaze_tick))
-        self.visual_gaze=tuple(current+(goal-current)*ease for current,goal in zip(self.visual_gaze,target))
+        elapsed=max(0.,now-self.gaze_tick)
+        eye_ease=1-math.exp(-22*elapsed)
+        ear_ease=1-math.exp(-12*elapsed)
+        self.visual_gaze=tuple(current+(goal-current)*eye_ease for current,goal in zip(self.visual_gaze,target))
+        self.visual_ear_gaze=tuple(current+(goal-current)*ear_ease for current,goal in zip(self.visual_ear_gaze,target))
         self.gaze_tick=now
         x,y=round(self.body.x-self.width()/2),round(self.body.y-self.height()/2)
         self.move(x,y)
