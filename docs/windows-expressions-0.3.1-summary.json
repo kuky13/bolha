@@ -1,0 +1,247 @@
+{
+  "version": "0.3.1",
+  "sourceSha": "1dd7277d49949bc014e3457569e3540becf50732",
+  "ci": {
+    "ciUrl": "https://github.com/kuky13/bolha/actions/runs/41763057623",
+    "ciPassed": true,
+    "automatedWindowsTests": 237,
+    "installerSize": 34780199,
+    "installerSha256": "8aa32617bc7a1638a25dfab87bc88ae7129918a12af93aae881a4807aa96cd1a",
+    "sha512Verified": true,
+    "checksumsVerified": true,
+    "releasePublished": false
+  },
+  "linuxTests": {
+    "passed": 226,
+    "skippedRequiresWindowsPowerShell": 11,
+    "cancelInteractionClearsPetHoverRegression": true
+  },
+  "ciInstallerTests": {
+    "native031ToFixture032": true,
+    "electron010To031": true,
+    "electron021To031": true
+  },
+  "realWindowsSource": {
+    "passed": true,
+    "sourceTrackedCleanAfter": true,
+    "realProfileAndRegistryUnchanged": true,
+    "foregroundUnchanged": true,
+    "globalInputUsed": false,
+    "physicalMultiMonitorTested": false,
+    "groups": [
+      {
+        "name": "healthy_source_open",
+        "passed": true
+      },
+      {
+        "name": "pet_release_first_game_frame",
+        "passed": true
+      },
+      {
+        "name": "toy_release_first_game_frame",
+        "passed": true
+      },
+      {
+        "name": "hold_brain_irritation_and_caress",
+        "passed": true
+      },
+      {
+        "name": "held_gesture_restarts_sleep_transition",
+        "passed": true
+      },
+      {
+        "name": "zzz_only_after_asleep_and_hidden_while_held",
+        "passed": true
+      },
+      {
+        "name": "ui_selector_peanut_ball_peanut_persists_sensors_off",
+        "passed": true
+      },
+      {
+        "name": "effects_bounds_body_masks_desk_clip_and_input_flags",
+        "passed": true
+      },
+      {
+        "name": "coherent_steady_metrics",
+        "passed": true
+      }
+    ],
+    "inputMethod": "QApplication.sendEvent to owned QWidget only",
+    "fixtureFiltersSpontaneousMouseEventsOnOwnedWidgets": true
+  },
+  "realWindowsInput": {
+    "passed": true,
+    "bodyHitsOwnedPet": true,
+    "haloHitsOwnedBackground": true,
+    "inputWsExNoActivate": true,
+    "visualWsExNoActivate": true,
+    "visualWsExTransparent": true,
+    "foregroundUnchanged": true,
+    "globalInputUsed": false,
+    "physicalMultiMonitorTested": false,
+    "realProfileAndRegistryUnchanged": true
+  },
+  "sourceEntrySample": {
+    "passed": true,
+    "sampleSeconds": 45.23400000000038,
+    "rssMinMiB": 86.953125,
+    "rssMeanMiB": 87.77109375,
+    "rssMaxMiB": 87.90625,
+    "cpuPercentOfOneCore": 46.459797939602566,
+    "blasThreads": 1,
+    "realProfileAndRegistryUnchanged": true,
+    "ownProcessExited": true,
+    "metrics": {
+      "version": "0.3.1",
+      "healthy": true,
+      "neurons": 470,
+      "frameP95Ms": 31,
+      "thinkP95Ms": 27.43,
+      "brainArrayMiB": 4.651
+    },
+    "conditions": {
+      "avatarSize": 136,
+      "roaming": false,
+      "toyAppearance": "peanut",
+      "mischiefEnabled": false,
+      "senseApp": false,
+      "senseIdle": false,
+      "senseCursor": false,
+      "senseWindows": false,
+      "adaptiveBehavior": false,
+      "learnRoutine": false
+    },
+    "overlappedInstallerDownload": true,
+    "frameStatisticsUseRollingWindow": true
+  },
+  "pending": {
+    "prolongedManualInteractiveSession": true,
+    "physicalMultipleMonitors": true,
+    "controlledLongDurationPerformance": true
+  },
+  "sourceSleepTrialHistory": {
+    "interferedAttempts": 2,
+    "interference": "GUI events received by the fixture during the sleep test",
+    "countercheck": "Hold and release restarts the sleep transition as expected",
+    "finalTrialPassed": true,
+    "applicationChanged": false,
+    "globalInputUsed": false
+  },
+  "sourceScreenshots": {
+    "count": 7,
+    "sha256Verified": true,
+    "desktopCaptureUsed": false
+  },
+  "realWindowsNativeUpdate": {
+    "fromVersion": "0.3.0",
+    "toVersion": "0.3.1",
+    "passed": true,
+    "wrapperPassed": true,
+    "scenarioCount": 10,
+    "registryUnchanged": true,
+    "realProfileAndRegistryUnchanged": true,
+    "applicationChangedBetweenAttempts": false,
+    "attempts": [
+      {
+        "number": 1,
+        "passed": false,
+        "errorType": "PermissionError",
+        "winError": 5,
+        "stage": "Base application termination in checksum scenario",
+        "causeConclusive": false
+      },
+      {
+        "number": 2,
+        "passed": true,
+        "passedScenarioCount": 10
+      }
+    ],
+    "scenarios": [
+      {
+        "scenario": "foreign_directory_preserved",
+        "passed": true
+      },
+      {
+        "scenario": "clean_install_existing_empty_directory",
+        "passed": true
+      },
+      {
+        "scenario": "checksum_rejected_app_continues",
+        "passed": true
+      },
+      {
+        "scenario": "interrupted_rejected_app_continues",
+        "passed": true
+      },
+      {
+        "scenario": "one_hour_deferral_persistent",
+        "passed": true
+      },
+      {
+        "scenario": "restart_offline_uses_verified_pending",
+        "passed": true
+      },
+      {
+        "scenario": "tampered_cached_installer_rejected",
+        "passed": true
+      },
+      {
+        "scenario": "failed_target_start_restores_previous_installation",
+        "passed": true
+      },
+      {
+        "scenario": "automatic_30_second_update_and_cleanup",
+        "passed": true
+      },
+      {
+        "scenario": "preferences_seed_learning_and_registry_preserved",
+        "passed": true
+      }
+    ]
+  },
+  "installedPackageEntrySample": {
+    "passed": true,
+    "sampleSeconds": 45.125,
+    "rssMinMiB": 79.04296875,
+    "rssMeanMiB": 79.32688802083334,
+    "rssMaxMiB": 79.4453125,
+    "cpuPercentOfOneCore": 44.42520775623269,
+    "blasThreads": 1,
+    "packagedInventoryVerified": true,
+    "packagedExeSha256": "4c6db9394a7e162c27dbc2287a10abf00ce15faa1f740ec40f7a2cf8e22c9656",
+    "realProfileAndRegistryUnchanged": true,
+    "ownProcessExited": true,
+    "ownProcessIdentityAndExecutableVerified": true,
+    "metrics": {
+      "version": "0.3.1",
+      "healthy": true,
+      "neurons": 470,
+      "frameP95Ms": 31,
+      "thinkP95Ms": 29.08,
+      "brainArrayMiB": 4.651
+    },
+    "conditions": {
+      "avatarSize": 136,
+      "opacity": 1,
+      "roaming": false,
+      "toyAppearance": "peanut",
+      "mischiefEnabled": false,
+      "senseApp": false,
+      "senseIdle": false,
+      "senseCursor": false,
+      "senseWindows": false,
+      "adaptiveBehavior": false,
+      "learnRoutine": false
+    },
+    "devicePixelRatio": 1.25,
+    "serialToOtherValidationRuns": true,
+    "frameStatisticsUseRollingWindow": true,
+    "frameRollingWindowSize": 1800,
+    "brainRollingWindowSize": 600,
+    "controlledBenchmark": false
+  },
+  "realProfileAndRegistrySnapshots": {
+    "pairsCompared": 3,
+    "allEqual": true
+  }
+}

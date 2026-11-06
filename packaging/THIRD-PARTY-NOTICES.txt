@@ -1,0 +1,26 @@
+Bolha 0.3 — componentes redistribuídos
+
+Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-only.
+Pestinha: mille-okws e contribuidores, GPL-3.0-or-later.
+Código fonte e instruções: https://github.com/kuky13/bolha
+Artes: André Ribeiro Lima (KukySolutions), CC BY-NC 4.0; consulte BOLHA-ASSETS.md.
+
+Qt 6.11.3 / PySide6 / Shiboken6: The Qt Company Ltd. e contribuidores.
+Este programa GPLv3 utiliza a opção GPLv3 dos componentes Qt/PySide6.
+Bibliotecas compartilhadas Qt permanecem separadas e podem ser substituídas.
+Fontes correspondentes: https://code.qt.io/cgit/qt/qtbase.git/tag/?h=v6.11.3
+https://code.qt.io/cgit/pyside/pyside-setup.git/tag/?h=v6.11.3
+Documentação de licenças: https://doc.qt.io/qt-6/licensing.html
+Texto GPLv3 incluído em licenses/LICENSE. Os textos de licença e avisos de
+terceiros do QtBase 6.11.3 acompanham licenses/third-party/QtBase-6.11.3.
+São os originais oficiais dos componentes Core/Gui/Widgets/OpenGL; alguns
+componentes opcionais listados podem não estar presentes nesta distribuição. As demais licenças e avisos coletados
+dos pacotes de distribuição ficam em licenses/third-party/.
+
+CPython 3.11: Python Software Foundation, licença PSF e avisos associados.
+NumPy: NumPy Developers, BSD e licenças dos componentes incluídos (OpenBLAS etc.).
+psutil: Giampaolo Rodola e contribuidores, BSD-3-Clause.
+pywin32: Mark Hammond e contribuidores, PSF-2.0.
+PyInstaller: PyInstaller Development Team, GPLv2+ com exceção de bootloader
+que permite distribuir programas segundo suas próprias licenças.
+NSIS: contribuidores do NSIS, zlib/libpng e avisos dos componentes do instalador.

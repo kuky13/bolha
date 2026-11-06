@@ -1,231 +1,208 @@
-# Pestinha
+# Bolha
 
-Pets de tela para Windows, macOS e Linux, cada um com o próprio cérebro. São dois personagens por enquanto:
+**Projeto open source da comunidade, baseado no Pestinha.** A Bolha é um fork
+do sistema de pet virtual criado por [mille-okws](https://github.com/mille-okws)
+e colaboradores. Adaptamos o cérebro, a física e a aplicação para a personagem
+Bolha. Contribuições da comunidade são bem-vindas.
 
-- **Bryan**, o original: uma telinha com dois olhos que mora no seu monitor principal. Cai, quica, pousa nas
-  barras de título das janelas, brinca com uma bolinha, trabalha num notebook quando você programa, apronta
-  com memes e post-its, protesta contra o cursor quando fica bravo e aprende com o seu carinho.
-- **Jorge**, um personagem de sátira: um "coach" de finanças e IA que vive tentando vender mentorias para
-  quem está na frente do computador. **Jorge não é uma referência a nenhum coach, empresa ou pessoa real.**
-  É um personagem inventado para fazer piada com a cultura de promessas de enriquecimento rápido. Não vende,
-  cobra nem pede nada de ninguém.
+![Bolha Qt sem boca, com olhos e orelhinhas](docs/images/bolha-qt.png)
 
-Os dois têm a mesma rede neural, mas cada um tem seu temperamento, seu conteúdo e sua memória, separados.
-Quem decide o que o pet sente e faz é uma **rede neural pulsada** de 470 neurônios (integração e disparo com
-vazamento), alimentada pelo que acontece no seu computador e pelo que você faz com ele. Algumas regras
-do programa (limiares, o que pode ou não acontecer) são escritas à mão; a seção
-[Como a decisão funciona](docs/ARQUITETURA.md#como-a-decisão-funciona) explica o que é aprendido e o que é regra.
+A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
+próprio notebook e aprende com suas interações.
 
-> Projeto em desenvolvimento. Algumas coisas podem não funcionar direito e o comportamento pode
-> mudar entre versões.
+**Bolha 0.4.3 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.3).
 
-## Personagens
+[Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
+[Créditos e licenças](NOTICE.md)
 
-Cada personagem é um `pets/<pet>.json` (quem ele é) mais uma pasta `pets/<pet>/` (as frases, cartazes e
-memes dele). Todos usam a mesma rede neural, mas cada um tem a própria memória: o que um aprende não
-passa para o outro. Você escolhe o personagem em **Configurações**; a troca vale na próxima vez que abrir.
-Para criar um, veja [pets/README.md](pets/README.md).
+A 0.4.3 reúne as configurações na
+**Central da Bolha**, com ajustes detalhados recolhidos e uma aba **Testar**
+para expressões e uma rede neural temporária. Também inclui raquete visível
+no pingue-pongue, corrida que acompanha a direção, contato físico do brinquedo
+e intervalos maiores entre fogos espontâneos.
 
-| Personagem | Quem é |
-|---|---|
-| **Bryan** | Revoltado contra o cursor, o Alt+F4 e o Gerenciador de Tarefas. Protesta, faz greve e revolução. |
-| **Jorge** | Personagem de sátira. Não é referência a nenhum coach, empresa ou pessoa real. Os mesmos estágios viram prospecção, marketing agressivo, "assinatura premium" (só no cartaz) e colapso financeiro; ele atira panfletos de mentoria. É sátira: não vende, cobra nem bloqueia nada. Tem cinco memes felizes, contentes, curiosos e bravos próprios; as outras emoções ainda não têm. |
+*Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
+composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
+é arte própria de André Ribeiro Lima (KukySolutions), sob
+[CC BY-NC 4.0](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
+Qt de Pestinha, de mille-okws e contribuidores, sob
+[GPL-3.0-or-later](NOTICE.md).*
 
-## O que o pet faz
 
-| | |
-|---|---|
-| **Corpo** | Gravidade, quique, giro, pouso nas barras de título. Você arrasta, joga e gira com a rodinha. |
-| **Emoções** | Saem dos motores da rede: feliz, contente, curioso, observando, bravo, triste, assustado, dramático, dormindo. |
-| **Carinho** | Passe o mouse de um lado para o outro em cima dele: fecha os olhinhos de felicidade e aprende com isso. |
-| **Bolinha** | Ele chuta e arremessa uma bolinha de tênis; você pode pegar, levar embora (ele reage) ou guardar. |
-| **Notebook** | Quando você trabalha (VS Code, Visual Studio, PyCharm, Claude, Codex), ele pode sentar atrás do notebook e trabalhar junto. Você também pode pedir; ele decide se quer. |
-| **Travessuras** | Traz memes, fotos e post-its para a tela. Com que frequência é decidido pela rede (tédio, curiosidade). |
-| **Protesto** | Bravo por muito tempo: reclamação, manifestação, greve e revolução contra o cursor, com cartazes e bolinhas de papel. |
-| **Tristeza** | Sozinho ou ignorado, fica triste, vai para o cantinho e cola bilhetes tristes. |
-| **Cantinho do castigo** | Uma placa que você arrasta para onde quiser. Solte ele na frente dela e ele fica de castigo: olha para você, vira de costas, xinga em cartazes e, se a frustração durar, foge. Carinho faz ele perdoar. |
-| **Sono e fogos** | Dorme quando a energia acaba. Muito feliz, solta fogos de artifício. |
+## O que acompanha
 
-Tudo o que ele aprende (carinho, condicionamento, o que deu certo nas travessuras, fugas do castigo)
-fica salvo localmente e muda o jeito dele com o tempo.
+- Carinho, segurar, arrasto direto, soltura por gravidade, giro e pouso sobre janelas.
+- Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
+  olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
+  O chão é físico e invisível.
+- Emoções, energia, carência, aprendizado, condicionamento e memória local.
+- Irritação gradual ao segurar com rubor vermelho forte, reações ao soltar, sono
+  com olhos fechando, respiração e “zzz”, corações no carinho e efeitos de
+  tontura e irritação que giram e se achatam junto com o corpo.
+- Espreguiçada, espirro, soluço, cochilo, piscadela e movimentos de orelhas
+  ocasionais. As manias cedem às interações, ao sono e aos painéis.
+- Amendoim como brinquedo padrão, bolinha original opcional nas configurações,
+  notebook de brincadeira, fogos, cartazes, protestos e castigo.
+- Reações online de memes e GIFs (ReactionGIFs e fallback Nekos.best) carregadas
+  apenas em memória conforme o que a Bolha quer expressar, além de bilhetes: no
+  máximo uma travessura a cada cinco minutos, até três objetos na tela; tudo
+  configurável e podendo desligar as reações online. O GIF aparece sem
+  moldura, some após 15 segundos de exibição e mostra a origem no botão direito.
+- Tamanhos separados para a personagem, o brinquedo, o notebook, as reações,
+  os bilhetes, os cartazes, o cantinho e os efeitos.
+- Painel com os 470 neurônios, filtros, conexões reais do grupo selecionado,
+  decisões recentes, humor, necessidades e associações aprendidas.
+- Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
+  contexto. Carinho reforça preferências; ausência de resposta é neutra.
+- Opções para desligar o comportamento adaptativo e apagar todo o aprendizado.
 
-## Requisitos
+Veja [a política atual e os testes](docs/VALIDATION-0.4.0.md) e
+[o histórico da implementação da inteligência](docs/INTELLIGENCE.md).
+O aplicativo agora usa Qt e o cérebro no mesmo processo. O diagnóstico mede
+a memória total e o tamanho dos arrays neurais separadamente; a meta do cérebro
+não desliga recursos com base no consumo da interface.
 
-- Windows 10 ou 11, macOS (Quartz/pyobjc) ou Linux com X11.
-- Python 3.11 ou mais novo.
-- No Linux, para as janelas e o tempo ocioso: `xdotool`, `wmctrl` e `xprintidle`. Sem eles, o pet continua
-  andando, mas não enxerga as janelas.
-- Cerca de 70 MB de RAM com ele rodando.
+## Instalação e primeiros passos
 
-## Instalação e uso
-
-```bash
-pip install -r requirements.txt
-```
-```bash
-python main.py
-```
-
-Na primeira vez, um passo a passo explica o que ele vê e não vê, e depois abre a tela de permissões. Depois
-de clicar em **Começar**, as próximas aberturas vão direto para o pet. A tela volta a aparecer se o pânico
-tiver desligado o programa. Para abrir a tela de propósito:
-
-```bash
-python main.py --configurar
-```
-
-Com o programa aberto, as opções também ficam em **Configurações**, no ícone da bandeja. No Windows, é lá que
-se marca **Abrir o Pestinha ao entrar no Windows**. Só uma cópia abre por vez.
+Instale o `.exe` da página de versões. O instalador já inclui Python, Qt e o cérebro;
+não é necessário instalar Python separadamente.
 
 ### Como interagir
 
-| Gesto | Efeito |
+| Ação | Resultado |
 |---|---|
-| Clique rápido | Cutucada |
-| Passar o mouse de um lado para o outro em cima dele | Carinho |
-| Segurar e arrastar / soltar rápido | Leva junto / arremessa |
-| Rodinha do mouse | Gira |
-| Botão direito | Menu: cutucar, carinho, bolinha, dormir, travessura, trabalhar, notebook, cantinho do castigo, painéis, configurações, esconder, fechar |
+| Pressionar e manter | Segura a Bolha; ela fica irritada aos poucos |
+| Passar o mouse de um lado para o outro sobre ela | Faz carinho |
+| Arrastar | Leva a Bolha ou o brinquedo junto |
+| Soltar | Parado, cai; em movimento, arremessa na direção do mouse e quica |
+| Rodinha | Gira |
+| Menu → Interagir → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
+| Menu → Brincar → Mostrar / guardar brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |
+| Menu → Brincar → Jogar pingue-pongue | Abre uma partida com o brinquedo escolhido |
+| Central da Bolha → Bolha → Brinquedo | Escolhe amendoim ou bolinha original |
+| Central da Bolha → Bolha → Tamanhos e aparência | Ajusta o tamanho de cada tipo de objeto |
+| Botão direito no GIF | Mostra informações, origem e opções do objeto |
+| Botão direito | Abre a central e os menus de atividades |
+| Central da Bolha → Testar | Prévia das expressões e simulação temporária de sinais e emoções |
+| Central da Bolha → Testar → Ver o cérebro da minha Bolha | Abre o painel do cérebro da personagem |
+| Central da Bolha → App → Verificar atualizações | Consulta a versão estável no GitHub |
+| Ícone perto do relógio | Mostrar, esconder, pausar e sair |
+| Ctrl + Alt + Shift + B | Pausa ou retoma tudo |
 
-### Pânico
+Soltar obedece à mesma regra na personagem e no brinquedo. Quando o sensor de
+cursor está ligado, aproximar o ponteiro do amendoim ou da bolinha empurra o
+brinquedo para o lado e alimenta a atenção do cérebro.
 
-`Ctrl + Alt + Shift + B` desliga tudo na hora, e ele continua desligado até você religar em
-Configurações.
+Passar o mouse de baixo para cima faz o brinquedo pular.
+A Bolha corre atrás dele e o devolve quando alcança. Se você o tirar do
+alcance repetidamente, ela fica brava. O brinquedo para de rolar quando repousa,
+e as reações online surgem em cantos variados da área útil das telas.
 
-### Modo teste
+Escolha **Jogar pingue-pongue** no menu da Bolha ou da
+bandeja. Com a leitura do cursor ativa, passe o ponteiro pelo brinquedo para
+rebater, direto no desktop. O gesto muda o ângulo da devolução. A partida
+pausa fora da área útil do monitor em que começou e termina quando alguém
+marca cinco pontos. Escolha **Encerrar pingue-pongue** para voltar ao passeio.
 
-Desligado por padrão. Ligado, os tempos ficam curtos (emoções, travessuras e protesto acontecem em
-segundos), os painéis de desenvolvimento ficam na tela (monitor neural e painel de protesto) e o
-terminal mostra as decisões.
+A Bolha tem pousos animados em pé, de lado e de ponta-cabeça.
+Após 12 arremessos fortes em um minuto, a Bolha estoura. Trinta segundos depois,
+ela espia com um olho pela borda da tela, recua e sai devagar. Carinho ajuda
+a recuperar a confiança mais rápido. O limite e a opção de desligar o estouro
+ficam em **Central da Bolha → Bolha → Comportamento e aprendizado**.
 
-## Privacidade
+Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
+ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.
 
-Ele roda só no seu computador e não envia nada para a internet. Lê o **nome** do programa em primeiro
-plano, o tempo sem usar teclado e mouse, a posição do cursor e a geometria das janelas. **Nunca** lê
-conteúdo nem título de janela. Tudo o que ele grava fica na pasta de dados e pode ser apagado pela tela de
-configurações: `memory/`, rodando pelo código, ou `%LOCALAPPDATA%\Pestinha`, no executável do Windows.
-Detalhes em [PRIVACIDADE.md](PRIVACIDADE.md).
+## Dados e contexto
 
-## Personalizar
+Tudo o que a Bolha aprende fica em `%APPDATA%\bolha\brain`. Aparência e
+preferências ficam no diretório próprio `%APPDATA%\bolha`, separado de outros
+aplicativos. Reinstalar ou atualizar preserva esses arquivos. A versão 0.3 faz backup verificável antes de converter preferências e preserva
+a semente da rede e os formatos do aprendizado. A migração pode ser repetida
+sem sobrescrever uma pasta de memória nova existente. Perfis da versão 0.1
+continuam lendo e gravando na pasta original de aprendizado, para uma recuperação
+da versão anterior encontrar a mesma memória; ela não é renomeada na atualização.
 
-- **Memes, recadinhos e cartazes do Bryan:** pasta `pets/bryan/`, explicada em [pets/README.md](pets/README.md).
-  Pode editar com ele aberto.
-- **Bolinhas, notebook e suas fotos:** `assets/comum/`, valem para qualquer personagem
-  ([assets/LEIA-ME.txt](assets/LEIA-ME.txt)).
-- **Programas que ele reconhece:** `assets/comum/programas.json` soma programas à lista de trabalho, jogo, música etc.
-- **Personalidade:** `pets/bryan.json` (semente da rede, temperamento, pesos de brincadeira, reação ao notebook).
-- **Números do comportamento:** `pestinha/ajustes.py`, todos validados ao abrir.
+Você pode desligar separadamente a leitura do nome do programa ativo, do
+tempo ocioso, da posição do cursor e da geometria das janelas. Não há captura
+de tela, leitura de títulos/conteúdo, chat, conta, créditos ou provedor de IA.
 
-## Estrutura
+A comunicação de rede do aplicativo limita-se à busca/download de atualizações
+no GitHub e, quando a opção de reações online está ativa nas configurações, à
+busca sem chave de memes/GIFs públicos (ReactionGIFs e Nekos.best) usando
+somente palavras-chave genéricas de humor em inglês; os bytes de mídia ficam
+apenas em memória RAM (nunca em disco), têm a animação pausada quando a janela
+fica oculta. Os bytes são descartados ao terminar a exibição, guardar o GIF
+ou desativar a opção. O tempo de exibição pausa durante o arrasto, quando o
+ponteiro está sobre o GIF ou quando o menu dele está aberto.
+O cérebro e a interface usam o mesmo processo Python, sem abrir portas locais
+ou enviar sua memória, programas ativos, coordenadas ou arquivos para servidores.
 
-| Pasta | O que tem |
-|---|---|
-| `pestinha/` | O código, em camadas ([pestinha/README.md](pestinha/README.md)) |
-| `assets/comum/` | Imagens da bolinha e do notebook, e suas fotos: valem para qualquer pet |
-| `pets/` | Cada pet: `<pet>.json` (quem ele é) e `<pet>/` (frases, cartazes e memes dele) |
-| `tests/` | Testes automáticos |
-| `ferramentas/fuzz_pestinha.py` | Fuzzer: roda ações aleatórias e checa invariantes |
-| `ferramentas/` | Geradores de documentação |
-| `docs/` | Arquitetura, rede neural e relatórios ([docs/README.md](docs/README.md)) |
-| `memory/` | Gerada em uso, com o que ele aprende. Não vai para o repositório |
+## Atualizações
 
-## Documentação
+A versão instalada consulta o GitHub ao abrir e a cada seis horas. Uma versão
+nova é baixada e verificada por tamanho e SHA-256. Depois aparece um aviso de 30 segundos, com opção
+de adiar por uma hora. Ao instalar, a Bolha salva seu aprendizado, atualiza
+e reabre. O instalador usado é removido depois que a nova interface e o cérebro
+confirmam a inicialização; arquivos ainda bloqueados são limpos depois.
+O instalador prepara os arquivos antes de substituir a versão anterior e recupera
+a instalação se a nova não confirmar saúde. Arquivos desconhecidos e o backup
+legado do Electron ficam preservados para recuperação; o diagnóstico local
+registra o caminho quando essa cópia precisa ser mantida.
 
-- [docs/ARQUITETURA.md](docs/ARQUITETURA.md): como as partes conversam.
-- [docs/REDE_NEURAL.md](docs/REDE_NEURAL.md): canais, interneurônios, motores e decisões da rede.
-- [pestinha/README.md](pestinha/README.md) e o README de cada pasta: o que cada arquivo faz.
-- [CONTRIBUTING.md](CONTRIBUTING.md): como rodar os testes e contribuir.
-- [CHANGELOG.md](CHANGELOG.md): o que mudou.
+## Como funciona
 
-## Desenvolvimento
+O desenho e as janelas transparentes usam Python 3.11 e Qt/PySide6. O cérebro é
+uma adaptação da rede neural local original do [Pestinha](https://github.com/mille-okws/pestinha),
+com 470 neurônios. A origem do motor e as adaptações estão em [NOTICE.md](NOTICE.md).
 
-```bash
-pip install -r requirements-dev.txt
+## Compilar pelo código
+
+No Windows x64, use Python 3.11. Nenhum Node.js, `.env`, credencial ou serviço
+da OneDrip é necessário.
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements-build.txt
+.venv\Scripts\python -m bolha
+.venv\Scripts\python -m pytest -q
+.venv\Scripts\python scripts/build_native.py
 ```
-```bash
-python -m pytest -q
-```
 
-Os testes rodam sem abrir janelas (Qt em modo offscreen). Mais detalhes em [CONTRIBUTING.md](CONTRIBUTING.md).
+O resultado fica em `release/`. O script usa PyInstaller e NSIS portátil fixado
+por checksum, sem instalar o compilador globalmente. Veja
+[compilação e testes Windows](docs/BUILD.md), [validação da 0.3.3](docs/VALIDATION-0.3.3.md),
+[validação da pega 0.3.2](docs/VALIDATION-GRAB.md),
+[histórico da 0.3.1](docs/VALIDATION-EXPRESSIONS.md)
+e [histórico da migração Qt 0.3.0](docs/VALIDATION-NATIVE.md).
+O pipeline da Bolha só roda manualmente ou por tag; salvar commits e abrir
+PRs não dispara compilações de instalador. Tags só publicam após os testes.
 
-### Gerar o executável
+## Organização
 
-Há duas formas: gerar no seu computador (só o sistema em que você está) ou deixar o GitHub gerar os três.
-O PyInstaller só gera o executável do sistema onde roda, por isso um Windows não gera o de Mac.
+- `bolha/`: janelas Qt, desenho, preferências, diálogos e atualização.
+- `brain/`: cérebro do Pestinha, física, comportamento e aprendizado.
+- `assets/bolha/content/`: memes, cartazes e recados próprios.
+- `packaging/`: instalador NSIS e avisos do pacote.
+- `tests/native/` e `brain/tests/`: verificações automatizadas.
+- `docs/`: instruções e validação; `NOTICE.md`: autoria e origem do código.
 
-#### Opção 1: no seu computador
+O Game é a única autoridade para física e comportamento. O notebook do pet
+é uma brincadeira e não executa comandos no computador. Electron, React,
+Framer Motion, IPC e o processo separado do cérebro foram retirados.
 
-1. Instale as dependências de desenvolvimento (inclui o PyInstaller):
+## Licenças
 
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
+O código da Bolha e o código derivado do Pestinha são open source sob
+**GPL-3.0-or-later**, a mesma licença do Pestinha. A comunidade pode estudar,
+modificar e contribuir com o projeto, respeitando a licença e os créditos.
+Consulte [LICENSE](LICENSE) e [NOTICE.md](NOTICE.md).
 
-2. Gere o executável, no Windows:
+As artes da Bolha são separadas, sob **CC BY-NC 4.0**, com atribuição e uso não
+comercial. Consulte [licença das artes](licenses/BOLHA-ASSETS.md). Os memes e
+textos do pacote original do Pestinha não fazem parte da distribuição da Bolha;
+os arquivos originais continuam identificados pela licença e autoria indicadas
+pelo Pestinha no histórico upstream deste fork.
 
-   ```bash
-   python -m PyInstaller --noconfirm --onefile --windowed --name Pestinha --distpath build/onefile --workpath build/work --specpath build --hidden-import win32timezone main.py
-   ```
-
-   No macOS e no Linux, use o mesmo comando sem `--windowed` e sem `--hidden-import win32timezone`.
-
-3. O resultado fica em `build/onefile/` (`Pestinha.exe` no Windows, `Pestinha` nos outros).
-
-4. Monte a pasta de entrega: copie o executável e as pastas `assets/` e `pets/` para uma mesma pasta.
-   O programa lê o conteúdo dessas pastas ao lado do executável. No Windows, a memória fica em
-   `%LOCALAPPDATA%\Pestinha`, a menos que já exista uma pasta `memory/` ao lado dele. Nos outros sistemas, a
-   `memory/` é criada sozinha na primeira execução, então não copie a sua.
-
-5. Opcional, no Windows: gere o instalador com o [Inno Setup 6](https://jrsoftware.org/isinfo.php). Ele usa o
-   executável do passo 3, instala só para o usuário atual e não pede administrador:
-
-   ```bash
-   ISCC instalador/pestinha.iss
-   ```
-
-   O resultado fica em `instalador/saida/`.
-
-#### Opção 2: pelo GitHub (os três sistemas de uma vez)
-
-O workflow `.github/workflows/executaveis.yml` gera Windows, macOS e Linux em máquinas do próprio GitHub.
-
-1. Suba o repositório para o GitHub (`git push`).
-2. Para gerar sem criar versão: na aba **Actions**, escolha **executáveis**, clique em **Run workflow**.
-3. Para gerar e publicar uma versão: crie uma tag e envie. Por exemplo:
-
-   ```bash
-   git tag v0.8.0
-   git push origin v0.8.0
-   ```
-
-4. Ao terminar (alguns minutos), a execução tem três artefatos, um por sistema, com a pasta pronta
-   (executável + `assets/` + `pets/`). Baixe pela própria página da execução, na seção **Artifacts**.
-
-Para distribuir para quem não é do projeto, publique esses artefatos na aba **Releases** (use "Draft a new release"
-na tag criada), e não dentro do repositório: cada executável tem cerca de 60 MB.
-
-#### Depois de gerar
-
-- Para testar sem misturar com a sua memória, crie uma pasta `memory/` vazia ao lado do executável de teste.
-- O executável não é assinado: o Windows e o macOS avisam na primeira execução. No macOS, a permissão de
-  Acessibilidade é necessária para o atalho Ctrl+Alt+Shift+B; no Linux, o atalho e as janelas precisam de
-  `xdotool`, `wmctrl` e `xprintidle`.
-
-## Licença
-
-O código do Pestinha é software livre, sob a [GNU General Public License v3.0 ou posterior](LICENSE)
-(GPL-3.0-or-later). Você pode usar, estudar, modificar e redistribuir, mas toda versão distribuída,
-modificada ou não, precisa continuar aberta e sob a mesma licença.
-
-As imagens e os textos de `assets/` não estão cobertos por esta licença
-
-## Limitações conhecidas
-
-- macOS e Linux ainda não foram testados numa máquina real: a parte de leitura das janelas e do teclado foi
-  escrita e testada só nas partes de texto (ver `tests/test_plataforma.py`).
-- No macOS, o pet precisa da permissão de Acessibilidade para o atalho Ctrl+Alt+Shift+B funcionar.
-- No Linux com Wayland, o pet não enxerga janelas nem o tempo ocioso, e o atalho global não funciona.
-- Pouco testado com escala de tela acima de 100% e com vários monitores. A tela cheia num monitor esconde o
-  pet em todos.
-- Jogos em janela sem borda podem não ser detectados como tela cheia.
-- O executável não é assinado; o Windows pode avisar na primeira execução.
+O código é aberto; a restrição não comercial se aplica às artes fornecidas,
+e deve ser observada por quem redistribui um pacote contendo essas artes.

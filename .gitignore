@@ -1,17 +1,19 @@
-# Dados do usuário (aprendizado, histórico, logs): nunca vão para o repositório
-memory/
-
-# Gerados pelo Python, pytest e PyInstaller
+node_modules/
+out/
+release/
+validation/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.env*
+!.env.example
+*.log
+brain-dist/
+brain-build/
 __pycache__/
-*.pyc
 .pytest_cache/
+.venv/
 build/
 dist/
 *.spec
-instalador/saida/
-
-# Temporários
-*.tmp
-*.corrompido
-*.log
-scratch_*.py
+*.egg-info/
