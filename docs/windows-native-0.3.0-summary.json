@@ -1,0 +1,134 @@
+{
+  "version": "0.3.0",
+  "sourceSha": "dba6e185a562eebf13226b0d618b54017b29c88d",
+  "releaseUrl": "https://github.com/kuky13/bolha/releases/tag/v0.3.0",
+  "ciUrl": "https://github.com/kuky13/bolha/actions/runs/41755479097",
+  "automatedTests": {
+    "passed": 166,
+    "seconds": 31.09,
+    "platform": "Windows"
+  },
+  "packageAuditPassed": true,
+  "nativeInstaller": {
+    "mode": "isolated-native",
+    "base": "0.3.0",
+    "targetFixture": "0.3.1",
+    "fixturePublished": false,
+    "passed": true,
+    "registryUnchanged": true,
+    "workspaceRetained": false,
+    "scenarios": [
+      {
+        "name": "foreign_directory_preserved",
+        "passed": true
+      },
+      {
+        "name": "clean_install_existing_empty_directory",
+        "passed": true
+      },
+      {
+        "name": "checksum_rejected_app_continues",
+        "passed": true
+      },
+      {
+        "name": "interrupted_rejected_app_continues",
+        "passed": true
+      },
+      {
+        "name": "one_hour_deferral_persistent",
+        "passed": true
+      },
+      {
+        "name": "restart_offline_uses_verified_pending",
+        "passed": true
+      },
+      {
+        "name": "tampered_cached_installer_rejected",
+        "passed": true
+      },
+      {
+        "name": "failed_target_start_restores_previous_installation",
+        "passed": true
+      },
+      {
+        "name": "automatic_30_second_update_and_cleanup",
+        "passed": true
+      },
+      {
+        "name": "preferences_seed_learning_and_registry_preserved",
+        "passed": true
+      }
+    ]
+  },
+  "legacyMigrations": [
+    {
+      "from": "Bolha-Setup-0.1.0-x64.exe",
+      "to": "0.3.0",
+      "passed": true,
+      "neurons": 470,
+      "memoryDirectory": "drippy",
+      "preferencesPreserved": true,
+      "learningPreserved": true,
+      "migrationBackupVerified": true,
+      "installerCleaned": true,
+      "cleanup": {
+        "nativeProcessExited": true,
+        "profileRemoved": true,
+        "installationUninstalled": true,
+        "registrationRemoved": true
+      }
+    },
+    {
+      "from": "Bolha-Setup-0.2.1-x64.exe",
+      "to": "0.3.0",
+      "passed": true,
+      "neurons": 470,
+      "memoryDirectory": "bolha",
+      "preferencesPreserved": true,
+      "learningPreserved": true,
+      "migrationBackupVerified": true,
+      "installerCleaned": true,
+      "cleanup": {
+        "nativeProcessExited": true,
+        "profileRemoved": true,
+        "installationUninstalled": true,
+        "registrationRemoved": true
+      }
+    }
+  ],
+  "physicalWindowsSourceSmoke": {
+    "mode": "windows-source-isolated",
+    "packagedInstaller": false,
+    "durationSeconds": 30.36,
+    "includesStartup": true,
+    "warmupDiscarded": false,
+    "cpuMeasured": false,
+    "exitCode": 0,
+    "processExited": true,
+    "launchAncestryVerified": true,
+    "neurons": 470,
+    "metrics": {
+      "appRssMiB": 88.41,
+      "brainArrayMiB": 4.651,
+      "frameP95Ms": 31,
+      "thinkP95Ms": 41.71,
+      "errors": []
+    },
+    "realProfileFilesUnchanged": true,
+    "realBolhaRegistryUnchanged": true
+  },
+  "publishedInstaller": {
+    "size": 34757375,
+    "sha256": "ec875b94f1c750028b7c221307930acc1b4f3bd83445442ca203a37948e3d96c",
+    "sha512Verified": true,
+    "releaseApiDigestsVerified": true,
+    "ciInstallerIdentical": true
+  },
+  "limitations": [
+    "unsigned experimental distribution",
+    "physical mixed-DPI multi-monitor interaction pending",
+    "extended physical Windows focus, click-through and suspend/resume validation pending",
+    "CI virtual-machine metrics are not a notebook benchmark",
+    "final packaged application needs a controlled extended physical Windows performance measurement"
+  ]
+}
