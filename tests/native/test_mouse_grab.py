@@ -134,7 +134,8 @@ def test_interrupcao_cancela_e_nao_reativa_com_botao_ainda_down(held_window,reas
         controller=SimpleNamespace(game=game,cancel_interactions=window.cancel_interaction)
         NativeApp._panel_opened(controller)
     else:
-        controller=SimpleNamespace(cancel_interactions=window.cancel_interaction)
+        controller=SimpleNamespace(game=game,cancel_interactions=window.cancel_interaction,
+                                   sync_pingpong=lambda: None)
         NativeApp._application_state_changed(controller,Qt.ApplicationSuspended)
         assert controller.suspended
     assert not active(window) and not body.held and not game.hover
@@ -209,6 +210,7 @@ def test_frame_existente_le_pega_antes_fisica_com_sensor_cursor_desligado(qt_app
     game.body.x,game.body.y=500,300;pet=PetWindow(game);scene=NativeScene(game)
     controller=SimpleNamespace(quitting=False,updating=False,suspended=False,last_tick=time.monotonic()-.016,
         frame_times=deque(),pet=pet,scene=scene,game=game,store=SimpleNamespace(preferences=game.prefs))
+    controller.sync_pingpong=lambda:None
     monkeypatch.setattr(app_module.QCursor,'pos',lambda:pytest.fail('sensor de contexto desativado'))
     try:
         pet.mousePressEvent(mouse(508.5,291.75));pointer.point=QPointF(708.5,191.75)

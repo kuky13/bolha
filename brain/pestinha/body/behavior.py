@@ -189,7 +189,7 @@ class Behavior:
                 and not self.mission and self.fuga_alvo is None and not self.canto
                 and not st.castigo and not st.protest_stage and not st.at_desk
                 and self.emotion not in STILL and not dizzy and not st.caressing(now) and body.upright()):
-            self.toy_action = self.play.follow(now, body, self.ball, cursor if sense_cursor else None,
+            self.toy_action = self.play.follow(dt, now, body, self.ball, cursor if sense_cursor else None,
                                               self.tone, self.emotion)
             if self.toy_action == 'return':
                 self.last_play = dict(started=now, action='return')

@@ -104,6 +104,7 @@ class ObjectWindow(QWidget):
         if self.offset is None:self.scene.game.hover=False
     def mousePressEvent(self,event):
         if event.button()!=Qt.LeftButton or self.offset is not None or not self.scene.game.visible() or not self.item.isVisible():return
+        if self.item.kind=='ball' and self.scene.game.pingpong is not None:return
         p=event.globalPosition();self.offset=(p.x()-self.item._cx,p.y()-self.item._cy)
         self.press_position=(p.x(),p.y());self.dragged=False;self.drag_position=QPointF(p)
         self.scene.game.interact(dict(type='drag-start',id=self.item.id,x=self.item._cx,y=self.item._cy))

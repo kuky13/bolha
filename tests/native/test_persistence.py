@@ -27,6 +27,21 @@ def test_migration_preserves_memory_optouts_and_backup(tmp_path):
     assert len(list((tmp_path/'backups').iterdir())) == 1
 
 
+def test_preferencias_de_arremesso_padrao_sanitizacao_e_migracao(tmp_path):
+    from bolha.preferences import defaults, sanitize
+    assert defaults()['popEnabled'] is True
+    assert defaults()['popThrowLimit'] == 12
+    assert sanitize({'popThrowLimit': 4, 'popEnabled': False})['popThrowLimit'] == 5
+    assert sanitize({'popThrowLimit': 31})['popThrowLimit'] == 30
+    assert sanitize({'popThrowLimit': 12.0})['popThrowLimit'] == 12
+    old = {'schemaVersion': 1, 'preferences': {'senseCursor': False}}
+    (tmp_path/'config.json').write_text(json.dumps(old), encoding='utf-8')
+    migrated = PreferencesStore(tmp_path)
+    assert migrated.preferences['popEnabled'] is True
+    assert migrated.preferences['popThrowLimit'] == 12
+    assert migrated.preferences['senseCursor'] is False
+
+
 def test_both_memory_directories_are_preserved(tmp_path):
     for name in ('drippy','bolha'):
         (tmp_path/'brain'/name).mkdir(parents=True)

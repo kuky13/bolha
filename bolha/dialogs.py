@@ -169,6 +169,13 @@ class SettingsDialog(QDialog):
         toy_form.addRow('&Brinquedo:',self.toy_appearance)
         layout.addLayout(toy_form)
         self._check('mischiefEnabled', 'Trazer memes e bilhetes', layout)
+        self._check('popEnabled', 'Estourar após muitos arremessos fortes', layout,
+                    'A contagem considera arremessos fortes numa janela de 1 minuto. A Bolha volta após 30 segundos.')
+        layout.addWidget(_label('Depois de estourar, a Bolha volta tímida em 30 segundos.'))
+        pop_form = QFormLayout()
+        self.pop_throw_limit = self._spin(5, 30, '', 'Arremessos fortes para estourar')
+        pop_form.addRow('&Limite de arremessos fortes:', self.pop_throw_limit)
+        layout.addLayout(pop_form)
         self._check('onlineReactions', 'Buscar reações online (memes e GIFs sem salvar em disco)', layout,
                     'Consulta ReactionGIFs e Nekos.best apenas com termos genéricos de humor; mídia fica só em memória.')
         form = QFormLayout()
@@ -180,6 +187,7 @@ class SettingsDialog(QDialog):
         self.checks['mischiefEnabled'].toggled.connect(self.interval.setEnabled)
         self.checks['mischiefEnabled'].toggled.connect(self.object_limit.setEnabled)
         self.checks['mischiefEnabled'].toggled.connect(self.checks['onlineReactions'].setEnabled)
+        self.checks['popEnabled'].toggled.connect(self.pop_throw_limit.setEnabled)
         self._check('adaptiveBehavior', 'Usar objetivos e aprendizado adaptativo', layout)
         self._check('learnRoutine', 'Aprender hábitos por horário', layout)
         layout.addWidget(_label('O aprendizado permanece neste computador. Desativar uma função preserva o que já foi aprendido.'))
@@ -228,7 +236,8 @@ class SettingsDialog(QDialog):
                     avatarSize=self.avatar_size.value(), opacity=self.opacity.value()/100,
                     objectScales={key: control.value() for key, control in self.object_scales.items()},
                     toyAppearance=self.toy_appearance.currentData(),
-                    mischiefInterval=self.interval.value()*60, maxObjects=self.object_limit.value())
+                    mischiefInterval=self.interval.value()*60, maxObjects=self.object_limit.value(),
+                    popThrowLimit=self.pop_throw_limit.value())
 
     def _load(self, preferences, appearance_only=False):
         loading = self._loading
@@ -243,11 +252,13 @@ class SettingsDialog(QDialog):
             self.toy_appearance.setCurrentIndex(self.toy_appearance.findData(values['toyAppearance']))
             self.interval.setValue(max(1, round(values['mischiefInterval']/60)))
             self.object_limit.setValue(int(values['maxObjects']))
+            self.pop_throw_limit.setValue(int(values['popThrowLimit']))
             for key, control in self.checks.items():
                 control.setChecked(values[key])
             self.interval.setEnabled(values['mischiefEnabled'])
             self.object_limit.setEnabled(values['mischiefEnabled'])
             self.checks['onlineReactions'].setEnabled(values['mischiefEnabled'])
+            self.pop_throw_limit.setEnabled(values['popEnabled'])
         rendered = self._values()
         for key in ('avatarSize', 'opacity') if appearance_only else rendered:
             self.baseline[key] = rendered[key]

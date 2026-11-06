@@ -156,6 +156,21 @@ def test_aplicar_preserva_sensores_desligados_e_valores_nao_editados(app):
     assert not dialog.apply_button.isEnabled()
 
 
+def test_controles_de_retorno_sao_ptbr_editaveis_e_salvos_sem_afetar_outros_campos(app):
+    controller = ControllerStub()
+    dialog = SettingsDialog(controller)
+    assert dialog.checks['popEnabled'].isChecked()
+    assert dialog.pop_throw_limit.value() == 12
+    assert dialog.pop_throw_limit.minimum() == 5 and dialog.pop_throw_limit.maximum() == 30
+    assert dialog.checks['popEnabled'].text() == 'Estourar após muitos arremessos fortes'
+    assert '1 minuto' in dialog.checks['popEnabled'].toolTip()
+    dialog.checks['popEnabled'].setChecked(False)
+    dialog.pop_throw_limit.setValue(20)
+    dialog.apply_button.click()
+    assert controller.saved[-1] == {'popEnabled': False, 'popThrowLimit': 20}
+    assert controller.store.preferences['mischiefEnabled'] is True
+
+
 def test_seletor_real_salva_reabre_e_preserva_privacidade(app,tmp_path,monkeypatch):
     from bolha.app import NativeApp
     from bolha.preferences import PreferencesStore

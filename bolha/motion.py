@@ -5,6 +5,8 @@ from .character import WINK_DURATION, wink_state
 
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
+LANDING_POSES = ('pouso_em_pe', 'pouso_de_lado', 'pouso_invertido')
+FLOOR_POSES = (*LANDING_POSES, 'deitada')
 
 
 def _unit(value):
@@ -26,7 +28,8 @@ def animation_pose(mode, seconds, strength=1.):
     pose = dict(emotion=mode, eye_open=1., ear_tilt=0., ear_raise=0., squash=0.,
                 gaze=None, blink=0., blink_left=None, blink_right=None,
                 angle_offset=0., zzz_strength=0., zzz_phase=t,
-                effect=None, effect_strength=0., effect_phase=t, anger=0.)
+                effect=None, effect_strength=0., effect_phase=t, effect_angle=0., anger=0.,
+                body_opacity=1.,visual_scale=1.)
     if mode == 'held':
         irritation = _ease((t - .7) / 3.)
         rage = _ease((t - 1.1) / 2.6) * (.55 + .45 * strength)
@@ -101,6 +104,58 @@ def animation_pose(mode, seconds, strength=1.):
                     squash=.10 * dash * strength - .045,
                     angle_offset=5. * math.sin(t * 10) * strength,
                     effect='perseguindo', effect_strength=.45 + .55 * strength)
+    elif mode == 'pingpong_rebatida':
+        impact = 1. - _ease(t/.09)
+        stretch = _ease((t-.035)/.085)*(1.-_ease((t-.13)/.22))
+        pose.update(emotion='atento', eye_open=1.-.56*impact+.24*stretch,
+                    ear_raise=-3.2*impact+3.3*stretch, ear_tilt=12.*impact-11.*stretch,
+                    squash=(-.20*impact+.17*stretch)*strength,
+                    angle_offset=(-5.5*impact+7.5*stretch)*strength,
+                    effect='rebatida', effect_strength=strength*(1.-_ease((t-.035)/.22)))
+    elif mode == 'pop':
+        rupture = t-.13
+        squeeze = _ease(t/.075)*(1.-_ease((t-.075)/.055))
+        swell = _ease((t-.075)/.055)*(1.-_ease(rupture/.13))
+        dissolve = _ease(rupture/.13)
+        pose.update(emotion='assustado',eye_open=1.+.3*swell-.4*squeeze,
+                    blink=_ease(rupture/.085),ear_raise=2.8*swell-4.*squeeze,
+                    ear_tilt=12.*squeeze*math.sin(t*85.),
+                    angle_offset=5.*squeeze*math.sin(t*65.),
+                    squash=.22*squeeze-.08*swell,
+                    body_opacity=1.-dissolve,visual_scale=1.-.08*squeeze+.15*swell,
+                    effect='pop',effect_phase=max(0.,rupture),effect_strength=float(rupture>=0.))
+    elif mode == 'pop_return':
+        pose.update(emotion='timido',eye_open=.98-.11*strength,
+                    blink=math.exp(-((t-.73)/.095)**2),
+                    ear_raise=-2.*strength,ear_tilt=5.*strength)
+    elif mode in LANDING_POSES:
+        settle = math.exp(-t*5.2)
+        bounce = math.cos(t*20.)*settle
+        force = .58+.42*strength
+        if mode == 'pouso_em_pe':
+            pose.update(emotion='atento',blink=max(0.,1.-t/.105),
+                        eye_open=1.+.18*_ease(t/.14)*settle,
+                        ear_raise=-3.6*bounce*force,ear_tilt=4.*math.sin(t*21.)*settle,
+                        squash=.21*bounce*force)
+        elif mode == 'pouso_de_lado':
+            relax = _ease((t-.23)/.57)
+            rock = math.cos(t*14.)*math.exp(-t*4.4)
+            pose.update(emotion='assustado' if t<.22 else 'contente',
+                        blink=1.-_ease(t/.18),eye_open=1.08-.37*relax,
+                        ear_raise=-3.8*settle-1.4*relax,ear_tilt=14.*rock+5.*relax,
+                        angle_offset=-19.*rock*force,squash=.28*bounce*force+.09*relax)
+        else:
+            pose.update(emotion='assustado' if t<.12 else 'tonto',
+                        blink=max(0.,1.-t/.10),ear_raise=-3.7*settle,
+                        ear_tilt=10.*math.sin(t*23.)*settle,
+                        angle_offset=7.*math.sin(t*23.)*settle,
+                        squash=.23*bounce*force,effect='tonto',
+                        effect_strength=_ease((t-.08)/.12)*settle)
+    elif mode == 'deitada':
+        breath = .5-.5*math.cos(t*math.tau/2.4)
+        blink = math.exp(-((t%4.7-2.9)/.16)**2)
+        pose.update(emotion='contente',blink=blink,eye_open=.71+.13*breath,
+                    ear_raise=-1.4+.7*breath,ear_tilt=5.+2.*breath,squash=.09-.027*breath)
     elif mode == 'bote_erro':
         flump = math.exp(-((t - .25) / .16) ** 2)
         wobble = math.sin(t * 13) * math.exp(-t * 1.8)
@@ -204,13 +259,25 @@ class ExpressionMotion:
         if state.dizzy(now) or abs(body.omega) > 450:self.dizzy_until = now + .8
         mode = state.emotion;strength = 1.;elapsed = None
         reaction = getattr(game, 'release_reaction', None) or {}
+        returning = reaction.get('kind')=='pop_return'
+        arriving = returning and now<reaction['arrives']
+        landing_reaction = getattr(game, 'landing_reaction', None) or {}
         play_reaction = getattr(game, 'play_reaction', None) or {}
-        if held:
+        pop_age = game.pop_effect_age(now)
+        if pop_age is not None:
+            mode='pop';elapsed=pop_age
+        elif held:
             mode = 'held';elapsed = now - self.held_since
             # A irritação neural acelera o gesto; o relógio só interpola seus quadros.
             strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
+        elif arriving:
+            mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since
         elif state.feliz_fechado(now):mode = 'caress';strength = .5 + .5 * tones['CHEER']
+        elif returning and now<reaction['until']:
+            mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
+        elif now < landing_reaction.get('until',0):
+            mode=landing_reaction['kind'];elapsed=now-landing_reaction['started'];strength=_unit(landing_reaction['intensity'])
         elif now < self.dizzy_until:mode = 'tonto'
         elif not body.grounded and math.hypot(body.vx, body.vy) > 500:
             mode = 'airborne';strength = _unit(math.hypot(body.vx, body.vy) / 1500)
@@ -221,6 +288,9 @@ class ExpressionMotion:
             mode=play_reaction['kind'];elapsed=now-play_reaction['started'];strength=_unit(play_reaction['intensity'])
         elif game.festa.fogos.isVisible():mode = 'comemorando';strength = tones['CHEER']
         elif mode == 'bravo':strength = .35 + .65 * tones['ANGRY']
+        elif (body.grounded and 55.<=abs((body.angle+180.)%360.-180.)<=125.
+              and mode in ('observando','contente','curioso','feliz','entediado','atento','neutro')):
+            mode = 'deitada'
         eligible = (game.visible() and body.grounded and not held and not game.hover and not game.panel
                     and mode in ('observando', 'contente', 'curioso', 'feliz', 'entediado'))
         if self.quirk is not None and (not eligible or now - self.quirk_since >= QUIRK_SECONDS[self.quirk]):
@@ -236,5 +306,29 @@ class ExpressionMotion:
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if mode == 'pouso_de_lado' and landing_reaction.get('angle',0.) < 0.:
+            self.pose['angle_offset'] *= -1.
+        if mode == 'deitada':
+            self.pose['gaze'] = tuple(.65*component for component in state.gaze)
+        if mode == 'pop_return':
+            inward = reaction['inward']
+            glance = .47+.22*math.sin(elapsed*5.)*math.exp(-elapsed)
+            self.pose['gaze'] = (inward*glance,.13*strength)
+            if arriving:
+                phase = _unit(elapsed/(reaction['arrives']-reaction['started']))
+                peek = _ease(phase/.23)
+                retreat = _ease((phase-.40)/.13)
+                emerge = _ease((phase-.56)/.44)
+                depth = -1.21+.99*peek-(.12+.12*strength)*retreat
+                self.pose['corner_peek'] = (inward,depth,emerge)
+                self.pose['angle_offset'] = inward*10.*peek*(1.-emerge)
+        if mode == 'pingpong_rebatida':
+            heading = play_reaction.get('heading',0.)
+            follow = math.sin(math.pi*_unit(elapsed/.42))
+            self.pose['angle_offset'] += 10.*math.sin(math.radians(heading))*follow
+            local_angle = heading-body.angle-self.pose['angle_offset']
+            self.pose['effect_angle'] = local_angle
+            aim = math.radians(local_angle)
+            self.pose['gaze'] = math.cos(aim),math.sin(aim)
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         return self.pose

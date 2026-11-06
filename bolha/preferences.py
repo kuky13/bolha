@@ -10,10 +10,11 @@ DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 objectScales={key:1. for key in OBJECT_SCALE_TYPES},
                 toyAppearance='peanut',
                 mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
+                popEnabled=True, popThrowLimit=12,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True)
 BOOLEAN_KEYS = ('roaming','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
-                'adaptiveBehavior','learnRoutine')
+                'adaptiveBehavior','learnRoutine','popEnabled')
 SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 
 
@@ -39,6 +40,8 @@ def sanitize(patch, previous=None):
         result['objectScales']=scales
     for key,low,high in (('avatarSize',48,200),('mischiefInterval',60,1800),('maxObjects',1,5)):
         if number(patch.get(key)):result[key]=math.floor(max(low,min(high,patch[key]))+.5)
+    if type(patch.get('popThrowLimit')) is int:
+        result['popThrowLimit']=max(5,min(30,patch['popThrowLimit']))
     if number(patch.get('opacity')): result['opacity']=max(.2,min(1.,patch['opacity']))
     if 'position' in patch:
         point=patch['position']

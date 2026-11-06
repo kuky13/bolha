@@ -5,14 +5,14 @@
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Bolha 0.4.1 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.1).
+**Bolha 0.4.2 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.2).
 
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos](NOTICE.md)
 
-A 0.4.1 acrescenta a brincadeira de bobinho, os efeitos de raiva animados e
-os GIFs em cantos variados. A atualização a partir da 0.4.0 foi testada
-no Windows. [Validação da 0.4.1](docs/VALIDATION-0.4.1.md).
+A 0.4.2 acrescenta pingue-pongue no desktop, quedas animadas e o retorno
+tímido pela borda da tela. O instalador passou pelos testes automatizados
+no Windows. [Validação da 0.4.2](docs/VALIDATION-0.4.2.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
@@ -71,6 +71,7 @@ não é necessário instalar Python separadamente.
 | Rodinha | Gira |
 | Menu → Dormir um pouco | Fecha os olhos aos poucos, respira e solta “zzz” |
 | Menu → Brinquedo | Mostra ou guarda o amendoim ou a bolinha escolhida |
+| Menu → Jogar pingue-pongue | Abre uma partida com o brinquedo escolhido |
 | Configurações → Comportamento → Brinquedo | Escolhe amendoim ou bolinha original |
 | Configurações → Aparência | Ajusta o tamanho de cada tipo de objeto |
 | Botão direito no GIF | Mostra informações, origem e opções do objeto |
@@ -87,6 +88,18 @@ Passar o mouse de baixo para cima faz o brinquedo pular.
 A Bolha corre atrás dele e o devolve quando alcança. Se você o tirar do
 alcance repetidamente, ela fica brava. O brinquedo para de rolar quando repousa,
 e as reações online surgem em cantos variados da área útil das telas.
+
+Escolha **Jogar pingue-pongue** no menu da Bolha ou da
+bandeja. Com a leitura do cursor ativa, passe o ponteiro pelo brinquedo para
+rebater, direto no desktop. O gesto muda o ângulo da devolução. A partida
+pausa fora da área útil do monitor em que começou e termina quando alguém
+marca cinco pontos. Escolha **Encerrar pingue-pongue** para voltar ao passeio.
+
+A Bolha tem pousos animados em pé, de lado e de ponta-cabeça.
+Após 12 arremessos fortes em um minuto, a Bolha estoura. Trinta segundos depois,
+ela espia com um olho pela borda da tela, recua e sai devagar. Carinho ajuda
+a recuperar a confiança mais rápido. O limite e a opção de desligar o estouro
+ficam em **Comportamento**.
 
 Ela evita monitores em tela cheia e continua nos demais; se todos estiverem
 ocupados, fica escondida. Iniciar com o Windows é opcional e vem desligado.

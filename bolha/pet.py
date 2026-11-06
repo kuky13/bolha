@@ -7,11 +7,11 @@ máscara circular nativa: a região fora do corpo recebe cliques no desktop.
 import math
 import time
 from collections import deque
-from PySide6.QtCore import Qt,QRect,QPointF,QEvent,Signal
+from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent,Signal
 from PySide6.QtGui import QPainter,QColor,QRegion
 from PySide6.QtWidgets import QWidget
 from .character import draw_character,draw_sleep_marks,draw_reaction_marks
-from .motion import ExpressionMotion
+from .motion import ExpressionMotion,FLOOR_POSES
 from .grab import MouseGrab
 
 FLAGS = Qt.FramelessWindowHint|Qt.Tool|Qt.WindowStaysOnTopHint|Qt.WindowDoesNotAcceptFocus
@@ -35,25 +35,47 @@ class PetVisual(QWidget):
         if game.state.desk_top is not None:
             p.setClipRect(QRect(0,0,self.width(),max(0,int(game.state.desk_top-self.y()))))
         pose=self.pet.motion.pose
-        scale=game.body.half_w/49
+        radius=game.body.half_w
+        scale=radius/49*pose.get('visual_scale',1.)
         angle=game.body.angle+pose['angle_offset']
         squash=pose['squash']
+        cx,cy=self.width()/2,self.height()/2
+        if 'corner_peek' in pose:
+            inward,depth,emerge=pose['corner_peek']
+            left,_,right,_=game.bounds()
+            edge=left if inward>0 else right
+            cx+=(edge+inward*radius*depth-game.body.x)*(1.-emerge)
+            # O recorte também esconde a Bolha quando há um monitor vizinho.
+            p.setClipRect(QRectF(left-self.x(),0.,right-left,self.height()),Qt.IntersectClip)
+        floor_squash,shift=self.pet.floor_pose()
+        p.translate(cx,cy+shift)
+        p.scale(1.+floor_squash,1.-floor_squash)
+        if self.pet.motion.mode in FLOOR_POSES:
+            squash=0.
         # A transformação comum gira corpo, olhos, orelhas e marcas no mesmo centro.
-        draw_character(p,self.width()/2,self.height()/2,scale=scale,
-                       angle=angle,emotion=pose['emotion'],
-                       blink=pose['blink'],gaze=pose['gaze'] or game.state.gaze,
-                       blink_left=pose['blink_left'],blink_right=pose['blink_right'],
-                       ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
-                       eye_open=pose['eye_open'],squash=squash,
-                       body_opacity=game.prefs.get('opacity',1),
-                       anger=pose.get('anger',0.))
+        if pose['body_opacity']>0.:
+            p.save()
+            p.setOpacity(p.opacity()*pose['body_opacity'])
+            draw_character(p,0.,0.,scale=scale,
+                           angle=angle,emotion=pose['emotion'],
+                           blink=pose['blink'],gaze=self.pet.visual_gaze,
+                           ear_gaze=self.pet.visual_ear_gaze,
+                           blink_left=pose['blink_left'],blink_right=pose['blink_right'],
+                           ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
+                           eye_open=pose['eye_open'],squash=squash,
+                           body_opacity=game.prefs.get('opacity',1),
+                           anger=pose.get('anger',0.))
+            p.restore()
         if pose['zzz_strength']>0:
-            draw_sleep_marks(p,self.width()/2,self.height()/2,scale,
+            draw_sleep_marks(p,0.,0.,scale,
                              pose['zzz_phase'],pose['zzz_strength'],angle=angle,squash=squash)
         if pose['effect'] and pose['effect_strength']>0:
-            draw_reaction_marks(p,self.width()/2,self.height()/2,scale,
+            if pose['effect']=='pop':
+                scale=radius/49
+                squash=0.
+            draw_reaction_marks(p,0.,0.,scale,
                                 pose['effect_phase'],pose['effect'],pose['effect_strength'],
-                                angle=angle,squash=squash)
+                                angle=angle,squash=squash,effect_angle=pose.get('effect_angle',0.))
         p.end();self.paint_times.append(now);self.painted.emit()
 
 
@@ -68,29 +90,56 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setMouseTracking(True);self.setFixedSize(256,256)
         self.visual=PetVisual(self)
+        self.visual_gaze=game.state.gaze
+        self.visual_ear_gaze=game.state.gaze
+        self.gaze_tick=time.monotonic()
         self.press=None;self.offset=(0.,0.);self.dragging=False
         self.mouse_grab=MouseGrab(self);self.drag_position=None
         self.rubs=deque()
         self.motion=ExpressionMotion(time.monotonic())
         self.sync()
 
+    def floor_pose(self):
+        """Mantém a base do desenho e a máscara no chão durante a deformação."""
+        pose=self.motion.pose
+        radius=self.body.half_w
+        if self.motion.mode in FLOOR_POSES:
+            squash=pose['squash']
+            clearance=max(0.,self.body.surface-self.body.y-radius)
+            contact=max(0.,1.-clearance/24.)
+            return squash,radius*squash*contact
+        return 0.,0.
+
     def sync(self):
         now=time.monotonic()
         self.motion.update(self.game,now,self.press[1] if self.press else None)
+        target=self.motion.pose['gaze'] or self.game.state.gaze
+        elapsed=max(0.,now-self.gaze_tick)
+        eye_ease=1-math.exp(-22*elapsed)
+        ear_ease=1-math.exp(-12*elapsed)
+        self.visual_gaze=tuple(current+(goal-current)*eye_ease for current,goal in zip(self.visual_gaze,target))
+        self.visual_ear_gaze=tuple(current+(goal-current)*ear_ease for current,goal in zip(self.visual_ear_gaze,target))
+        self.gaze_tick=now
         x,y=round(self.body.x-self.width()/2),round(self.body.y-self.height()/2)
         self.move(x,y)
         self.visual.move(round(self.body.x-self.visual.width()/2),round(self.body.y-self.visual.height()/2))
-        r=round(self.body.half_w)
+        radius=self.body.half_w*self.motion.pose['visual_scale']
+        squash,shift=self.floor_pose()
+        rx,ry=round(radius*(1.+squash)),round(radius*(1.-squash))
+        rise=round(shift)
         clip=max(0,min(256,int(self.game.state.desk_top-y))) if self.game.state.desk_top is not None else 256
-        key=(r,clip,self.devicePixelRatioF())
+        key=(rx,ry,rise,clip,self.devicePixelRatioF())
         if key!=getattr(self,'_mask_key',None):
-            mask=QRegion(QRect(128-r,128-r,r*2,r*2),QRegion.Ellipse)
+            mask=QRegion(QRect(128-rx,128-ry+rise,rx*2,ry*2),QRegion.Ellipse)
             if clip<256:mask=mask.intersected(QRegion(0,0,256,clip))
             self.setMask(mask);self._mask_key=key
-        show=self.game.visible()
-        if show and not self.isVisible(): self.visual.show();self.show()
-        if not show:
-            self.cancel_interaction();self.hide();self.visual.hide()
+        visual_show=self.game.pet_visible(now)
+        input_show=self.game.pet_interactive() and 'corner_peek' not in self.motion.pose
+        if visual_show and not self.visual.isVisible():self.visual.show()
+        if not visual_show:self.visual.hide()
+        if input_show and not self.isVisible():self.show()
+        if not input_show:
+            if self.isVisible():self.cancel_interaction();self.hide()
         self.visual.update()
 
     def paintEvent(self,event):
@@ -103,6 +152,7 @@ class PetWindow(QWidget):
 
     def mousePressEvent(self,event):
         if event.button()!=Qt.LeftButton or self.press is not None or not self.game.visible():return
+        if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
         self.press=(pos,now);self.offset=(pos.x()-self.body.x,pos.y()-self.body.y)
         self.drag_position=QPointF(pos)
@@ -112,6 +162,7 @@ class PetWindow(QWidget):
         except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
 
     def mouseMoveEvent(self,event):
+        if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
         if self.press is None:
             self.rubs.append((now,pos.x()))
