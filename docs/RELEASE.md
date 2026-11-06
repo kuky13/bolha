@@ -1,12 +1,19 @@
-# Bolha 0.4.1
+# Bolha 0.4.2
 
-Passe o mouse de baixo para cima para fazer a bolinha ou o amendoim pular.
-A Bolha corre atrás do brinquedo, salta e devolve quando alcança. Quando você
-tira o brinquedo dela várias vezes, ela fica brava, com marcas pulsantes e
-faíscas que giram junto com o corpo.
+Jogue pingue-pongue com a bolinha ou o amendoim direto na área de trabalho.
+O ponteiro rebate o brinquedo e a Bolha acompanha a direção com os olhos,
+as orelhas e uma animação de rebatida.
 
-O brinquedo fica parado quando pousa. A Bolha olha para o mouse quando ele se
-mexe perto, e os GIFs aparecem em cantos variados da área útil das telas.
+Os pousos têm reações diferentes em pé, de lado e de ponta-cabeça. Deitada,
+ela respira de leve e pisca devagar. Após muitos arremessos fortes, ela estoura
+em gotinhas e volta 30 segundos depois, espiando com um olho pela borda da tela.
+O limite padrão é 12 arremessos fortes em um minuto, ajustável nas configurações.
+
+Esta publicação disponibiliza a 0.4.2 no canal de atualização do aplicativo.
+Abra o menu da Bolha ou da bandeja e escolha **Atualizações → Verificar agora**.
 
 O instalador Windows x64 é distribuído sem assinatura digital.
-[Relatório de validação](https://github.com/kuky13/bolha/blob/main/docs/VALIDATION-0.4.1.md).
+Passaram 421 testes e 10 cenários automatizados de instalação, atualização
+e recuperação no Windows do GitHub. O kukybook26 estava offline e o teste
+visual nesse notebook ficou pendente.
+[Relatório de validação](https://github.com/kuky13/bolha/blob/main/docs/VALIDATION-0.4.2.md).
