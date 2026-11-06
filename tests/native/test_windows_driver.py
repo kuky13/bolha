@@ -15,6 +15,27 @@ from scripts.test_windows_native import (Feed, NativeValidation, installer_versi
 import scripts.test_windows_native as driver
 
 
+@pytest.mark.parametrize('exited',[True,False])
+def test_consulta_do_processo_aguarda_a_saida_sem_ignorar_falha_de_permissao(monkeypatch,exited):
+    from unittest.mock import Mock
+    kernel = SimpleNamespace(
+        OpenProcess=Mock(return_value=1),
+        WaitForSingleObject=Mock(side_effect=[258,0 if exited else 258]),
+        QueryFullProcessImageNameW=Mock(return_value=False),
+        CloseHandle=Mock(),
+    )
+    monkeypatch.setattr(driver.ctypes,'WinDLL',lambda *_args,**_kwargs:kernel,raising=False)
+    monkeypatch.setattr(driver.ctypes,'get_last_error',lambda:5,raising=False)
+    monkeypatch.setattr(driver.ctypes,'WinError',lambda code:PermissionError(code,'Acesso negado'),raising=False)
+    if exited:
+        assert driver.process_alive(123,'Bolha.exe') is False
+    else:
+        with pytest.raises(PermissionError):
+            driver.process_alive(123,'Bolha.exe')
+    assert kernel.WaitForSingleObject.call_args_list[-1].args==(1,100)
+    kernel.CloseHandle.assert_called_once_with(1)
+
+
 def test_legacy_never_runs_on_notebook_and_needs_hosted_runner():
     hosted = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted', RUNNER_OS='Windows')
     assert legacy_allowed(hosted, 'github-runner')

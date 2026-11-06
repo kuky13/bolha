@@ -219,9 +219,11 @@ def process_alive(pid, expected_exe):
         size = wintypes.DWORD(32768)
         path = ctypes.create_unicode_buffer(size.value)
         if not kernel.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)):
-            if kernel.WaitForSingleObject(handle, 0) == 0:
+            error = ctypes.get_last_error()
+            # O Windows pode negar o caminho um instante antes de sinalizar a saída.
+            if kernel.WaitForSingleObject(handle, 100) == 0:
                 return False
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise ctypes.WinError(error)
         if Path(path.value).resolve() != Path(expected_exe).resolve():
             raise AssertionError('PID não pertence ao executável isolado esperado.')
         return kernel.WaitForSingleObject(handle, 0) == 258
