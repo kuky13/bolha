@@ -14,6 +14,12 @@ A 0.4.2 acrescenta pingue-pongue no desktop, quedas animadas e o retorno
 tímido pela borda da tela. O instalador passou pelos testes automatizados
 no Windows. [Validação da 0.4.2](docs/VALIDATION-0.4.2.md).
 
+Em desenvolvimento, a próxima atualização reúne as configurações na
+**Central da Bolha**, com ajustes detalhados recolhidos e uma aba **Testar**
+para expressões e uma rede neural temporária. Também inclui raquete visível
+no pingue-pongue, corrida que acompanha a direção, contato físico do brinquedo
+e intervalos maiores entre fogos espontâneos.
+
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
