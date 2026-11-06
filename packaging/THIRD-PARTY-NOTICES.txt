@@ -1,9 +1,9 @@
-Bolha 0.3 — componentes redistribuídos
+Bolha 0.4.4 — componentes redistribuídos
 
-Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-only.
+Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-or-later.
 Pestinha: mille-okws e contribuidores, GPL-3.0-or-later.
 Código fonte e instruções: https://github.com/kuky13/bolha
-Artes: André Ribeiro Lima (KukySolutions), CC BY-NC 4.0; consulte BOLHA-ASSETS.md.
+Artes, animações e conteúdo Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-or-later; consulte BOLHA-ASSETS.md.
 
 Qt 6.11.3 / PySide6 / Shiboken6: The Qt Company Ltd. e contribuidores.
 Este programa GPLv3 utiliza a opção GPLv3 dos componentes Qt/PySide6.

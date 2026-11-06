@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Instaladores reais somente no Windows, sempre em perfil /TEST descartável.
 
 python scripts/test_windows_native.py --installer release/Bolha-Setup-0.3.0-x64.exe \

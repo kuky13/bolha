@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """SHA-256 nativo e latest.yml SHA-512 compatível com electron-updater 6.8.11."""
 import argparse
 import base64

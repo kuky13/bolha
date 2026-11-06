@@ -26,14 +26,13 @@ a **GNU GPL versão 3 ou posterior (`GPL-3.0-or-later`)**, a mesma licença do
 Pestinha. Veja o arquivo [LICENSE](LICENSE). Contribuições ao código seguem a
 GPL e devem preservar os créditos e avisos de autoria.
 
-As artes próprias da personagem Bolha, seus ícones e memes estão separadas do
-código e são licenciadas sob **CC BY-NC 4.0**. A restrição não comercial vale
-para essas artes; ela não acrescenta uma restrição não comercial ao código
-GPL. Consulte [licenses/BOLHA-ASSETS.md](licenses/BOLHA-ASSETS.md).
+As artes, ícones, animações, memes e textos próprios da Bolha também estão sob
+**GPL-3.0-or-later**, com autoria de André Ribeiro Lima (KukySolutions).
+Consulte [licenses/BOLHA-ASSETS.md](licenses/BOLHA-ASSETS.md).
 
 Os memes, textos e imagens dos personagens do Pestinha não integram os arquivos
-da distribuição da Bolha. Eles permanecem no repositório upstream e no histórico
-de origem sob os avisos e direitos definidos por seus autores.
+da distribuição da Bolha. As referências privadas de Drippy não foram copiadas
+nem enviadas ao repositório ou aos releases.
 
 Qt, PySide6, Shiboken6, CPython, NumPy, psutil, pywin32, PyInstaller e NSIS
 mantêm suas próprias licenças. Consulte

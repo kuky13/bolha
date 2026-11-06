@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Rejeita artefatos web/worker e dependências Qt fora do runtime Core/Gui/Widgets."""
 import argparse
 import json

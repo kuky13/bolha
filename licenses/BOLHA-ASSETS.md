@@ -1,23 +1,18 @@
-# Artes da Bolha
+# Artes, animações e conteúdo da Bolha
 
-Copyright © 2026 André Ribeiro Lima (KukySolutions).
+As artes, geometrias, ícones, animações feitas em código, memes e textos
+originais da Bolha são Copyright © 2026 André Ribeiro Lima (KukySolutions) e
+estão sob **GNU GPL versão 3 ou posterior (`GPL-3.0-or-later`)**, junto com o
+código deste projeto. Isso permite usar, modificar e redistribuir esses
+arquivos sob os termos da GPL, preservando a licença e a autoria.
 
-Os desenhos, geometrias, aparência, ícones e memes em `assets/bolha/` são
-licenciados separadamente sob **Creative Commons Atribuição-NãoComercial 4.0
-Internacional (CC BY-NC 4.0)**. Inclua autoria, link da licença e indicação
-de alterações quando redistribuir ou adaptar essas artes. O uso comercial
-dessas artes exige outra autorização do titular.
+Este aviso cobre os arquivos próprios em `assets/bolha/` e `docs/images/`,
+além das animações e desenhos vetoriais implementados em `bolha/`. Os desenhos
+Qt do notebook e dos brinquedos são adaptações do Pestinha, por
+[@mille-okws](https://github.com/mille-okws) e contribuidores, também sob
+GPL-3.0-or-later. Consulte [NOTICE.md](../NOTICE.md) para a origem e os
+créditos do código.
 
-Texto integral: `CC-BY-NC-4.0.txt`.
-Licença: https://creativecommons.org/licenses/by-nc/4.0/
-
-Essa condição é das artes e não acrescenta uma restrição não comercial ao
-código GPLv3. O código pode ser reutilizado sob a GPLv3 com artes substitutas.
-Os arquivos de renderização e a lógica do aplicativo em `bolha/` estão sob GPLv3;
-eles carregam os recursos visuais separados dessa pasta.
-
-Os desenhos Qt do notebook, da bolinha e da variante de papel em
-`bolha/objects.py` são derivados do código de Pestinha, de mille-okws e
-contribuidores, sob GPL-3.0-or-later. Eles não são artes próprias de André
-Ribeiro Lima e não estão sob a licença CC BY-NC descrita acima. Nenhuma
-fotografia PNG dos objetos de Pestinha integra esta distribuição.
+Os memes, imagens e textos dos personagens do Pestinha não fazem parte da
+distribuição da Bolha. As referências privadas de Drippy não fazem parte deste
+repositório nem dos artefatos publicados.

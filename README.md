@@ -10,12 +10,12 @@ Bolha. Contribuições da comunidade são bem-vindas.
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Bolha 0.4.3 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.3).
+**Bolha 0.4.4 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.4).
 
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.4.3 reúne as configurações na
+A 0.4.4 reúne as configurações na
 **Central da Bolha**, com ajustes detalhados recolhidos e uma aba **Testar**
 para expressões e uma rede neural temporária. Também inclui raquete visível
 no pingue-pongue, corrida que acompanha a direção, contato físico do brinquedo
@@ -24,7 +24,7 @@ e intervalos maiores entre fogos espontâneos.
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
-[CC BY-NC 4.0](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
+[GPL-3.0-or-later](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
 Qt de Pestinha, de mille-okws e contribuidores, sob
 [GPL-3.0-or-later](NOTICE.md).*
 
@@ -198,11 +198,11 @@ O código da Bolha e o código derivado do Pestinha são open source sob
 modificar e contribuir com o projeto, respeitando a licença e os créditos.
 Consulte [LICENSE](LICENSE) e [NOTICE.md](NOTICE.md).
 
-As artes da Bolha são separadas, sob **CC BY-NC 4.0**, com atribuição e uso não
-comercial. Consulte [licença das artes](licenses/BOLHA-ASSETS.md). Os memes e
-textos do pacote original do Pestinha não fazem parte da distribuição da Bolha;
+As artes e animações próprias da Bolha também estão sob **GPL-3.0-or-later**.
+Consulte [licença das artes](licenses/BOLHA-ASSETS.md). Os memes e textos do
+pacote original do Pestinha não fazem parte da distribuição da Bolha;
 os arquivos originais continuam identificados pela licença e autoria indicadas
 pelo Pestinha no histórico upstream deste fork.
 
-O código é aberto; a restrição não comercial se aplica às artes fornecidas,
-e deve ser observada por quem redistribui um pacote contendo essas artes.
+O projeto é aberto à comunidade. As referências privadas de Drippy não estão
+neste repositório e não fazem parte da licença ou dos artefatos da Bolha.

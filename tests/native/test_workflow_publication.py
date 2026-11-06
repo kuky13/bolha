@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Executa o passo PowerShell real com GitHub/CLI simulados: nunca publica nada."""
 import json
 from pathlib import Path

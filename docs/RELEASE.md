@@ -1,22 +1,20 @@
-# Bolha 0.4.3
+# Bolha 0.4.4
 
-A raquete agora acompanha o mouse no pingue-pongue, com a área de contato
-alinhada ao desenho. A corrida acompanha o sentido real do movimento,
-incluindo olhos, orelhas, inclinação e rastros.
+A Bolha agora está publicada como fork comunitário do Pestinha. Esta versão
+registra no código, no README e nos avisos os créditos a mille-okws e aos
+contribuidores do projeto original.
 
-Bolinha e amendoim rebatem ao atingir a Bolha, com reação direcional e sinais
-de impacto ao cérebro. Esperar pelo brinquedo deixou de parecer um tropeço.
-Os fogos espontâneos têm intervalo mínimo de dois minutos, e a comemoração
-completa do pingue-pongue aparece ao vencer a partida.
+O código, as artes, os ícones, os memes e as animações próprias da Bolha usam
+GPL-3.0-or-later. Os guias privados de referência da Drippy não fazem parte do
+repositório nem dos arquivos desta publicação. Dependências de terceiros
+mantêm as próprias licenças, listadas em `packaging/THIRD-PARTY-NOTICES.txt`.
 
-A **Central da Bolha** organiza os controles em quatro abas, com os ajustes
-detalhados recolhidos. Em **Testar**, veja as expressões animadas e experimente
-sinais e emoções numa rede temporária separada do aprendizado da personagem.
-O painel neural da sua Bolha continua acessível nessa aba.
+A Bolha 0.4.4 mantém o comportamento da 0.4.3: a Central da Bolha, o teste de
+expressões e sinais, a raquete de pingue-pongue, a corrida direcional e as
+interações com o amendoim e a bolinha.
 
-Na 0.4.2, use **Atualizações → Verificar agora** para receber esta versão.
-Na central nova, as atualizações ficam em **App → Verificar atualizações**.
+Na 0.4.3, use **Central da Bolha → App → Verificar atualizações** para receber
+esta versão. O canal publica no repositório `kuky13/bolha`.
 
-O instalador Windows x64 é distribuído sem assinatura digital.
-O fluxo de publicação valida o instalador no Windows, incluindo instalação,
-atualização e recuperação. Os relatórios acompanham os arquivos desta versão.
+O instalador Windows x64 é distribuído sem assinatura digital. A validação
+automatizada do instalador e da atualização acompanha os arquivos da release.

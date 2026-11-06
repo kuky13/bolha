@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Gestos Qt exercitam o controlador real e seus limites de objetos."""
 from pathlib import Path
 from types import SimpleNamespace

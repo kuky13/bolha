@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Uma QApplication por sessão para toda a suíte (widgets e atualizador)."""
 import os
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')

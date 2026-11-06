@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """O pedido estático do driver jamais controla aplicativos fora do teste."""
 from pathlib import Path
 from types import SimpleNamespace
