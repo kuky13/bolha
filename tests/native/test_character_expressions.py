@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """As expressões continuam legíveis e contidas quando a esfera vira geleia."""
 import math
 

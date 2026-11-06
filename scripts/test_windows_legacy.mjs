@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 // Electron antigo somente no runner descartável; o pacote Qt não inclui Node.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

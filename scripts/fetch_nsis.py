@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """NSIS portable oficial, fixado por SHA-256; não instala nada no sistema."""
 import argparse
 import hashlib

@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Amostrador de teste: soma RSS e CPU da árvore inteira, sem telemetria."""
 import json
 import sys
