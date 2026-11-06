@@ -181,14 +181,21 @@ def registry_fingerprint():
                      r'Software\Microsoft\Windows\CurrentVersion\Run'):
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, location, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
+                if location.endswith('Run'):
+                    try:
+                        value, kind = winreg.QueryValueEx(key, 'Bolha')
+                    except FileNotFoundError:
+                        values.append((location, None))
+                    else:
+                        values.append((location, 'Bolha', value, kind))
+                    continue
                 index = 0
                 while True:
                     try:
                         name, value, kind = winreg.EnumValue(key, index)
                     except OSError:
                         break
-                    if not location.endswith('Run') or name == 'Bolha':
-                        values.append((location, name, value, kind))
+                    values.append((location, name, value, kind))
                     index += 1
         except FileNotFoundError:
             values.append((location, None))
