@@ -856,7 +856,14 @@ class Game:
                     and (y+ey <= bottom+1e-7 or open_edge(area, 'bottom', x, ex)))
 
         desired = pet.x+nx*radius, pet.y+ny*radius
-        if fits(desired):
+        left, top, right, bottom = source
+        x, y = desired
+        side = (1 if x < left+3*ex and not open_edge(source, 'left', y, ey) else
+                -1 if x > right-3*ex and not open_edge(source, 'right', y, ey) else 0)
+        vertical = (1 if y < top+3*ey and not open_edge(source, 'top', x, ex) else
+                    -1 if y > bottom-3*ey and not open_edge(source, 'bottom', x, ex) else 0)
+        corner = side and vertical and nx*side < 0. and ny*vertical < 0.
+        if not corner and fits(desired):
             return desired, 0
         # As tangentes à parede deixam o brinquedo contornar a personagem.
         candidates = [(pet.x+dx*radius, pet.y+dy*radius)
@@ -874,6 +881,9 @@ class Game:
                     candidates.extend(((pet.x-offset, y), (pet.x+offset, y)))
         valid = [point for point in candidates if fits(point)]
         if valid:
+            if corner:
+                exits = [p for p in valid if (p[0]-pet.x)*side >= 0. or (p[1]-pet.y)*vertical >= 0.]
+                valid = exits or valid
             x, y = min(valid, key=lambda p: (round(math.dist(p, desired), 8), p[1]))
             area = _area_em(areas, x, y) or source
             if x-ex <= area[0]+1. and not open_edge(area, 'left', y, ey):

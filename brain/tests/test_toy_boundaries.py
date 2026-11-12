@@ -76,6 +76,22 @@ def test_toy_leaves_corner_even_with_pet_standing_still(tmp_path, appearance, si
     assert (initial_x - toy.x)*side > pet.half_w*2
 
 
+def test_small_toy_can_be_nudged_out_of_corner_pocket(tmp_path):
+    game = Game(tmp_path, CONTENT)
+    pet, toy = game.body, game.ball.body
+    pet.x, pet.y = 1212., 692.
+    toy.x, toy.y = 1270., 750.
+    toy.half_w = toy.half_h = 10.
+    game.ball.kick(-280., -160.)
+
+    for frame in range(120):
+        previous_toy = toy.x, toy.y
+        game.ball.step(.016, game.bounds())
+        game._toy_contact((pet.x, pet.y), previous_toy, 100. + frame*.016)
+
+    assert toy.x < pet.x - pet.half_w
+
+
 @pytest.mark.parametrize('seam', [0., 1280.])
 def test_contact_does_not_turn_shared_edge_into_wall(tmp_path, seam):
     game = Game(tmp_path, CONTENT)
