@@ -80,11 +80,10 @@ def validate(installer, output):
                     elif not set_directory:
                         click(hwnd,1)  # boas-vindas e licença
                     elif (expected/'Bolha.exe').is_file():
-                        checkboxes=[h for h in controls if wg.GetClassName(h)=='Button'
-                                    and (wg.GetWindowLong(h,wc.GWL_STYLE)&15) in (2,3)]
-                        if checkboxes:
-                            for h in checkboxes:
-                                wg.SendMessage(h,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
+                        run_checkbox=next((h for h in controls if wg.GetDlgCtrlID(h)==1203
+                                           and wg.GetClassName(h)=='Button'),None)
+                        if run_checkbox:
+                            wg.SendMessage(run_checkbox,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
                             finished=click(hwnd,1)
                 if finished and process.poll() is not None:break
                 if process.poll() is not None and not windows:
