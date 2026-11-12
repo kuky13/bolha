@@ -23,6 +23,7 @@ ShowUninstDetails show
 BrandingText "Bolha — companhia local"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_FINISHPAGE_RUN_FUNCTION FinishOpenBolha
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
