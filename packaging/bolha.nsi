@@ -129,7 +129,7 @@ FunctionEnd
 
 !macro RejectInstallDirectory MESSAGE
   ${IfNot} ${Silent}
-    MessageBox MB_OK|MB_ICONSTOP "${MESSAGE}"
+    MessageBox MB_OK|MB_ICONSTOP "${MESSAGE}$\r$\n$\r$\nPasta selecionada: $INSTDIR"
   ${EndIf}
   Abort "${MESSAGE}"
 !macroend
