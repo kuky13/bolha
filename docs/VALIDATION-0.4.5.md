@@ -41,3 +41,9 @@ Em Linux com Qt offscreen, Python 3.11 e PySide6 6.11.3:
 
 A [rodada final Windows](https://github.com/kuky13/bolha/actions/runs/43278521936), no commit `096579f`, passou em 649 testes, quatro cenários do assistente gráfico com o instalador completo e dez cenários de instalação, atualização e recuperação. O instalador baixado do artefato conferiu com o manifesto SHA-256.
 Validação manual em computador Windows com monitores físicos: não realizada nesta etapa. O runner e o Qt offscreen não comprovam o comportamento visual de todos os aplicativos reais.
+
+## Menos falas e bobinho
+
+A Bolha espera pelo menos 45 segundos entre balões. A primeira fala espontânea pode aparecer depois de cinco minutos, com espera maior se a preferência de travessuras pedir. Passar o cursor pela bola ou pelo amendoim conta como toque mesmo quando o ponteiro cruza o brinquedo inteiro entre dois quadros. Toques rápidos têm força limitada. A Bolha persegue por até dez segundos após o último movimento do brinquedo e devolve com menos força.
+
+A [rodada Windows com esses ajustes](https://github.com/kuky13/bolha/actions/runs/43284227992) validou o commit `9a32b29` com 657 testes, quatro cenários do assistente gráfico e dez de instalação, atualização e recuperação. O instalador entregue conferiu com o manifesto SHA-256.
