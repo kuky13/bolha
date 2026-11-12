@@ -26,12 +26,13 @@ def ball(angle=0,paper=False):
     return image
 
 
-def test_notebook_sem_logo_centro_uniforme_base_prateada_e_borda_de_trabalho(qt_application):
+def test_notebook_detalhado_com_tela_teclas_base_e_estado_de_trabalho(qt_application):
     idle=notebook();working=notebook(True)
-    assert idle.pixelColor(20,30)==idle.pixelColor(55,30)==idle.pixelColor(90,30)
-    center=idle.pixelColor(55,30);assert center.red()<center.green()<center.blue()
-    assert idle.pixelColor(55,61).red()>140
-    assert working.pixelColor(4,30).name()=='#63e56f'
+    # A tela tem painel, linhas de atividade e contraste com a moldura.
+    assert len({idle.pixelColor(x,30).name() for x in range(12,98)})>4
+    assert idle.pixelColor(55,20).lightness()<idle.pixelColor(55,61).lightness()
+    assert working.pixelColor(98,61)!=idle.pixelColor(98,61)
+    assert working.pixelColor(4,30).name()=='#c6a8ee'
     assert idle.pixelColor(4,30)!=working.pixelColor(4,30)
 
 @pytest.mark.parametrize('paper',[False,True])

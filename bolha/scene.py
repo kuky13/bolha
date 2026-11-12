@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QWidget,QMenu
 from .pet import FLAGS
 from .objects import paint_notebook,paint_ball,paint_peanut,peanut_shape,notebook_shape
 from .grab import MouseGrab
+from .speech import SpeechWindow, bubble_path, paint_bubble
 from .reactions import (
     InMemoryMedia, MAX_TOTAL_MEDIA_BYTES, NEKOS_HOSTS,
     OnlineReactionFetcher, REACTIONGIFS_HOSTS, validate_reaction_url,
@@ -57,6 +58,7 @@ class ObjectWindow(QWidget):
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
         else:
             if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()),item.working)
+            elif item.kind in ('note','sign'):path=bubble_path(QRectF(self.rect()),item.kind=='note')
             else:
                 path=QPainterPath();path.addRoundedRect(QRectF(self.rect()),8,8)
             mask=QRegion(path.toFillPolygon().toPolygon())
@@ -95,7 +97,8 @@ class ObjectWindow(QWidget):
         key=tuple(data[field] for field in ('kind','text','image','angle','working','x','y'))+(
             getattr(item,'appearance',None),
             getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'attribution',None),
-            frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible)
+            frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible,
+            int(time.monotonic()*10) if visible and item.kind=='notebook' and item.working else None)
         if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
             self._paint_key=key;self.update()
     def enterEvent(self,event):
@@ -222,7 +225,7 @@ class ObjectWindow(QWidget):
                 paint_ball(p,w/2,h/2,radius=self.item.body.half_w,
                            angle=self.item.roll_angle,paper=kind=='paper')
         elif kind=='notebook':
-            paint_notebook(p,QRectF(self.rect()),self.item.working)
+            paint_notebook(p,QRectF(self.rect()),self.item.working,phase=time.monotonic())
         elif kind=='fireworks':
             age=max(0,3.2-(self.item.until-time.monotonic()))
             scale=min(w/max(1,self.item._base_w),h/max(1,self.item._base_h))
@@ -236,6 +239,8 @@ class ObjectWindow(QWidget):
             img=self.reaction_media.current_image() if self.reaction_media is not None else None
             if img is not None and not img.isNull():
                 p.drawImage(self._media_rect(img),img)
+        elif kind in ('note','sign'):
+            paint_bubble(p,QRectF(self.rect()),self.item.text,kind=='note')
         else:
             scale=min(w/max(1,self.item._base_w),h/max(1,self.item._base_h))
             corner=kind=='corner';p.setPen(QPen(QColor('#846c49'),max(1.,2*scale)));p.setBrush(QColor('#e4cfa1' if corner else '#fff0be'));p.drawRoundedRect(QRectF(1,1,w-2,h-2),7*scale,7*scale)
@@ -250,6 +255,7 @@ class ObjectWindow(QWidget):
 class NativeScene:
     def __init__(self,game,reaction_fetcher=None,on_scale_change=None):
         self.game=game;self.windows={}
+        self.speech=SpeechWindow(game)
         self.fetcher=reaction_fetcher or OnlineReactionFetcher()
         self.on_scale_change=on_scale_change
         self.reaction_status={}
@@ -365,6 +371,7 @@ class NativeScene:
             window.set_reaction_media(media)
             self._status(ident,'ready','');self._reaction_deadlines.pop(str(ident),None)
     def sync(self):
+        self.speech.sync()
         self._poll_reactions()
         now=time.monotonic()
         for ident,deadline in list(self._reaction_deadlines.items()):
@@ -425,8 +432,9 @@ class NativeScene:
             self.fetcher.cancel(ident)
             self.windows.pop(ident).close()
     def close(self):
+        self.speech.close()
         self.fetcher.stop()
         self._reaction_deadlines.clear()
         for window in self.windows.values():window.close()
         self.windows.clear()
-    def ids(self):return [int(w.winId()) for w in self.windows.values()]
+    def ids(self):return [int(w.winId()) for w in self.windows.values()]+[int(self.speech.winId())]

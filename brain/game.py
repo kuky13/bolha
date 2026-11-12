@@ -15,7 +15,7 @@ from pestinha.core.emotion import EmotionState
 from pestinha.core.episodic import EpisodicMemory
 from pestinha.core.conditioning import Conditioning
 from pestinha.core.protesto import Protesto
-from pestinha.core.physics import Body
+from pestinha.core.physics import Body, _area_em, _tem_vizinha, _physical_neighbor
 from pestinha.body.behavior import Behavior
 from pestinha.body.pet_state import PetState
 from pestinha.body.brincadeira import Play
@@ -33,7 +33,7 @@ from pestinha.paths import PetPaths, ConteudoPaths
 from pestinha.store import read_json, write_json, preserve_invalid, clear_protection_after_backup
 from pestinha.scene import set_scene, Ball, FloatingThing
 from pestinha.scene import object_scale
-from geometry import fullscreen_monitors
+from geometry import fullscreen_monitors, visible_window_platforms
 from intelligence import Intelligence
 from pingpong import PingPong
 
@@ -276,15 +276,15 @@ class Game:
             self.blocked.clear()
             if self.prefs.get('senseWindows', True):
                 windows = []
+                platform_windows = []
                 for hwnd, (left, top, right, _bottom), maximized in native.janelas_visiveis(self.excluded):
                     style = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_STYLE)
                     extended = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_EXSTYLE)
                     if extended & native.win32con.WS_EX_LAYERED:
                         continue
                     windows.append(((left, top, right, _bottom), maximized, bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))))
-                    left, top = self.native_point(left, top)
-                    right, _ = self.native_point(right, _bottom)
-                    if not maximized: self.platforms.append((hwnd, left + 10, right, top))
+                    platform_windows.append((hwnd, (left, top, right, _bottom), maximized))
+                self.platforms = visible_window_platforms(platform_windows, self.displays)
                 self.blocked = fullscreen_monitors(windows, self.displays)
             if self.available_areas():
                 if previous_blocked != self.blocked:
@@ -820,6 +820,51 @@ class Game:
         self.state.gaze = ((dx*math.cos(angle)+dy*math.sin(angle))/distance,
                            (-dx*math.sin(angle)+dy*math.cos(angle))/distance)
 
+    def _toy_contact_position(self, nx, ny, radius):
+        """Separa os círculos sem prensar o brinquedo contra paredes ou costuras."""
+        pet, toy = self.body, self.ball.body
+        areas = self.available_areas() or self.areas
+        monitors = [m for i, m in enumerate(self.monitors) if i not in self.blocked]
+        displays = [d for i, d in enumerate(self.displays) if i not in self.blocked]
+        source = self.bounds((toy.x, toy.y))
+        ex, ey = toy.extents()
+
+        def fits(point):
+            x, y = point
+            area = _area_em(areas, x, y) or source
+            left, top, right, bottom = area
+            def open_edge(side, coordinate, extent):
+                if displays:
+                    return _physical_neighbor(areas, displays, area, side, coordinate) is not None
+                return _tem_vizinha(areas, area, side, coordinate, extent, monitors)
+            return ((x-ex >= left-1e-7 or open_edge('left', y, ey))
+                    and (x+ex <= right+1e-7 or open_edge('right', y, ey))
+                    and (y-ey >= top-1e-7 or open_edge('top', x, ex))
+                    and (y+ey <= bottom+1e-7 or open_edge('bottom', x, ex)))
+
+        desired = pet.x+nx*radius, pet.y+ny*radius
+        if fits(desired):
+            return desired
+        # As tangentes à parede deixam o brinquedo contornar a personagem.
+        candidates = [(pet.x+dx*radius, pet.y+dy*radius)
+                      for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1))]
+        for left, top, right, bottom in areas:
+            for x in (left+ex, right-ex):
+                remainder = radius*radius-(x-pet.x)**2
+                if remainder >= 0:
+                    offset = math.sqrt(remainder)
+                    candidates.extend(((x, pet.y-offset), (x, pet.y+offset)))
+            for y in (top+ey, bottom-ey):
+                remainder = radius*radius-(y-pet.y)**2
+                if remainder >= 0:
+                    offset = math.sqrt(remainder)
+                    candidates.extend(((pet.x-offset, y), (pet.x+offset, y)))
+        valid = [point for point in candidates if fits(point)]
+        if valid:
+            return min(valid, key=lambda p: (round(math.dist(p, desired), 8), p[1]))
+        # Só ocorre se não houver espaço para os dois círculos na área útil.
+        return toy.x, toy.y
+
     def _toy_contact(self, previous_pet, previous_toy, now):
         """O contato circular reflete o brinquedo, inclusive entre dois quadros."""
         pet, toy = self.body, self.ball.body
@@ -849,14 +894,22 @@ class Game:
             return
         length=math.hypot(*normal)
         nx,ny=(normal[0]/length,normal[1]/length) if length>1e-8 else (1.,0.)
-        toy.x,toy.y=pet.x+nx*(radius+.5),pet.y+ny*(radius+.5)
-        incoming=(toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny
+        incoming = (toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny
+        old_position = toy.x, toy.y
+        toy.x, toy.y = self._toy_contact_position(nx, ny, radius+.5)
+        separation = math.hypot(toy.x-pet.x, toy.y-pet.y)
+        if separation > 1e-8:
+            nx, ny = (toy.x-pet.x)/separation, (toy.y-pet.y)/separation
+        if math.dist(old_position, (toy.x, toy.y)) > .01:
+            toy.grounded = False
+            toy.platform = None
+        # A parede muda a saída, mas conserva o impulso do contato inicial.
+        incoming = min(incoming, (toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny)
         if incoming<0.:
             restitution=.78 if incoming < -80. else 0.
             toy.vx-=(1.+restitution)*incoming*nx
             toy.vy-=(1.+restitution)*incoming*ny
             toy.grounded=False;toy.platform=None
-        self.fit(toy,margin=0.)
         self.ball.place()
         if incoming>=-90.:
             return

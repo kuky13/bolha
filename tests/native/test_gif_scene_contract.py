@@ -104,7 +104,11 @@ def test_scene_toy_size_mask_and_negative_monitor_clamp(qt_app,tmp_path):
     window=scene.windows[sign.id]
     assert window.width()<=game.areas[0][2]-game.areas[0][0]
     assert window.height()<=game.areas[0][3]-game.areas[0][1]
-    assert window.mask().boundingRect().width()==window.width()
+    # A margem transparente e os cantos do balão deixam o desktop receber cliques.
+    from PySide6.QtCore import QPoint
+    assert 0 < window.mask().boundingRect().width() <= window.width()
+    assert window.mask().contains(QPoint(window.width()//2,window.height()//2))
+    assert not window.mask().contains(QPoint(0,0))
     assert game.areas[0][0] <= sign._cx-window.width()/2
     assert sign._cx+window.width()/2 <= game.areas[0][2]
     scene.close()
