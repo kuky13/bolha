@@ -39,5 +39,5 @@ Em Linux com Qt offscreen, Python 3.11 e PySide6 6.11.3:
 * Testes de notebook cobrem escalas, máscara, preservação da silhueta e diferença entre atividade e repouso.
 * `git diff --check` aprovado.
 
-A [primeira rodada Windows](https://github.com/kuky13/bolha/actions/runs/43266320623) passou em 649 testes e dez cenários do instalador anterior à correção da escolha de pasta. A revisão completa do pacote com a correção roda separadamente.
+A [rodada final Windows](https://github.com/kuky13/bolha/actions/runs/43278521936), no commit `096579f`, passou em 649 testes, quatro cenários do assistente gráfico com o instalador completo e dez cenários de instalação, atualização e recuperação. O instalador baixado do artefato conferiu com o manifesto SHA-256.
 Validação manual em computador Windows com monitores físicos: não realizada nesta etapa. O runner e o Qt offscreen não comprovam o comportamento visual de todos os aplicativos reais.
