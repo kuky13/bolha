@@ -128,9 +128,9 @@ class Dialogue:
             return None
         if category != previous and category is not None and now >= self.next_reaction:
             self.next_reaction = now+9.
-            self.next_ambient = now+50.
+            self.next_ambient = now+game.prefs.get('mischiefInterval', 300)
         elif now >= self.next_ambient and game.prefs.get('mischiefEnabled', True) and not game.sleep.asleep:
-            self.next_ambient = now+50.
+            self.next_ambient = now+game.prefs.get('mischiefInterval', 300)
             # O cérebro pode preferir silêncio; nenhum sorteio independente decide agir.
             options = [key for key in ('ambiente', 'casual', 'pensamento') if key != self.last_category]
             category = game.intelligence.choose('dialogue_intent', options+['silencio'], rates=game.rates,
@@ -172,7 +172,7 @@ class SpeechWindow(QWidget):
             self.until = 0.
             self.hide()
             self.dialogue.previous = None
-            self.dialogue.next_ambient = now+50.
+            self.dialogue.next_ambient = now+game.prefs.get('mischiefInterval', 300)
             return
         result = self.dialogue.update(game, now)
         if result:

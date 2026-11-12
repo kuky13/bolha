@@ -50,11 +50,12 @@ def test_politica_pode_escolher_silencio_e_categorias_ambiente_nao_repetem(tmp_p
     monkeypatch.setattr(game.intelligence, 'choose', choose)
     assert dialogue.update(game, 100.) is None
     assert calls[0][0] == 'dialogue_intent'
-    assert dialogue.next_ambient == 150.
+    assert dialogue.next_ambient == 400.
     monkeypatch.setattr(game.intelligence, 'choose', lambda action, candidates, **kwargs: candidates[0])
-    first = dialogue.update(game, 150.)
+    first = dialogue.update(game, 400.)
     assert first[0] in LINES['ambiente']
-    second = dialogue.update(game, 200.)
+    assert dialogue.update(game, 699.) is None
+    second = dialogue.update(game, 700.)
     assert second[0] in LINES['casual']
 
 
