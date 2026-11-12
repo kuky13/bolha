@@ -12,6 +12,12 @@ Alterações em revisão; o release público continua na versão 0.4.4.
 
 A leitura usa somente geometria externa das janelas, sem conteúdo, títulos ou painéis internos. A preferência de leitura de janelas continua obrigatória; quando desligada, não há consulta nativa nem plataformas de aplicativos.
 
+## Assistente de instalação
+
+O assistente valida a pasta ao clicar em **Instalar**. Aceita caminhos ainda inexistentes, explica quando um destino é recusado e pode oferecer uma pasta dedicada quando a escolhida contém arquivos. Uma instalação reconhecida pode ser reinstalada no mesmo destino. Se a Bolha estiver aberta, o assistente informa como fechar pela bandeja e permite repetir ou cancelar.
+
+O [teste gráfico com arquivos descartáveis](https://github.com/kuky13/bolha/actions/runs/43278324061) passou em quatro cenários: pasta nova com subpastas ainda inexistentes, pasta com arquivos preservados, reinstalação no mesmo destino e pasta antiga não reconhecida com alternativa ao lado.
+
 ## Prévias reproduzíveis
 
 ![Desenho Qt real](previews/visual-polish-045.png)
@@ -33,5 +39,5 @@ Em Linux com Qt offscreen, Python 3.11 e PySide6 6.11.3:
 * Testes de notebook cobrem escalas, máscara, preservação da silhueta e diferença entre atividade e repouso.
 * `git diff --check` aprovado.
 
-Validação de pacote, instalação e atualização no runner Windows: pendente nesta revisão inicial.
+A [primeira rodada Windows](https://github.com/kuky13/bolha/actions/runs/43266320623) passou em 649 testes e dez cenários do instalador anterior à correção da escolha de pasta. A revisão completa do pacote com a correção roda separadamente.
 Validação manual em computador Windows com monitores físicos: não realizada nesta etapa. O runner e o Qt offscreen não comprovam o comportamento visual de todos os aplicativos reais.
