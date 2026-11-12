@@ -139,6 +139,32 @@ def test_balao_curto_ocupa_menos_espaco_e_fica_menos_tempo(qt_application, tmp_p
     window.close()
 
 
+@pytest.mark.parametrize('y', [68., 692.])
+def test_texto_da_referencia_cabe_no_corpo_do_balao_em_cima_e_em_baixo(qt_application, tmp_path, y):
+    from PySide6.QtGui import QFont, QFontMetricsF
+    from bolha.speech import BUBBLE_TEXT_FLAGS, COMPACT_TEXT_PADDING
+
+    game = Game(tmp_path, CONTENT)
+    game.body.x, game.body.y = 1212., y
+    window = SpeechWindow(game)
+    window.dialogue.next_ambient = 1000.
+    window.present('Trabalhando muito ou só encarando a tela comigo?', thought=True, now=100.)
+    window.sync(101.)
+    try:
+        assert window.isVisible()
+        assert window.tail_top == (y == 68.)
+        pad_x, pad_y, tail = COMPACT_TEXT_PADDING
+        metrics = QFontMetricsF(QFont('Segoe UI', 10), window)
+        text = metrics.boundingRect(QRectF(0.,0.,window.width()-2*pad_x,0.),
+                                    BUBBLE_TEXT_FLAGS, window.text)
+        assert text.height() >= 2*metrics.height()
+        assert window.height()-2*pad_y-tail >= text.height()+2.
+        assert window.geometry().bottom() < 760
+        assert window.geometry().right() < 1280
+    finally:
+        window.close()
+
+
 @pytest.mark.parametrize('thought', [False, True])
 @pytest.mark.parametrize('tail_top', [False, True])
 def test_silhueta_tem_ponta_de_fala_ou_pontos_de_pensamento(thought, tail_top):

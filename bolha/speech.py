@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Falas locais escolhidas pela política neural, sem ler conteúdo do desktop."""
+import math
 import time
 from collections import deque
 
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QTransform
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPen, QTransform
 from PySide6.QtWidgets import QWidget
 from .pet import FLAGS
 
@@ -62,6 +63,8 @@ LINES = {
 THOUGHTS = frozenset(('pensamento', 'sono', 'curioso', 'triste', 'ambiente'))
 SPEECH_INTERVAL = 45.
 AMBIENT_MIN_INTERVAL = 300.
+COMPACT_TEXT_PADDING = (11, 8, 12)
+BUBBLE_TEXT_FLAGS = Qt.AlignCenter | Qt.TextWordWrap
 
 
 def bubble_path(rect, thought=False, anchor=None, tail_top=False, *, compact=False):
@@ -97,10 +100,10 @@ def paint_bubble(painter, rect, text, thought=False, anchor=None, opacity=1., ta
     painter.setPen(QColor('#fff1c7'))
     font = QFont('Segoe UI', 10)
     painter.setFont(font)
-    pad_x, pad_y, tail = (11, 6, 10) if compact else (14, 10, 14)
+    pad_x, pad_y, tail = COMPACT_TEXT_PADDING if compact else (14, 10, 14)
     text_rect = QRectF(rect).adjusted(pad_x, pad_y + (tail if tail_top else 0),
                                     -pad_x, -pad_y - (0 if tail_top else tail))
-    painter.drawText(text_rect, Qt.AlignCenter | Qt.TextWordWrap, text)
+    painter.drawText(text_rect, BUBBLE_TEXT_FLAGS, text)
     painter.restore()
 
 
@@ -196,13 +199,14 @@ class SpeechWindow(QWidget):
             self.hide()
             return
         left, top, right, bottom = game.bounds((game.body.x, game.body.y))
-        metrics = QFontMetrics(QFont('Segoe UI', 10))
-        width = min(212, int(right-left-16), max(46, metrics.horizontalAdvance(self.text)+24))
+        metrics = QFontMetricsF(QFont('Segoe UI', 10), self)
+        pad_x, pad_y, tail = COMPACT_TEXT_PADDING
+        width = min(212, int(right-left-16), max(46, math.ceil(metrics.horizontalAdvance(self.text))+2*pad_x+2))
         if width < 46:
             self.hide()
             return
-        text_height = metrics.boundingRect(0, 0, width-22, 200, Qt.TextWordWrap, self.text).height()
-        height = text_height+24
+        text_bounds = metrics.boundingRect(QRectF(0., 0., width-2*pad_x, 0.), BUBBLE_TEXT_FLAGS, self.text)
+        height = math.ceil(text_bounds.height()) + 2*pad_y + tail + 3
         if height > bottom-top-16:
             self.hide()
             return
