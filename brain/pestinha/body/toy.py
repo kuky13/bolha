@@ -99,6 +99,11 @@ def push_from_cursor(ball, cursor, cursor_vel, now, last_push, radius=RADIUS + 6
     d = math.hypot(dx, dy)
     if d >= radius:
         return last_push
+    cursor_vx, cursor_vy = cursor_vel
+    if ball.kind == 'ball' and dy <= 4. and cursor_vy < -160. and abs(cursor_vx) <= -cursor_vy*.45:
+        # O movimento de baixo para cima preserva a direção do gesto.
+        ball.kick(max(-110., min(110., cursor_vx*.35)), -max(430., min(780., -cursor_vy*.65)))
+        return now
     speed_in = math.hypot(cursor_vel[0], cursor_vel[1])
     if d > 1e-6:
         nx, ny = dx / d, dy / d

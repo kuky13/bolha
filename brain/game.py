@@ -128,6 +128,7 @@ class Game:
         self.prev_distance = None
         self.cursor_toy_near = False
         self.cursor_sample = None
+        self.cursor_path_start = None
         self.cursor_velocity = (0., 0.)
         self.last_toy_push = -1e9
         self.next_toy_attention = 0.
@@ -298,8 +299,8 @@ class Game:
         except Exception as error:
             self.native_error = str(error)
 
-    def interact(self, event):
-        now = time.monotonic()
+    def interact(self, event, *, now=None):
+        now = time.monotonic() if now is None else now
         kind = event.get('type')
         if kind == 'pingpong':
             if self.pingpong is not None:
@@ -458,14 +459,17 @@ class Game:
                     refusal_reason=None if allowed else 'low_energy_or_unwilling_mood',factors=dict(emotion=self.state.emotion,energy=self.drives.energy,neural={'SENTAR':self.rates.get('SENTAR',0.)}))
             self.intelligence.history.append(dict(self.intelligence.current_decision))
         elif kind == 'play':
+            trick = event.get('trick')
+            explicit_trick = trick in ('kick','lift')
             distance = math.dist((self.body.x,self.body.y),(self.ball.body.x,self.ball.body.y))
             allowed = (self.visible() and not self.sleep.asleep and not self.body.held and self.body.grounded
                        and not self.mesa.sentado and not self.behavior.mission and not self.state.protest_stage and self.drives.energy > .2
                        and self.body.upright() and not self.state.castigo and not self.behavior.canto
                        and self.behavior.fuga_alvo is None and not self.state.caressing(now)
-                       and not self.ball_stored and self.ball.isVisible() and not self.ball.dragging and distance <= 220
-                       and self.state.emotion in ('feliz','curioso','contente','bravo'))
-            actions = ['throw'] if self.state.emotion == 'bravo' else ['kick']
+                       and not self.ball_stored and self.ball.isVisible() and not self.ball.dragging
+                       and not self.ball.body.held and distance <= 220
+                       and (explicit_trick or self.state.emotion in ('feliz','curioso','contente','bravo')))
+            actions = [trick] if explicit_trick else ['throw'] if self.state.emotion == 'bravo' else ['kick']
             action = self.intelligence.choose('play_request',actions,rates=self.rates,emotion=self.state.emotion,
                     energy=self.drives.energy,contact=self.drives.contact,duration=1.,source='explicit_user_request') if allowed else None
             if action:
@@ -730,6 +734,7 @@ class Game:
 
     def _reset_cursor_motion(self):
         self.cursor_sample = None
+        self.cursor_path_start = None
         self.cursor_velocity = (0., 0.)
         self.mouse_moved_at = -1e9
         self.cursor_toy_near = False
@@ -742,6 +747,7 @@ class Game:
         prev_cursor, prev_now = self.cursor_sample
         dt = now - prev_now
         if math.dist(self.cursor, prev_cursor) > 1.:
+            self.cursor_path_start = self.cursor_sample if .001 <= dt <= .15 else None
             self.cursor_velocity = (((self.cursor[0] - prev_cursor[0]) / dt,
                                      (self.cursor[1] - prev_cursor[1]) / dt)
                                     if .001 <= dt <= .15 else (0., 0.))
@@ -757,14 +763,14 @@ class Game:
         if not self.prefs.get('senseCursor',True) or not self.visible():
             self._reset_cursor_motion()
             return
+        moved=self._track_cursor(now)
+        previous_sample, self.cursor_path_start = self.cursor_path_start, None
         if (self.panel or self.ball_stored or not self.ball.isVisible()
                 or self.ball.dragging or self.ball.body.held
                 or self.body.held or self.held_since is not None
                 or self.state.pressing or self.scene_dragging):
             self.cursor_toy_near = False
             return
-        previous_sample = self.cursor_sample
-        moved=self._track_cursor(now)
         radius=self.ball.body.half_w+24
         toy_center = self.ball.body.x, self.ball.body.y
         near=math.dist(self.cursor,toy_center)<radius

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bolha"
-version = "0.4.7"
+version = "0.4.8"
 description = "Bolha, mascote de desktop baseada no Pestinha e aberta à comunidade"
 requires-python = ">=3.11,<3.12"
 license = "GPL-3.0-or-later"

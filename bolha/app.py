@@ -141,7 +141,7 @@ class NativeApp:
         try:
             self.pet.poll_interaction();self.scene.poll_interactions()
             if self.store.preferences.get('senseCursor',True):
-                point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()))
+                point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()), now=now)
             else:self.game.cursor=(self.game.body.x,self.game.body.y)
             self.game.tick(dt,now);self.pet.sync();self.scene.sync()
             self.sync_pingpong()
@@ -230,6 +230,9 @@ class NativeApp:
                            ('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work')):
             action=play.addAction(label)
             action.triggered.connect(lambda checked=False,k=kind:self.interact(k))
+        for label, trick in (('Dar uma bicuda', 'kick'), ('Jogar para cima', 'lift')):
+            action = play.addAction(label)
+            action.triggered.connect(lambda checked=False, move=trick: self.interact('play', trick=move))
         interactions=menu.addMenu('Interagir')
         for label,kind in (('Carinho','caress'),('Dormir um pouco','sleep'),('Acordar','wake'),
                            ('Comemorar','celebrate'),('Uma travessura','mischief'),

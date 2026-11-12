@@ -380,7 +380,8 @@ def test_toque_de_baixo_para_cima_levanta_brinquedo_e_inicia_brincadeira(tmp_pat
     clock[0] += .035
     game.interact(dict(type='cursor',x=x,y=y+14.))
     game._sense_toy_cursor(clock[0])
-    assert game.ball.body.vy < -300.
+    assert game.ball.body.vy < -430.
+    assert game.ball.body.vx == pytest.approx(0.)
     assert game.play.chase_until > clock[0]
 
 
@@ -389,9 +390,9 @@ def test_toque_de_baixo_para_cima_levanta_brinquedo_e_inicia_brincadeira(tmp_pat
 def test_passagem_rapida_do_cursor_empurra_sem_precisar_parar_na_bolinha(tmp_path, direction, offset, elapsed, hit):
     game = Game(tmp_path, CONTENT)
     x, y = game.ball.body.x, game.ball.body.y
-    game.cursor = (x - 110.*direction, y + offset)
+    game.interact(dict(type='cursor',x=x - 110.*direction,y=y + offset), now=100.)
     game._sense_toy_cursor(100.)
-    game.cursor = (x + 110.*direction, y + offset)
+    game.interact(dict(type='cursor',x=x + 110.*direction,y=y + offset), now=100. + elapsed)
     game._sense_toy_cursor(100. + elapsed)
     if hit:
         assert game.ball.body.vx == pytest.approx(620.*direction)
@@ -399,6 +400,46 @@ def test_passagem_rapida_do_cursor_empurra_sem_precisar_parar_na_bolinha(tmp_pat
     else:
         assert game.ball.body.vx == 0.
         assert game.play.chase_until == 0.
+
+
+@pytest.mark.parametrize('appearance', ['ball', 'peanut'])
+def test_jogar_para_cima_espera_descida_e_rebate_duas_vezes(tmp_path, appearance):
+    game = Game(tmp_path, CONTENT)
+    game.configure(dict(senseApp=False,senseIdle=False,senseCursor=False,senseWindows=False, toyAppearance=appearance))
+    pet, toy = game.body, game.ball.body
+    pet.x, pet.y, pet.surface, pet.grounded = 600., 692., 760., True
+    toy.x, toy.y = 685., 742.
+    game.last_think = 1000.
+    game.interact(dict(type='play',trick='lift'), now=100.)
+    game.tick(.016,100.)
+    assert game.behavior.last_play['action'] == 'lift'
+    assert abs(toy.vx) <= 110. and toy.vy < -700.
+    assert game.play.volley_left == 2
+    strikes = 0
+    highest = toy.y
+    for frame in range(1, 180):
+        previous = game.play.volley_left
+        descending = toy.vy > 0.
+        game.tick(.016,100. + frame*.016)
+        highest = min(highest, toy.y)
+        if game.behavior.toy_action == 'return' and game.play.volley_left == previous-1:
+            assert descending and toy.vy < -700.
+            strikes += 1
+    assert highest < 640.
+    assert strikes == 2
+
+
+@pytest.mark.parametrize('direction', [-1, 1])
+def test_bicuda_explicitamente_pedida_sai_para_cima_e_para_o_lado(tmp_path, direction):
+    game = Game(tmp_path, CONTENT)
+    pet, toy = game.body, game.ball.body
+    pet.x, pet.y, pet.grounded = 600., 500., True
+    toy.x, toy.y = pet.x + 90.*direction, pet.y
+    game.last_think = 100.
+    game.interact(dict(type='play',trick='kick'), now=100.)
+    game.tick(.016,100.016)
+    assert game.behavior.last_play['action'] == 'kick'
+    assert toy.vx*direction > 580. and toy.vy < -400.
 
 
 def test_olha_mouse_em_movimento_mesmo_com_brinquedo_guardado(tmp_path, monkeypatch):
