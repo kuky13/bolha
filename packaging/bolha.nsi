@@ -190,7 +190,7 @@ Function PrepareInstallDirectory
       Abort
       useSuggestedDirectory:
       StrCpy $INSTDIR "$2"
-      SendMessage $mui.DirectoryPage.Directory ${WM_SETTEXT} 0 "STR:$INSTDIR"
+      ; Alterar o campo durante LEAVE dispara notificações que podem esvaziar DirVar.
       ; A alternativa precisa estar vazia, inclusive quando já tiver marcador.
       FindFirst $0 $1 "$INSTDIR\*.*"
       ${DoWhile} $1 != ""
