@@ -27,6 +27,8 @@ def validate(installer, output):
     def wizard(selected, expected, allow_alternative):
         env=test_environment(root/'data',selected,root/'runtime.json')
         process=subprocess.Popen([str(installer),'/TEST','/D='+str(selected)],env=env)
+        transaction=expected.with_name(expected.name+'.transaction.ini')
+        previous=transaction.read_bytes() if transaction.exists() else None
         owned={process.pid}
         set_directory=False
         confirmed=False
@@ -79,22 +81,22 @@ def validate(installer, output):
                         click(hwnd,1)
                     elif not set_directory:
                         click(hwnd,1)  # boas-vindas e licença
-                    elif (expected/'Bolha.exe').is_file():
+                    elif not finished and (expected/'Bolha.exe').is_file():
                         run_checkbox=next((h for h in controls if wg.GetDlgCtrlID(h)==1203
                                            and wg.GetClassName(h)=='Button'),None)
                         if run_checkbox:
                             wg.SendMessage(run_checkbox,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
                             finished=click(hwnd,1)
-                if finished and process.poll() is not None:break
-                if process.poll() is not None and not windows:
-                    raise AssertionError('O instalador encerrou antes de concluir o assistente')
+                if process.poll() is not None:break
                 time.sleep(.15)
             else:raise TimeoutError(f'Assistente NSIS não concluiu: destino={expected.is_dir()}, '
                                     f'confirmação={confirmed}, controles={last_page!r}')
-            assert process.returncode==0
-            assert set_directory and finished
+            assert process.returncode==0, f'Código do instalador: {process.returncode}; controles={last_page!r}'
+            assert set_directory
             assert confirmed==allow_alternative
             assert (expected/'bolha-native-installation.flag').is_file()
+            assert transaction.read_bytes()!=previous
+            assert 'state=committed' in transaction.read_text(encoding='utf-16')
             assert sentinel.read_bytes()==b'nao alterar'
             assert registry_fingerprint()==original_registry
             records.append(dict(selected=str(selected),installed=str(expected),alternative=confirmed,passed=True))
