@@ -52,6 +52,7 @@ Var PreviousUninstall
 Var PreviousQuietUninstall
 Var PreviousIcon
 Var InstallerMutex
+Var ConfirmedInstallDirectory
 
 Function .onInit
   ${IfNot} ${RunningX64}
@@ -127,21 +128,6 @@ Function CheckNativeMarker
   ${EndIf}
 FunctionEnd
 
-!ifdef DIRECTORY_TRACE
-Var DirectoryTraceFile
-Var DirectoryTraceHandle
-!endif
-!macro TraceDirectory LABEL
-!ifdef DIRECTORY_TRACE
-  ReadEnvStr $DirectoryTraceFile "BOLHA_TEST_DIRECTORY_TRACE"
-  FileOpen $DirectoryTraceHandle "$DirectoryTraceFile" a
-  FileSeek $DirectoryTraceHandle 0 END
-  FileWrite $DirectoryTraceHandle "${LABEL}: destination=<$INSTDIR> register2=<$2>$\r$\n"
-  FileClose $DirectoryTraceHandle
-  ClearErrors
-!endif
-!macroend
-
 !macro RejectInstallDirectory MESSAGE
   ${IfNot} ${Silent}
     MessageBox MB_OK|MB_ICONSTOP "${MESSAGE}$\r$\n$\r$\nPasta selecionada: $INSTDIR"
@@ -160,11 +146,9 @@ Function NormalizeInstallDirectory
 FunctionEnd
 
 Function PrepareInstallDirectory
-  !insertmacro TraceDirectory "prepare-start"
+  StrCpy $ConfirmedInstallDirectory ""
   ; Valida uma vez ao clicar Instalar, exibindo o motivo em vez de desativar o botão.
-  !insertmacro TraceDirectory "before-fullpath"
   Call NormalizeInstallDirectory
-  !insertmacro TraceDirectory "after-fullpath"
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
   ${OrIf} $INSTDIR == "$0\"
@@ -214,14 +198,10 @@ Function PrepareInstallDirectory
       ${Else}
         StrCpy $2 "$INSTDIR\Bolha"
       ${EndIf}
-      !insertmacro TraceDirectory "before-question"
       MessageBox MB_YESNO|MB_ICONINFORMATION|MB_DEFBUTTON2 "A pasta escolhida contém arquivos e não é uma instalação reconhecida da Bolha.$\r$\n$\r$\nNenhum arquivo existente será substituído. Deseja instalar em uma pasta exclusiva?$\r$\n$2" IDYES useSuggestedDirectory
       Abort
       useSuggestedDirectory:
-      !insertmacro TraceDirectory "before-suggested"
       StrCpy $INSTDIR "$2"
-      !insertmacro TraceDirectory "after-suggested"
-      ; Alterar o campo durante LEAVE dispara notificações que podem esvaziar DirVar.
       ; A alternativa precisa estar vazia, inclusive quando já tiver marcador.
       FindFirst $0 $1 "$INSTDIR\*.*"
       ${DoWhile} $1 != ""
@@ -235,15 +215,12 @@ Function PrepareInstallDirectory
       FindClose $0
     ${EndIf}
   ${EndIf}
-  !insertmacro TraceDirectory "prepare-before-validate"
   Call ValidateInstallDirectory
+  StrCpy $ConfirmedInstallDirectory "$INSTDIR"
 FunctionEnd
 
 Function ValidateInstallDirectory
-  !insertmacro TraceDirectory "validate-start"
-  !insertmacro TraceDirectory "before-fullpath"
   Call NormalizeInstallDirectory
-  !insertmacro TraceDirectory "after-fullpath"
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
   ${OrIf} $INSTDIR == "$0\"
@@ -351,6 +328,11 @@ Function RecoverInterrupted
 FunctionEnd
 
 Section "Bolha" SEC_MAIN
+  ; O NSIS relê o campo da página depois do callback LEAVE.
+  ${IfNot} ${Silent}
+  ${AndIf} $ConfirmedInstallDirectory != ""
+    StrCpy $INSTDIR "$ConfirmedInstallDirectory"
+  ${EndIf}
   ReadRegStr $PreviousVersion HKCU "Software\$RegistryGuid" "InstallVersion"
   ReadRegStr $PreviousVersion HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$RegistryGuid" "DisplayVersion"
   ReadRegStr $PreviousUninstall HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$RegistryGuid" "UninstallString"
