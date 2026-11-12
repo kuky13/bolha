@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
+"""Exercita o assistente NSIS real em pastas /TEST, sem tocar na instalação pessoal."""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import time
+
+
+def validate(installer, output):
+    import psutil
+    import win32con as wc
+    import win32gui as wg
+    import win32process
+    from test_windows_native import test_environment, registry_fingerprint, installer_version
+    root=Path(tempfile.mkdtemp(prefix='bolha-wizard-'))
+    parent=root/'Meus aplicativos ç'
+    parent.mkdir()
+    sentinel=parent/'documento.txt';sentinel.write_bytes(b'nao alterar')
+    original_registry=registry_fingerprint()
+    records=[]
+
+    def wizard(selected, expected, allow_alternative):
+        env=test_environment(root/'data',selected,root/'runtime.json')
+        process=subprocess.Popen([str(installer),'/TEST','/D='+str(selected)],env=env)
+        owned={process.pid}
+        set_directory=False
+        confirmed=False
+        finished=False
+        deadline=time.monotonic()+180
+        def children(hwnd):
+            found=[]
+            wg.EnumChildWindows(hwnd,lambda h,_:found.append(h),None)
+            return [h for h in found if wg.IsWindowVisible(h)]
+        def click(hwnd, identity):
+            button=wg.GetDlgItem(hwnd,identity)
+            if button and wg.IsWindowEnabled(button):
+                wg.PostMessage(button,wc.BM_CLICK,0,0)
+                return True
+            return False
+        try:
+            while time.monotonic()<deadline:
+                try:owned.update(p.pid for p in psutil.Process(process.pid).children(recursive=True))
+                except psutil.NoSuchProcess:pass
+                windows=[]
+                def collect(hwnd,_):
+                    if (wg.IsWindowVisible(hwnd) and wg.GetClassName(hwnd)=='#32770'
+                            and win32process.GetWindowThreadProcessId(hwnd)[1] in owned):windows.append(hwnd)
+                wg.EnumWindows(collect,None)
+                for hwnd in windows:
+                    controls=children(hwnd)
+                    if wg.GetWindow(hwnd,wc.GW_OWNER):
+                        if wg.GetDlgItem(hwnd,wc.IDYES) and allow_alternative:
+                            confirmed=True;click(hwnd,wc.IDYES)
+                        else:
+                            text=' | '.join(wg.GetWindowText(h) for h in controls if wg.GetWindowText(h))
+                            raise AssertionError('Diálogo inesperado: '+text)
+                        continue
+                    edit=next((h for h in controls if wg.GetClassName(h)=='Edit' and wg.GetDlgCtrlID(h)==1019),None)
+                    if edit and not set_directory:
+                        wg.SendMessage(edit,wc.WM_SETTEXT,0,str(selected))
+                        time.sleep(.3)
+                        button=wg.GetDlgItem(hwnd,1)
+                        assert wg.IsWindowEnabled(button), 'Instalar desabilitado ao selecionar pasta válida'
+                        set_directory=True
+                        click(hwnd,1)
+                    elif not set_directory:
+                        click(hwnd,1)  # boas-vindas e licença
+                    elif (expected/'Bolha.exe').is_file():
+                        button=wg.GetDlgItem(hwnd,1)
+                        caption=wg.GetWindowText(button).replace('&','').casefold() if button else ''
+                        if any(word in caption for word in ('concluir','terminar','fechar','finish')):
+                            for control in controls:
+                                if (wg.GetClassName(control)=='Button'
+                                        and wg.GetWindowLong(control,wc.GWL_STYLE)&15 in (2,3)):
+                                    wg.SendMessage(control,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
+                            finished=click(hwnd,1)
+                if finished and process.poll() is not None:break
+                if process.poll() is not None and not windows:
+                    raise AssertionError('O instalador encerrou antes de concluir o assistente')
+                time.sleep(.15)
+            else:raise TimeoutError('Assistente NSIS não concluiu em 180 segundos')
+            assert process.returncode==0
+            assert set_directory and finished
+            assert confirmed==allow_alternative
+            assert (expected/'bolha-native-installation.flag').is_file()
+            assert sentinel.read_bytes()==b'nao alterar'
+            assert registry_fingerprint()==original_registry
+            records.append(dict(selected=str(selected),installed=str(expected),alternative=confirmed,passed=True))
+        finally:
+            if process.poll() is None:
+                process.terminate();process.wait(timeout=10)
+    try:
+        wizard(parent,parent/'Bolha',True)
+        wizard(parent/'Bolha',parent/'Bolha',False)
+        unknown=root/'Instalação antiga'/'Bolha'
+        unknown.mkdir(parents=True)
+        saved=unknown/'arquivo-importante.txt';saved.write_bytes(b'preservar pasta antiga')
+        wizard(unknown,unknown.parent/('Bolha-'+installer_version(installer)),True)
+        assert saved.read_bytes()==b'preservar pasta antiga'
+        report=dict(passed=True,scenarios=records)
+    except Exception as error:
+        report=dict(passed=False,scenarios=records,error=str(error),retained=str(root))
+        raise
+    finally:
+        output.parent.mkdir(parents=True,exist_ok=True)
+        output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+    return report
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--installer',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    args=parser.parse_args()
+    if os.name!='nt':parser.error('Somente Windows executa o assistente real.')
+    validate(args.installer.resolve(),args.output.resolve())

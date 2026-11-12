@@ -52,6 +52,10 @@ jobs:
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$bolhaVersion") { throw 'A tag diverge da versão do código.' }
       - name: Compilar e auditar pacote Python/Qt
         run: python scripts/build_native.py
+      - name: Assistente de pasta e reinstalação manual
+        timeout-minutes: 8
+        shell: pwsh
+        run: python scripts/test_windows_directory.py --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --output validation/windows-directory/report.json
       - name: Empacotar fixture de atualização sem recompilar o aplicativo
         shell: pwsh
         run: |
