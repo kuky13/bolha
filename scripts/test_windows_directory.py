@@ -78,10 +78,10 @@ def validate(installer, output):
                         button=control(hwnd,1)
                         caption=wg.GetWindowText(button).replace('&','').casefold() if button else ''
                         if any(word in caption for word in ('concluir','terminar','fechar','finish')):
-                            for control in controls:
-                                if (wg.GetClassName(control)=='Button'
-                                        and wg.GetWindowLong(control,wc.GWL_STYLE)&15 in (2,3)):
-                                    wg.SendMessage(control,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
+                            for widget_handle in controls:
+                                if (wg.GetClassName(widget_handle)=='Button'
+                                        and wg.GetWindowLong(widget_handle,wc.GWL_STYLE)&15 in (2,3)):
+                                    wg.SendMessage(widget_handle,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
                             finished=click(hwnd,1)
                 if finished and process.poll() is not None:break
                 if process.poll() is not None and not windows:
