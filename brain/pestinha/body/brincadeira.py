@@ -69,7 +69,7 @@ class Play:
         started = now >= self.chase_until
         if started:
             self.toy_in_reach = False
-        self.chase_until = now + 6.
+        self.chase_until = now + 10.
         distance = math.hypot(ball.body.x-body.x, ball.body.y-body.y)
         reach = body.half_w + ball.body.half_w + 34.
         if distance <= reach:
@@ -98,20 +98,21 @@ class Play:
         held = toy.held or ball.dragging
         if distance <= reach+34.:
             self.toy_in_reach = True
-        if not held and distance <= reach+12.:
+        if not held and distance <= reach+20.:
             player_side = cursor[0]-toy.x if cursor is not None else 0.
             direction = math.copysign(1., player_side if abs(player_side)>40. else dx or 1.)
             style = self.policy.choose('toy_return', ['tap','lob'], rates=self.rates, emotion=emotion,
                                        energy=self.energy, contact=self.contact,
                                        weights={'tap':.25, 'lob':.14+.55*tone.vigor()}) if self.policy else 'tap'
-            ball.kick(direction*(340. if style=='lob' else 460.), -535. if style=='lob' else -365.)
+            speed = max(170., min(360., abs(player_side)*2.5)) if abs(player_side)>40. else 260.
+            ball.kick(direction*speed, -470. if style=='lob' else -365.)
             self.stop_chase()
             self.next_at = now+2.2
             if body.grounded:
                 body.jump(body.vx*.3, -235.)
             return 'return'
         if body.grounded:
-            speed = min(430., max(220., tone.speed()*1.7))
+            speed = min(510., max(310., tone.speed()*2.))
             desired = max(-speed, min(speed, dx*5.)) if abs(dx)>reach*.72 else 0.
             change = 1800.*dt
             body.vx += max(-change,min(change,desired-body.vx))

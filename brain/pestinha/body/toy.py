@@ -85,7 +85,7 @@ def kick(ball, vx, vy):
 
 
 
-def push_from_cursor(ball, cursor, cursor_vel, now, last_push, radius=RADIUS + 6):
+def push_from_cursor(ball, cursor, cursor_vel, now, last_push, radius=RADIUS + 6, *, max_speed=1200.):
     """
     O cursor também bate na bolinha: se o ponteiro encosta nela, ela sai na direção
     em que o ponteiro vinha (ou para longe do ponteiro, se ele estava parado).
@@ -117,7 +117,7 @@ def push_from_cursor(ball, cursor, cursor_vel, now, last_push, radius=RADIUS + 6
         ux = sign * 0.6
     norm = math.hypot(ux, uy) or 1.0
     ux, uy = ux / norm, uy / norm
-    speed = max(260.0, min(1200.0, speed_in * 0.8))
+    speed = max(260.0, min(max_speed, speed_in * 0.8))
     lift = min(-120.0, uy * speed - 120.0)
     if cursor_vel[1] < -160.0 and dy <= 4.0:
         # Um toque de baixo para cima levanta o brinquedo de propósito.

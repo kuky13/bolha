@@ -37,7 +37,10 @@ def test_reacoes_observam_acao_real_e_nao_repetem_por_quadro(tmp_path):
         assert dialogue.update(game, now) is None
     game.body.held = False
     game.state.mark_caress(111.)
-    assert dialogue.update(game, 111.)[0] in LINES['carinho']
+    assert dialogue.update(game, 111.) is None
+    assert dialogue.update(game, 146.) is None
+    game.state.mark_caress(147.)
+    assert dialogue.update(game, 147.)[0] in LINES['carinho']
 
 
 def test_politica_pode_escolher_silencio_e_categorias_ambiente_nao_repetem(tmp_path, monkeypatch):
@@ -49,13 +52,17 @@ def test_politica_pode_escolher_silencio_e_categorias_ambiente_nao_repetem(tmp_p
         return 'silencio' if action == 'dialogue_intent' else candidates[0]
     monkeypatch.setattr(game.intelligence, 'choose', choose)
     assert dialogue.update(game, 100.) is None
+    assert not calls
+    assert dialogue.update(game, 400.) is None
     assert calls[0][0] == 'dialogue_intent'
-    assert dialogue.next_ambient == 400.
+    assert dialogue.next_ambient == 700.
     monkeypatch.setattr(game.intelligence, 'choose', lambda action, candidates, **kwargs: candidates[0])
-    first = dialogue.update(game, 400.)
+    first = dialogue.update(game, 700.)
     assert first[0] in LINES['ambiente']
-    assert dialogue.update(game, 699.) is None
-    second = dialogue.update(game, 700.)
+    game.state.mark_caress(701.)
+    assert dialogue.update(game, 701.) is None
+    assert dialogue.update(game, 999.) is None
+    second = dialogue.update(game, 1000.)
     assert second[0] in LINES['casual']
 
 

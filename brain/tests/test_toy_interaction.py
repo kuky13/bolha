@@ -357,6 +357,19 @@ def test_bobinho_persegue_irrita_e_devolve_no_contato(tmp_path, monkeypatch):
     assert game.play_reaction['kind'] == 'brinquedo_rebatida'
 
 
+@pytest.mark.parametrize('direction', [-1, 1])
+def test_bobinho_devolve_na_direcao_do_jogador_com_impulso_controlado(tmp_path, direction):
+    game = Game(tmp_path, CONTENT)
+    pet, toy = game.body, game.ball.body
+    toy.x, toy.y = pet.x + (pet.half_w + toy.half_w + 16.)*direction, pet.y
+    game.play.notice_toy_move(100., pet, game.ball)
+    cursor = (toy.x + 100.*direction, toy.y)
+
+    assert game.play.follow(.016, 107., pet, game.ball, cursor, game.state.tone, 'curioso') == 'return'
+    assert toy.vx == pytest.approx(250.*direction)
+    assert toy.vy < 0.
+
+
 def test_toque_de_baixo_para_cima_levanta_brinquedo_e_inicia_brincadeira(tmp_path, monkeypatch):
     clock = [100.]
     monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
@@ -369,6 +382,23 @@ def test_toque_de_baixo_para_cima_levanta_brinquedo_e_inicia_brincadeira(tmp_pat
     game._sense_toy_cursor(clock[0])
     assert game.ball.body.vy < -300.
     assert game.play.chase_until > clock[0]
+
+
+@pytest.mark.parametrize('direction', [-1, 1])
+@pytest.mark.parametrize('offset,elapsed,hit', [(0., .016, True), (65., .016, False), (0., .25, False)])
+def test_passagem_rapida_do_cursor_empurra_sem_precisar_parar_na_bolinha(tmp_path, direction, offset, elapsed, hit):
+    game = Game(tmp_path, CONTENT)
+    x, y = game.ball.body.x, game.ball.body.y
+    game.cursor = (x - 110.*direction, y + offset)
+    game._sense_toy_cursor(100.)
+    game.cursor = (x + 110.*direction, y + offset)
+    game._sense_toy_cursor(100. + elapsed)
+    if hit:
+        assert game.ball.body.vx == pytest.approx(620.*direction)
+        assert game.play.chase_until == pytest.approx(110. + elapsed)
+    else:
+        assert game.ball.body.vx == 0.
+        assert game.play.chase_until == 0.
 
 
 def test_olha_mouse_em_movimento_mesmo_com_brinquedo_guardado(tmp_path, monkeypatch):

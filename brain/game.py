@@ -763,16 +763,28 @@ class Game:
                 or self.state.pressing or self.scene_dragging):
             self.cursor_toy_near = False
             return
+        previous_sample = self.cursor_sample
         moved=self._track_cursor(now)
         radius=self.ball.body.half_w+24
-        near=math.dist(self.cursor,(self.ball.body.x,self.ball.body.y))<radius
+        toy_center = self.ball.body.x, self.ball.body.y
+        near=math.dist(self.cursor,toy_center)<radius
+        contact = self.cursor
+        if not near and moved and previous_sample is not None:
+            previous, sampled_at = previous_sample
+            dx, dy = self.cursor[0] - previous[0], self.cursor[1] - previous[1]
+            length_sq = dx*dx + dy*dy
+            if length_sq > 1. and .001 <= now - sampled_at <= .15:
+                # Testa o trajeto do cursor mesmo quando os dois pontos ficam fora do brinquedo.
+                fraction = ((toy_center[0] - previous[0])*dx + (toy_center[1] - previous[1])*dy) / length_sq
+                fraction = max(0., min(1., fraction))
+                contact = previous[0] + fraction*dx, previous[1] + fraction*dy
         if near and not self.cursor_toy_near and now>=self.next_toy_attention:
             self.senses.kick('NOVELTY',.35)
             self.behavior.look_at(self.ball.body.x,self.ball.body.y,now)
             self.next_toy_attention=now+2.5
-        if near and moved:
+        if moved and math.dist(contact, toy_center) < radius:
             pushed_at = push_from_cursor(
-                self.ball,self.cursor,self.cursor_velocity,now,self.last_toy_push,radius=radius)
+                self.ball,contact,self.cursor_velocity,now,self.last_toy_push,radius=radius,max_speed=620.)
             if pushed_at != self.last_toy_push:
                 self.last_toy_push = pushed_at
                 self.ball.last_handled = now

@@ -60,6 +60,8 @@ LINES = {
         'Às vezes eu também preciso de uma pausa.', 'Sua companhia já deixa tudo mais leve.'),
 }
 THOUGHTS = frozenset(('pensamento', 'sono', 'curioso', 'triste', 'ambiente'))
+SPEECH_INTERVAL = 45.
+AMBIENT_MIN_INTERVAL = 300.
 
 
 def bubble_path(rect, thought=False, anchor=None, tail_top=False):
@@ -101,7 +103,7 @@ class Dialogue:
         self.recent = deque(maxlen=18)
         self.last_category = None
         self.next_reaction = 0.
-        self.next_ambient = 0.
+        self.next_ambient = None
         self.previous = None
 
     def choose(self, game, category):
@@ -126,11 +128,15 @@ class Dialogue:
         previous, self.previous = self.previous, category
         if not game.pet_visible(now) or game.panel or now < game.quiet_until:
             return None
-        if category != previous and category is not None and now >= self.next_reaction:
-            self.next_reaction = now+9.
-            self.next_ambient = now+game.prefs.get('mischiefInterval', 300)
+        ambient_interval = max(AMBIENT_MIN_INTERVAL, game.prefs.get('mischiefInterval', 300))
+        if self.next_ambient is None:
+            self.next_ambient = now + ambient_interval
+        if now < self.next_reaction:
+            return None
+        if category != previous and category is not None:
+            self.next_ambient = now + ambient_interval
         elif now >= self.next_ambient and game.prefs.get('mischiefEnabled', True) and not game.sleep.asleep:
-            self.next_ambient = now+game.prefs.get('mischiefInterval', 300)
+            self.next_ambient = now + ambient_interval
             # O cérebro pode preferir silêncio; nenhum sorteio independente decide agir.
             options = [key for key in ('ambiente', 'casual', 'pensamento') if key != self.last_category]
             category = game.intelligence.choose('dialogue_intent', options+['silencio'], rates=game.rates,
@@ -142,6 +148,8 @@ class Dialogue:
         else:
             return None
         text = self.choose(game, category)
+        if text:
+            self.next_reaction = now + SPEECH_INTERVAL
         return (text, category in THOUGHTS) if text else None
 
 
@@ -172,7 +180,7 @@ class SpeechWindow(QWidget):
             self.until = 0.
             self.hide()
             self.dialogue.previous = None
-            self.dialogue.next_ambient = now+game.prefs.get('mischiefInterval', 300)
+            self.dialogue.next_ambient = None
             return
         result = self.dialogue.update(game, now)
         if result:
