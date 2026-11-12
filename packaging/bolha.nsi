@@ -135,6 +135,7 @@ Var DirectoryTraceHandle
 !ifdef DIRECTORY_TRACE
   ReadEnvStr $DirectoryTraceFile "BOLHA_TEST_DIRECTORY_TRACE"
   FileOpen $DirectoryTraceHandle "$DirectoryTraceFile" a
+  FileSeek $DirectoryTraceHandle 0 END
   FileWrite $DirectoryTraceHandle "${LABEL}: destination=<$INSTDIR> register2=<$2>$\r$\n"
   FileClose $DirectoryTraceHandle
   ClearErrors
@@ -148,11 +149,21 @@ Var DirectoryTraceHandle
   Abort "${MESSAGE}"
 !macroend
 
+Function NormalizeInstallDirectory
+  ; A API Win32 normaliza o destino mesmo quando a pasta ainda não existe.
+  System::Call 'kernel32::GetFullPathNameW(w "$INSTDIR",i${NSIS_MAX_STRLEN},w.r0,p0)i.r1'
+  ${If} $1 == 0
+  ${OrIf} $1 >= ${NSIS_MAX_STRLEN}
+    !insertmacro RejectInstallDirectory "O caminho da instalação é inválido ou muito longo. Escolha outra pasta."
+  ${EndIf}
+  StrCpy $INSTDIR "$0"
+FunctionEnd
+
 Function PrepareInstallDirectory
   !insertmacro TraceDirectory "prepare-start"
   ; Valida uma vez ao clicar Instalar, exibindo o motivo em vez de desativar o botão.
   !insertmacro TraceDirectory "before-fullpath"
-  GetFullPathName $INSTDIR "$INSTDIR"
+  Call NormalizeInstallDirectory
   !insertmacro TraceDirectory "after-fullpath"
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
@@ -231,7 +242,7 @@ FunctionEnd
 Function ValidateInstallDirectory
   !insertmacro TraceDirectory "validate-start"
   !insertmacro TraceDirectory "before-fullpath"
-  GetFullPathName $INSTDIR "$INSTDIR"
+  Call NormalizeInstallDirectory
   !insertmacro TraceDirectory "after-fullpath"
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
