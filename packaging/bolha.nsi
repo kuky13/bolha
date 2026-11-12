@@ -286,7 +286,13 @@ Function RecoverInterrupted
   ${If} $Backup == ""
     Return
   ${EndIf}
-  GetFullPathName $Backup "$Backup"
+  ; Uma primeira instalação também grava o registro, mas não tem backup.
+  System::Call 'kernel32::GetFullPathNameW(w "$Backup",i${NSIS_MAX_STRLEN},w.r0,p0)i.r1'
+  ${If} $1 == 0
+  ${OrIf} $1 >= ${NSIS_MAX_STRLEN}
+    Abort "Caminho de recuperação inválido. Nenhuma pasta foi alterada."
+  ${EndIf}
+  StrCpy $Backup "$0"
   ${GetParent} "$Backup" $0
   ${GetParent} "$INSTDIR" $1
   ${StrStr} $2 $Backup "$INSTDIR.rollback-"
@@ -294,7 +300,17 @@ Function RecoverInterrupted
   ${OrIf} $2 != "$Backup"
     Abort "Registro de recuperação inválido. Nenhuma pasta foi alterada."
   ${EndIf}
-  System::Call 'kernel32::GetFileAttributesW(w "$Backup")i.r0'
+  System::Call 'kernel32::GetFileAttributesW(w "$Backup")i.r0 ?e'
+  Pop $1
+  ${If} $0 == -1
+    ${If} $1 == 2
+    ${OrIf} $1 == 3
+      ${If} ${FileExists} "$INSTDIR\Bolha.exe"
+        Return
+      ${EndIf}
+    ${EndIf}
+    Abort "Não encontrei um backup acessível para recuperar a instalação. Nenhuma pasta foi alterada."
+  ${EndIf}
   IntOp $0 $0 & 0x400
   ${If} $0 != 0
     Abort "A recuperação não pode atravessar junctions."

@@ -58,6 +58,9 @@ def validate(installer, output):
                 for hwnd in windows:
                     controls=children(hwnd)
                     last_page=[(wg.GetDlgCtrlID(h),wg.GetClassName(h),wg.GetWindowText(h)) for h in controls]
+                    if any(identity==1037 and ('abortada' in caption.casefold() or 'aborted' in caption.casefold())
+                           for identity,_,caption in last_page):
+                        raise AssertionError(f'Assistente abortou: {last_page!r}')
                     # O assistente NSIS também pode ter uma janela proprietária oculta.
                     if not control(hwnd,3):
                         if control(hwnd,wc.IDYES) and allow_alternative:
