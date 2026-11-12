@@ -370,7 +370,7 @@ def _draw_pop_marks(painter, phase, strength):
 
 
 def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
-                        angle=0.0, squash=0.0, effect_angle=0.0):
+                        angle=0.0, squash=0.0, effect_angle=0.0, *, at_contact=False):
     """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
     if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida', 'pop'): return
@@ -438,7 +438,7 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
         painter.rotate(math.degrees(math.atan2(math.sin(direction)/(1.-deformation),
                                                math.cos(direction)/(1.+deformation))))
         progress = _clamp(phase/.24,0.,1.)
-        x, height = 47.+6.*progress, 7.+4.*progress
+        x, height = (-2. if at_contact else 47.)+6.*progress, 7.+4.*progress
         arc = QPainterPath(QPointF(x-2.,-height))
         arc.quadTo(x+7.,0.,x-2.,height)
         painter.setBrush(Qt.NoBrush)

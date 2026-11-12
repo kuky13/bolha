@@ -357,8 +357,16 @@ class ExpressionMotion:
             follow = math.sin(math.pi*_unit(elapsed/.42))
             self.pose['angle_offset'] += 10.*math.sin(math.radians(heading))*follow
             local_angle = heading-body.angle-self.pose['angle_offset']
-            self.pose['effect_angle'] = local_angle
+            impact_angle = play_reaction.get('impact_angle', heading)
+            self.pose['effect_angle'] = impact_angle-body.angle-self.pose['angle_offset']
             aim = math.radians(local_angle)
             self.pose['gaze'] = math.cos(aim),math.sin(aim)
+        if 'impact_point' in play_reaction and not held and pop_age is None:
+            age = now - play_reaction['started']
+            if 0. <= age < .255:
+                self.pose['impact_point'] = play_reaction['impact_point']
+                self.pose['impact_angle'] = play_reaction['impact_angle']
+                self.pose['impact_phase'] = age
+                self.pose['impact_strength'] = play_reaction['intensity'] * (1.-_ease((age-.035)/.22))
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         return self.pose

@@ -49,6 +49,7 @@ class PetVisual(QWidget):
             # O recorte também esconde a Bolha quando há um monitor vizinho.
             p.setClipRect(QRectF(left-self.x(),0.,right-left,self.height()),Qt.IntersectClip)
         floor_squash,shift=self.pet.floor_pose()
+        p.save()
         p.translate(cx,cy+shift)
         p.scale(1.+floor_squash,1.-floor_squash)
         if self.pet.motion.mode in FLOOR_POSES:
@@ -70,13 +71,20 @@ class PetVisual(QWidget):
         if pose['zzz_strength']>0:
             draw_sleep_marks(p,0.,0.,scale,
                              pose['zzz_phase'],pose['zzz_strength'],angle=angle,squash=squash)
-        if pose['effect'] and pose['effect_strength']>0:
+        if pose['effect'] and pose['effect_strength']>0 and not (
+                pose['effect']=='rebatida' and 'impact_point' in pose):
             if pose['effect']=='pop':
                 scale=radius/49
                 squash=0.
             draw_reaction_marks(p,0.,0.,scale,
                                 pose['effect_phase'],pose['effect'],pose['effect_strength'],
                                 angle=angle,squash=squash,effect_angle=pose.get('effect_angle',0.))
+        p.restore()
+        if 'impact_point' in pose:
+            x, y = pose['impact_point']
+            draw_reaction_marks(p, x-self.x(), y-self.y(), radius/49,
+                                pose['impact_phase'], 'rebatida', pose['impact_strength'],
+                                angle=pose['impact_angle'], at_contact=True)
         p.end();self.paint_times.append(now);self.painted.emit()
 
 

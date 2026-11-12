@@ -66,6 +66,20 @@ def test_brinquedo_rapido_nao_atravessa_bolha_pequena(tmp_path,monkeypatch):
     assert game.play_reaction['kind']=='brinquedo_rebatida'
 
 
+def test_impacto_guarda_ponto_do_contato_antes_do_ricochete(tmp_path, monkeypatch):
+    game, clock = at_rest(tmp_path, monkeypatch)
+    pet, toy = game.body, game.ball.body
+    pet.x, pet.y = 610., 400.
+    toy.x, toy.y = 650., 400.
+    toy.vx, toy.vy = -900., -450.
+    game._toy_contact((600.,400.), (700.,400.), clock[0])
+    reaction = game.play_reaction
+    fraction = (100. - pet.half_w - toy.half_w) / 60.
+    assert reaction['impact_point'] == pytest.approx((600.+10.*fraction+pet.half_w,400.))
+    assert reaction['impact_angle'] == pytest.approx(0.)
+    assert reaction['heading'] < -10.
+
+
 def test_impacto_real_acorda_a_bolha_sem_simular_tropeco(tmp_path,monkeypatch):
     game,clock=at_rest(tmp_path,monkeypatch)
     game.sleep.asleep=True

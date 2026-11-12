@@ -627,6 +627,8 @@ class Game:
                 speed = math.hypot(match.vx,match.vy)/match.speed_scale
                 self.play_reaction['intensity'] = .62+.38*min(1.,speed/780.)
                 self.play_reaction['heading'] = math.degrees(math.atan2(match.vy,match.vx))
+                self.play_reaction['impact_point'] = match.pet_contact
+                self.play_reaction['impact_angle'] = match.pet_contact_angle
         if now-self.last_save >= 30:
             self.save()
             self.last_save = now
@@ -914,6 +916,7 @@ class Game:
         delta = end[0]-start[0],end[1]-start[1]
         distance = math.hypot(*end)
         normal = end
+        impact_center = pet.x, pet.y
         if math.hypot(*start)>radius:
             a = delta[0]**2+delta[1]**2
             b = 2.*(start[0]*delta[0]+start[1]*delta[1])
@@ -925,10 +928,14 @@ class Game:
             if not 0.<=contact<=1.:
                 return
             normal = start[0]+delta[0]*contact,start[1]+delta[1]*contact
+            impact_center = (previous_pet[0] + (pet.x-previous_pet[0])*contact,
+                             previous_pet[1] + (pet.y-previous_pet[1])*contact)
         elif distance>=radius:
             return
         length=math.hypot(*normal)
         nx,ny=(normal[0]/length,normal[1]/length) if length>1e-8 else (1.,0.)
+        impact_point = impact_center[0] + nx*pet.half_w, impact_center[1] + ny*pet.half_w
+        impact_angle = math.degrees(math.atan2(ny, nx))
         incoming = (toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny
         old_position = toy.x, toy.y
         (toy.x, toy.y), inward = self._toy_contact_position(nx, ny, radius+.5)
@@ -969,7 +976,8 @@ class Game:
         self.play_reaction=dict(kind='brinquedo_rebatida' if playing else 'brinquedo_susto',
                                 started=now,until=now+(.42 if playing else .75),
                                 intensity=max(.35,strength),
-                                heading=math.degrees(math.atan2(toy.vy,toy.vx)))
+                                heading=math.degrees(math.atan2(toy.vy,toy.vx)),
+                                impact_point=impact_point, impact_angle=impact_angle)
         self._look_at_point((toy.x,toy.y))
 
     def _play_expression(self,now):
@@ -1002,7 +1010,9 @@ class Game:
             intensity=max(.35,min(1.,self.behavior.play_pull+self.state.tone.r.get('CHEER',0)*.3))
             self.play_reaction=dict(kind=kind,started=now,until=now+duration,intensity=intensity)
             if kind=='brinquedo_rebatida':
-                self.play_reaction['heading']=math.degrees(math.atan2(self.ball.body.vy,self.ball.body.vx))
+                pet, toy = self.body, self.ball.body
+                self.play_reaction['heading'] = math.degrees(math.atan2(toy.vy, toy.vx))
+                self.play_reaction['impact_angle'] = math.degrees(math.atan2(toy.y-pet.y, toy.x-pet.x))
             self.next_play_scene=now+12
 
     def reset_learning(self):
