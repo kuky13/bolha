@@ -42,7 +42,8 @@ def validate(installer, output):
         def click(hwnd, identity):
             button=control(hwnd,identity)
             if button and wg.IsWindowEnabled(button):
-                wg.PostMessage(button,wc.BM_CLICK,0,0)
+                # BN_CLICKED (zero) no diálogo, sem depender do foco do runner.
+                wg.PostMessage(hwnd,wc.WM_COMMAND,identity,button)
                 return True
             return False
         def control(hwnd, identity):
