@@ -53,6 +53,29 @@ def test_sustained_horizontal_push_does_not_pin_toy(tmp_path, side):
     assert len({(round(x), round(y)) for x, y in positions}) > 40
 
 
+@pytest.mark.parametrize('appearance', ['peanut', 'ball'])
+@pytest.mark.parametrize('side', [-1, 1])
+@pytest.mark.parametrize('top', [False, True])
+def test_toy_leaves_corner_even_with_pet_standing_still(tmp_path, appearance, side, top):
+    game = Game(tmp_path, CONTENT)
+    game.ball.appearance = appearance
+    pet, toy = game.body, game.ball.body
+    pet.x = 68. if side < 0 else 1212.
+    toy.x = 17. if side < 0 else 1263.
+    pet.y, toy.y = (68., 17.) if top else (692., 743.)
+    pet.grounded, pet.surface = not top, 760.
+    initial_x = toy.x
+
+    for frame in range(120):
+        previous_toy = toy.x, toy.y
+        game.ball.step(.016, game.bounds())
+        game._toy_contact((pet.x, pet.y), previous_toy, 100. + frame*.016)
+        assert toy.half_w <= toy.x <= 1280.-toy.half_w
+        assert toy.half_h <= toy.y <= 760.-toy.half_h
+
+    assert (initial_x - toy.x)*side > pet.half_w*2
+
+
 @pytest.mark.parametrize('seam', [0., 1280.])
 def test_contact_does_not_turn_shared_edge_into_wall(tmp_path, seam):
     game = Game(tmp_path, CONTENT)

@@ -841,22 +841,23 @@ class Game:
         source = self.bounds((toy.x, toy.y))
         ex, ey = toy.extents()
 
+        def open_edge(area, side, coordinate, extent):
+            if displays:
+                return _physical_neighbor(areas, displays, area, side, coordinate) is not None
+            return _tem_vizinha(areas, area, side, coordinate, extent, monitors)
+
         def fits(point):
             x, y = point
             area = _area_em(areas, x, y) or source
             left, top, right, bottom = area
-            def open_edge(side, coordinate, extent):
-                if displays:
-                    return _physical_neighbor(areas, displays, area, side, coordinate) is not None
-                return _tem_vizinha(areas, area, side, coordinate, extent, monitors)
-            return ((x-ex >= left-1e-7 or open_edge('left', y, ey))
-                    and (x+ex <= right+1e-7 or open_edge('right', y, ey))
-                    and (y-ey >= top-1e-7 or open_edge('top', x, ex))
-                    and (y+ey <= bottom+1e-7 or open_edge('bottom', x, ex)))
+            return ((x-ex >= left-1e-7 or open_edge(area, 'left', y, ey))
+                    and (x+ex <= right+1e-7 or open_edge(area, 'right', y, ey))
+                    and (y-ey >= top-1e-7 or open_edge(area, 'top', x, ex))
+                    and (y+ey <= bottom+1e-7 or open_edge(area, 'bottom', x, ex)))
 
         desired = pet.x+nx*radius, pet.y+ny*radius
         if fits(desired):
-            return desired
+            return desired, 0
         # As tangentes à parede deixam o brinquedo contornar a personagem.
         candidates = [(pet.x+dx*radius, pet.y+dy*radius)
                       for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1))]
@@ -873,9 +874,15 @@ class Game:
                     candidates.extend(((pet.x-offset, y), (pet.x+offset, y)))
         valid = [point for point in candidates if fits(point)]
         if valid:
-            return min(valid, key=lambda p: (round(math.dist(p, desired), 8), p[1]))
+            x, y = min(valid, key=lambda p: (round(math.dist(p, desired), 8), p[1]))
+            area = _area_em(areas, x, y) or source
+            if x-ex <= area[0]+1. and not open_edge(area, 'left', y, ey):
+                return (x, y), 1
+            if x+ex >= area[2]-1. and not open_edge(area, 'right', y, ey):
+                return (x, y), -1
+            return (x, y), 0
         # Só ocorre se não houver espaço para os dois círculos na área útil.
-        return toy.x, toy.y
+        return (toy.x, toy.y), 0
 
     def _toy_contact(self, previous_pet, previous_toy, now):
         """O contato circular reflete o brinquedo, inclusive entre dois quadros."""
@@ -908,7 +915,7 @@ class Game:
         nx,ny=(normal[0]/length,normal[1]/length) if length>1e-8 else (1.,0.)
         incoming = (toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny
         old_position = toy.x, toy.y
-        toy.x, toy.y = self._toy_contact_position(nx, ny, radius+.5)
+        (toy.x, toy.y), inward = self._toy_contact_position(nx, ny, radius+.5)
         separation = math.hypot(toy.x-pet.x, toy.y-pet.y)
         if separation > 1e-8:
             nx, ny = (toy.x-pet.x)/separation, (toy.y-pet.y)/separation
@@ -922,6 +929,15 @@ class Game:
             toy.vx-=(1.+restitution)*incoming*nx
             toy.vy-=(1.+restitution)*incoming*ny
             toy.grounded=False;toy.platform=None
+        if inward and abs(ny) > .35:
+            # Sem velocidade tangente, a gravidade devolve o brinquedo à mesma fresta.
+            tangent_speed = inward * 380.
+            toy.vx = tangent_speed * abs(ny) + nx * 50.
+            toy.vy = -tangent_speed * nx * math.copysign(1., ny) + ny * 50.
+            if ny < 0.:
+                toy.vy -= 190.  # Dá tempo de passar sobre a Bolha antes de cair.
+            toy.grounded = False
+            toy.platform = None
         self.ball.place()
         if incoming>=-90.:
             return

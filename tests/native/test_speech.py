@@ -121,6 +121,25 @@ def test_entrada_e_saida_possuem_transicao_suave(qt_application, tmp_path):
 
 
 @pytest.mark.parametrize('thought', [False, True])
+def test_balao_curto_ocupa_menos_espaco_e_fica_menos_tempo(qt_application, tmp_path, thought):
+    game = Game(tmp_path, CONTENT)
+    window = SpeechWindow(game)
+    window.dialogue.next_ambient = 1000.
+    window.present('Oi!', thought, now=100.)
+    window.sync(101.)
+    short_width, short_height = window.width(), window.height()
+    assert 46 <= short_width < 100
+    assert short_height < 60
+    assert window.until - window.started < 3.
+    window.present('Será que minhas orelhas parecem duas montanhas?', thought, now=105.)
+    window.sync(106.)
+    assert short_width < window.width() <= 212
+    assert window.height() > short_height
+    assert window.until - window.started > 3.
+    window.close()
+
+
+@pytest.mark.parametrize('thought', [False, True])
 @pytest.mark.parametrize('tail_top', [False, True])
 def test_silhueta_tem_ponta_de_fala_ou_pontos_de_pensamento(thought, tail_top):
     rect = QRectF(0, 0, 220, 90)

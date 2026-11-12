@@ -64,19 +64,23 @@ SPEECH_INTERVAL = 45.
 AMBIENT_MIN_INTERVAL = 300.
 
 
-def bubble_path(rect, thought=False, anchor=None, tail_top=False):
+def bubble_path(rect, thought=False, anchor=None, tail_top=False, *, compact=False):
     """Silhueta comum a falas e bilhetes; a ponta permanece dentro da janela."""
-    r = QRectF(rect).adjusted(2, 2, -2, -16)
+    tail_space = 12 if compact else 16
+    r = QRectF(rect).adjusted(2, 2, -2, -tail_space)
     path = QPainterPath()
-    path.addRoundedRect(r, 15, 15)
-    x = max(r.left()+20, min(r.right()-20, anchor if anchor is not None else r.center().x()))
+    radius = 10 if compact else 15
+    path.addRoundedRect(r, radius, radius)
+    anchor_margin = 14 if compact else 20
+    x = max(r.left()+anchor_margin, min(r.right()-anchor_margin, anchor if anchor is not None else r.center().x()))
+    scale = .7 if compact else 1.
     if thought:
-        path.addEllipse(QPointF(x, r.bottom()+5), 4, 3)
-        path.addEllipse(QPointF(x-3, r.bottom()+11), 2, 2)
+        path.addEllipse(QPointF(x, r.bottom()+5*scale), 4*scale, 3*scale)
+        path.addEllipse(QPointF(x-3*scale, r.bottom()+11*scale), 2*scale, 2*scale)
     else:
-        tail = QPainterPath(QPointF(x-9, r.bottom()-1))
-        tail.quadTo(x-5, r.bottom()+7, x-2, r.bottom()+13)
-        tail.quadTo(x+3, r.bottom()+5, x+10, r.bottom()-1)
+        tail = QPainterPath(QPointF(x-9*scale, r.bottom()-1))
+        tail.quadTo(x-5*scale, r.bottom()+7*scale, x-2*scale, r.bottom()+13*scale)
+        tail.quadTo(x+3*scale, r.bottom()+5*scale, x+10*scale, r.bottom()-1)
         tail.closeSubpath()
         path = path.united(tail)
     if tail_top:
@@ -84,16 +88,19 @@ def bubble_path(rect, thought=False, anchor=None, tail_top=False):
     return path
 
 
-def paint_bubble(painter, rect, text, thought=False, anchor=None, opacity=1., tail_top=False):
+def paint_bubble(painter, rect, text, thought=False, anchor=None, opacity=1., tail_top=False, *, compact=False):
     painter.save()
     painter.setOpacity(painter.opacity()*max(0., min(1., opacity)))
-    painter.setPen(QPen(QColor('#b4a0d8'), 1.3))
-    painter.setBrush(QColor('#25212f'))
-    painter.drawPath(bubble_path(rect, thought, anchor, tail_top))
+    painter.setPen(QPen(QColor('#9383af' if compact else '#b4a0d8'), 1. if compact else 1.3))
+    painter.setBrush(QColor(37, 33, 47, 224 if compact else 255))
+    painter.drawPath(bubble_path(rect, thought, anchor, tail_top, compact=compact))
     painter.setPen(QColor('#fff1c7'))
     font = QFont('Segoe UI', 10)
     painter.setFont(font)
-    painter.drawText(QRectF(rect).adjusted(14, 24 if tail_top else 10, -14, -10 if tail_top else -24), Qt.AlignCenter | Qt.TextWordWrap, text)
+    pad_x, pad_y, tail = (11, 6, 10) if compact else (14, 10, 14)
+    text_rect = QRectF(rect).adjusted(pad_x, pad_y + (tail if tail_top else 0),
+                                    -pad_x, -pad_y - (0 if tail_top else tail))
+    painter.drawText(text_rect, Qt.AlignCenter | Qt.TextWordWrap, text)
     painter.restore()
 
 
@@ -170,7 +177,7 @@ class SpeechWindow(QWidget):
     def present(self, text, thought=False, now=None):
         self.text, self.thought = str(text), bool(thought)
         self.started = time.monotonic() if now is None else now
-        self.until = self.started+max(4., min(7., 2.+len(self.text)/18.))
+        self.until = self.started + max(2.6, min(5., 1.7 + len(self.text)/18.))
         self.setAccessibleDescription(self.text)
 
     def sync(self, now=None):
@@ -189,17 +196,23 @@ class SpeechWindow(QWidget):
             self.hide()
             return
         left, top, right, bottom = game.bounds((game.body.x, game.body.y))
-        width = max(80, min(270, int(right-left-16)))
         metrics = QFontMetrics(QFont('Segoe UI', 10))
-        text_height = metrics.boundingRect(0, 0, width-28, 200, Qt.TextWordWrap, self.text).height()
-        height = max(66, text_height+36)
+        width = min(212, int(right-left-16), max(46, metrics.horizontalAdvance(self.text)+24))
+        if width < 46:
+            self.hide()
+            return
+        text_height = metrics.boundingRect(0, 0, width-22, 200, Qt.TextWordWrap, self.text).height()
+        height = text_height+24
+        if height > bottom-top-16:
+            self.hide()
+            return
         self.resize(width, height)
-        self.anchor = max(22., min(width-22., game.body.x-max(left+8, min(right-width-8, game.body.x-width/2))))
         x = max(left+8, min(right-width-8, game.body.x-width/2))
-        target_y = game.body.y-game.body.half_h-height-10
+        self.anchor = game.body.x-x
+        target_y = game.body.y-game.body.half_h-height-8
         self.tail_top = target_y < top+8
         if self.tail_top:
-            target_y = game.body.y+game.body.half_h+10
+            target_y = game.body.y+game.body.half_h+8
         self.alpha = min(1., max(0., (now-self.started)/.22), max(0., (self.until-now)/.30))
         eased = 1.-(1.-self.alpha)**3
         y = max(top+8, min(bottom-height-8, target_y+(1.-eased)*6))
@@ -210,5 +223,5 @@ class SpeechWindow(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        paint_bubble(p, QRectF(self.rect()), self.text, self.thought, self.anchor, self.alpha, self.tail_top)
+        paint_bubble(p, QRectF(self.rect()), self.text, self.thought, self.anchor, self.alpha, self.tail_top, compact=True)
         p.end()
