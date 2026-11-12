@@ -31,7 +31,8 @@ def validate(installer, output):
         set_directory=False
         confirmed=False
         finished=False
-        deadline=time.monotonic()+180
+        deadline=time.monotonic()+75
+        last_page=[]
         def children(hwnd):
             found=[]
             wg.EnumChildWindows(hwnd,lambda h,_:found.append(h),None)
@@ -56,6 +57,7 @@ def validate(installer, output):
                 wg.EnumWindows(collect,None)
                 for hwnd in windows:
                     controls=children(hwnd)
+                    last_page=[(wg.GetDlgCtrlID(h),wg.GetClassName(h),wg.GetWindowText(h)) for h in controls]
                     # O assistente NSIS também pode ter uma janela proprietária oculta.
                     if not control(hwnd,3):
                         if control(hwnd,wc.IDYES) and allow_alternative:
@@ -75,19 +77,18 @@ def validate(installer, output):
                     elif not set_directory:
                         click(hwnd,1)  # boas-vindas e licença
                     elif (expected/'Bolha.exe').is_file():
-                        button=control(hwnd,1)
-                        caption=wg.GetWindowText(button).replace('&','').casefold() if button else ''
-                        if any(word in caption for word in ('concluir','terminar','fechar','finish')):
-                            for widget_handle in controls:
-                                if (wg.GetClassName(widget_handle)=='Button'
-                                        and wg.GetWindowLong(widget_handle,wc.GWL_STYLE)&15 in (2,3)):
-                                    wg.SendMessage(widget_handle,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
+                        checkboxes=[h for h in controls if wg.GetClassName(h)=='Button'
+                                    and (wg.GetWindowLong(h,wc.GWL_STYLE)&15) in (2,3)]
+                        if checkboxes:
+                            for h in checkboxes:
+                                wg.SendMessage(h,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
                             finished=click(hwnd,1)
                 if finished and process.poll() is not None:break
                 if process.poll() is not None and not windows:
                     raise AssertionError('O instalador encerrou antes de concluir o assistente')
                 time.sleep(.15)
-            else:raise TimeoutError('Assistente NSIS não concluiu em 180 segundos')
+            else:raise TimeoutError(f'Assistente NSIS não concluiu: destino={expected.is_dir()}, '
+                                    f'confirmação={confirmed}, controles={last_page!r}')
             assert process.returncode==0
             assert set_directory and finished
             assert confirmed==allow_alternative
@@ -99,6 +100,8 @@ def validate(installer, output):
             if process.poll() is None:
                 process.terminate();process.wait(timeout=10)
     try:
+        new=root/'Nova instalação'/'Bolha'
+        wizard(new,new,False)
         wizard(parent,parent/'Bolha',True)
         wizard(parent/'Bolha',parent/'Bolha',False)
         unknown=root/'Instalação antiga'/'Bolha'
