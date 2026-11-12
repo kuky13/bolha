@@ -127,6 +127,20 @@ Function CheckNativeMarker
   ${EndIf}
 FunctionEnd
 
+!ifdef DIRECTORY_TRACE
+Var DirectoryTraceFile
+Var DirectoryTraceHandle
+!endif
+!macro TraceDirectory LABEL
+!ifdef DIRECTORY_TRACE
+  ReadEnvStr $DirectoryTraceFile "BOLHA_TEST_DIRECTORY_TRACE"
+  FileOpen $DirectoryTraceHandle "$DirectoryTraceFile" a
+  FileWrite $DirectoryTraceHandle "${LABEL}: destination=<$INSTDIR> register2=<$2>$\r$\n"
+  FileClose $DirectoryTraceHandle
+  ClearErrors
+!endif
+!macroend
+
 !macro RejectInstallDirectory MESSAGE
   ${IfNot} ${Silent}
     MessageBox MB_OK|MB_ICONSTOP "${MESSAGE}$\r$\n$\r$\nPasta selecionada: $INSTDIR"
@@ -135,8 +149,11 @@ FunctionEnd
 !macroend
 
 Function PrepareInstallDirectory
+  !insertmacro TraceDirectory "prepare-start"
   ; Valida uma vez ao clicar Instalar, exibindo o motivo em vez de desativar o botão.
+  !insertmacro TraceDirectory "before-fullpath"
   GetFullPathName $INSTDIR "$INSTDIR"
+  !insertmacro TraceDirectory "after-fullpath"
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
   ${OrIf} $INSTDIR == "$0\"
@@ -186,10 +203,13 @@ Function PrepareInstallDirectory
       ${Else}
         StrCpy $2 "$INSTDIR\Bolha"
       ${EndIf}
+      !insertmacro TraceDirectory "before-question"
       MessageBox MB_YESNO|MB_ICONINFORMATION|MB_DEFBUTTON2 "A pasta escolhida contém arquivos e não é uma instalação reconhecida da Bolha.$\r$\n$\r$\nNenhum arquivo existente será substituído. Deseja instalar em uma pasta exclusiva?$\r$\n$2" IDYES useSuggestedDirectory
       Abort
       useSuggestedDirectory:
+      !insertmacro TraceDirectory "before-suggested"
       StrCpy $INSTDIR "$2"
+      !insertmacro TraceDirectory "after-suggested"
       ; Alterar o campo durante LEAVE dispara notificações que podem esvaziar DirVar.
       ; A alternativa precisa estar vazia, inclusive quando já tiver marcador.
       FindFirst $0 $1 "$INSTDIR\*.*"
@@ -204,11 +224,15 @@ Function PrepareInstallDirectory
       FindClose $0
     ${EndIf}
   ${EndIf}
+  !insertmacro TraceDirectory "prepare-before-validate"
   Call ValidateInstallDirectory
 FunctionEnd
 
 Function ValidateInstallDirectory
+  !insertmacro TraceDirectory "validate-start"
+  !insertmacro TraceDirectory "before-fullpath"
   GetFullPathName $INSTDIR "$INSTDIR"
+  !insertmacro TraceDirectory "after-fullpath"
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
   ${OrIf} $INSTDIR == "$0\"

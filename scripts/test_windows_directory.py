@@ -26,6 +26,7 @@ def validate(installer, output):
 
     def wizard(selected, expected, allow_alternative):
         env=test_environment(root/'data',selected,root/'runtime.json')
+        env['BOLHA_TEST_DIRECTORY_TRACE']=str(root/'directory.trace')
         process=subprocess.Popen([str(installer),'/TEST','/D='+str(selected)],env=env)
         owned={process.pid}
         set_directory=False
@@ -108,7 +109,9 @@ def validate(installer, output):
         assert saved.read_bytes()==b'preservar pasta antiga'
         report=dict(passed=True,scenarios=records)
     except Exception as error:
-        report=dict(passed=False,scenarios=records,error=str(error),retained=str(root))
+        trace=(root/'directory.trace').read_text(errors='replace') if (root/'directory.trace').exists() else 'no trace'
+        print(trace, flush=True)
+        report=dict(passed=False,scenarios=records,error=str(error),trace=trace,retained=str(root))
         raise
     finally:
         output.parent.mkdir(parents=True,exist_ok=True)

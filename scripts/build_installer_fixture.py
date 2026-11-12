@@ -25,7 +25,7 @@ def build():
     icon.write_bytes(struct.pack('<HHH',0,1,1)+struct.pack('<BBBBHHII',w,w,0,0,1,32,len(dib),22)+dib)
     filelist=work/'files.nsh';filelist.write_text('Delete "$INSTDIR\\Bolha.exe"\n')
     subprocess.run([str(fetch(ROOT/'build/tools')),'/V2','/WX','/INPUTCHARSET','UTF8',
-                    '/DVERSION='+version,'/DBUNDLE='+str(bundle),'/DOUTPUT='+str(work),
+                    '/DDIRECTORY_TRACE','/DVERSION='+version,'/DBUNDLE='+str(bundle),'/DOUTPUT='+str(work),
                     '/DICON='+str(icon),'/DFILELIST='+str(filelist),str(ROOT/'packaging/bolha.nsi')],check=True,cwd=ROOT)
 
 
