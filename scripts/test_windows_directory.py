@@ -15,6 +15,7 @@ def validate(installer, output):
     import win32con as wc
     import win32gui as wg
     import win32process
+    import pywintypes
     from test_windows_native import test_environment, registry_fingerprint, installer_version
     root=Path(tempfile.mkdtemp(prefix='bolha-wizard-'))
     parent=root/'Meus aplicativos ç'
@@ -36,11 +37,14 @@ def validate(installer, output):
             wg.EnumChildWindows(hwnd,lambda h,_:found.append(h),None)
             return [h for h in found if wg.IsWindowVisible(h)]
         def click(hwnd, identity):
-            button=wg.GetDlgItem(hwnd,identity)
+            button=control(hwnd,identity)
             if button and wg.IsWindowEnabled(button):
                 wg.PostMessage(button,wc.BM_CLICK,0,0)
                 return True
             return False
+        def control(hwnd, identity):
+            try:return wg.GetDlgItem(hwnd,identity)
+            except pywintypes.error:return None
         try:
             while time.monotonic()<deadline:
                 try:owned.update(p.pid for p in psutil.Process(process.pid).children(recursive=True))
@@ -52,8 +56,9 @@ def validate(installer, output):
                 wg.EnumWindows(collect,None)
                 for hwnd in windows:
                     controls=children(hwnd)
-                    if wg.GetWindow(hwnd,wc.GW_OWNER):
-                        if wg.GetDlgItem(hwnd,wc.IDYES) and allow_alternative:
+                    # O assistente NSIS também pode ter uma janela proprietária oculta.
+                    if not control(hwnd,3):
+                        if control(hwnd,wc.IDYES) and allow_alternative:
                             confirmed=True;click(hwnd,wc.IDYES)
                         else:
                             text=' | '.join(wg.GetWindowText(h) for h in controls if wg.GetWindowText(h))
@@ -63,14 +68,14 @@ def validate(installer, output):
                     if edit and not set_directory:
                         wg.SendMessage(edit,wc.WM_SETTEXT,0,str(selected))
                         time.sleep(.3)
-                        button=wg.GetDlgItem(hwnd,1)
+                        button=control(hwnd,1)
                         assert wg.IsWindowEnabled(button), 'Instalar desabilitado ao selecionar pasta válida'
                         set_directory=True
                         click(hwnd,1)
                     elif not set_directory:
                         click(hwnd,1)  # boas-vindas e licença
                     elif (expected/'Bolha.exe').is_file():
-                        button=wg.GetDlgItem(hwnd,1)
+                        button=control(hwnd,1)
                         caption=wg.GetWindowText(button).replace('&','').casefold() if button else ''
                         if any(word in caption for word in ('concluir','terminar','fechar','finish')):
                             for control in controls:
