@@ -39,11 +39,13 @@ def validate(installer, output):
             found=[]
             wg.EnumChildWindows(hwnd,lambda h,_:found.append(h),None)
             return [h for h in found if wg.IsWindowVisible(h)]
-        def click(hwnd, identity):
+        def click(hwnd, identity, finish=False):
             button=control(hwnd,identity)
             if button and wg.IsWindowEnabled(button):
-                # BN_CLICKED (zero) no diálogo, sem depender do foco do runner.
-                wg.PostMessage(hwnd,wc.WM_COMMAND,identity,button)
+                if finish:
+                    wg.PostMessage(hwnd,wc.WM_COMMAND,identity,button)
+                else:
+                    wg.PostMessage(button,wc.BM_CLICK,0,0)
                 return True
             return False
         def control(hwnd, identity):
@@ -87,7 +89,7 @@ def validate(installer, output):
                                            and wg.GetClassName(h)=='Button'),None)
                         if run_checkbox:
                             wg.SendMessage(run_checkbox,wc.BM_SETCHECK,wc.BST_UNCHECKED,0)
-                            finished=click(hwnd,1)
+                            finished=click(hwnd,1,finish=True)
                 if process.poll() is not None:break
                 time.sleep(.15)
             else:raise TimeoutError(f'Assistente NSIS não concluiu: destino={expected.is_dir()}, '
