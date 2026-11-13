@@ -46,7 +46,8 @@ def tap(node):
 
 
 def activity():
-    adb('shell', 'am', 'start', '-W', '-n', f'{PACKAGE}/.MainActivity')
+    result = adb('shell', 'am', 'start', '-W', '-n', f'{PACKAGE}/.MainActivity').decode()
+    assert 'Status: ok' in result, result
 
 
 def windows():
@@ -67,8 +68,12 @@ def smoke(apk, output):
     passed = []
     try:
         adb('logcat', '-c')
+        adb('shell', 'settings', 'put', 'secure', 'anr_show_background', '0')
+        page_size = adb('shell', 'getconf', 'PAGE_SIZE').decode().strip()
+        print(f'Android page size: {page_size}', flush=True)
         adb('install', '-r', str(apk))
         activity()
+        wait_for('atividade da Bolha em primeiro plano', lambda: foreground_app(PACKAGE))
         control('470 neurônios')
         for action in ('Carinho', 'Dormir / acordar', 'Dormir / acordar', 'Bola / amendoim'):
             tap(control(action))
@@ -114,6 +119,9 @@ def smoke(apk, output):
     finally:
         (output / 'logcat.txt').write_bytes(adb('logcat', '-d', check=False))
         (output / 'janelas.txt').write_text(windows(), encoding='utf-8')
+        (output / 'atividades.txt').write_bytes(adb('shell', 'dumpsys', 'activity', 'activities'))
+        adb('shell', 'uiautomator', 'dump', WINDOW_XML, check=False)
+        (output / 'interface.xml').write_bytes(adb('exec-out', 'cat', WINDOW_XML, check=False))
         if not (output / 'flutuante.png').exists():
             (output / 'diagnostico.png').write_bytes(adb('exec-out', 'screencap', '-p'))
         (output / 'relatorio.json').write_text(json.dumps({'validado': passed},

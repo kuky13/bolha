@@ -64,8 +64,8 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          target: google_apis
-          profile: pixel_6
+          target: default
+          profile: pixel_2
           disable-animations: true
           emulator-boot-timeout: 480
           disable-linux-hw-accel: auto
