@@ -7,7 +7,7 @@ from .facial_motion import WINK_DURATION, wink_state, mouth_state
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
 LANDING_POSES = ('pouso_em_pe', 'pouso_de_lado', 'pouso_invertido')
-FLOOR_POSES = (*LANDING_POSES, 'deitada')
+FLOOR_POSES = (*LANDING_POSES, 'deitada', 'embaixadinha')
 
 
 def _unit(value):
@@ -159,7 +159,8 @@ def animation_pose(mode, seconds, strength=1.):
                     effect='rebatida', effect_strength=strength*(1.-_ease((t-.035)/.22)))
     elif mode == 'embaixadinha':
         tap = _mouth_pulse(t,.29,.045)
-        pose.update(emotion='feliz', squash=-.11*tap, ear_raise=2.8*tap,
+        pose.update(emotion='contente', eye_open=1.-.35*tap,
+                    squash=-.075*tap, ear_raise=2.8*tap,
                     ear_tilt=-10.*tap, gaze=(0.,-.75), mouth_open=.54*tap,
                     mouth_curve=.9, mouth_width=1.06)
     elif mode == 'pop':
@@ -356,7 +357,7 @@ class ExpressionMotion:
             strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
         elif prank is not None and prank.active:
             mode='cursor_'+prank.phase;elapsed=now-prank.started;strength=prank.intensity
-        elif 0.<=now-game.play.juggle_at<.37 and game.play.juggle_count:
+        elif game.play.count_text(now) is not None:
             mode='embaixadinha';elapsed=now-game.play.juggle_at
         elif arriving:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])

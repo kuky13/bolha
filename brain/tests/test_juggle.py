@@ -5,6 +5,7 @@ import time
 import pytest
 
 from game import Game
+from bolha.motion import ExpressionMotion
 
 CONTENT = Path(__file__).resolve().parents[2]/'assets/bolha/content'
 
@@ -71,3 +72,59 @@ def test_brain_can_choose_juggling_without_a_manual_request(tmp_path,monkeypatch
     action = game.play.tick(time.monotonic(),game.body,game.ball,game.cursor,'feliz',1.,game.bounds())
     assert action=='juggle' and game.play.juggle_count==1
     assert ('toy_play',['kick','juggle','wait']) in choices_seen
+
+
+def test_slow_frames_do_not_hide_or_reset_the_running_count(tmp_path,monkeypatch):
+    game = ready(tmp_path)
+    now = time.monotonic()
+    game.last_think = now+60.
+    monkeypatch.setattr('pestinha.body.brincadeira.random.randint',lambda *_:6)
+    game.interact(dict(type='play',trick='juggle'),now=now)
+    numbers = []
+    for frame in range(170):
+        tick = now+frame*.22
+        game.tick(.22,tick)  # Game caps physics steps at 50 ms.
+        text, alpha = game.play.count_text(tick)
+        assert alpha==1.
+        if not numbers or text!=numbers[-1]:
+            numbers.append(text)
+        if text=='6':
+            break
+    assert numbers==[str(n) for n in range(1,7)]
+
+
+def test_missed_ball_keeps_the_last_number_until_it_fades(tmp_path,monkeypatch):
+    game = ready(tmp_path)
+    now = time.monotonic()
+    game.last_think = now+20.
+    monkeypatch.setattr('pestinha.body.brincadeira.random.randint',lambda *_:6)
+    game.interact(dict(type='play',trick='juggle'),now=now)
+    game.tick(.016,now)
+    assert game.play.juggling()
+    toy = game.ball.body
+    toy.x = game.body.x+300.
+    toy.vx = 0.
+    for frame in range(1,100):
+        tick = now+frame*.016
+        game.tick(.016,tick)
+        if not game.play.juggling():
+            break
+    assert toy.grounded and not game.play.juggling()
+    assert game.play.count_text(tick)==('1',1.)
+    assert 0.<game.play.count_text(tick+1.17)[1]<.5
+    assert game.play.count_text(tick+1.26) is None
+
+
+def test_juggle_pose_stays_coherent_between_taps(tmp_path,monkeypatch):
+    game = ready(tmp_path)
+    now = time.monotonic()
+    game.last_think = now+20.
+    monkeypatch.setattr('pestinha.body.brincadeira.random.randint',lambda *_:6)
+    game.interact(dict(type='play',trick='juggle'),now=now)
+    game.tick(.016,now)
+    motion = ExpressionMotion(now)
+    contact = motion.update(game,now+.055)
+    between_taps = motion.update(game,now+.45)
+    assert motion.mode=='embaixadinha'
+    assert contact['emotion']==between_taps['emotion']=='contente'
+    assert contact['mouth_open']>.4 and between_taps['mouth_open']==0.

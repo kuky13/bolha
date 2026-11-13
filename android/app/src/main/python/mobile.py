@@ -331,6 +331,8 @@ def tick(dt):
         last_ear_gaze = tuple(value+(target-value)*(1.-math.exp(-12.*dt)) for value,target in zip(last_ear_gaze,goal))
     note_visible = game.mischief.has_note()
     count = game.play.count_text(now) if not game.panel and not note_visible else None
+    if count:
+        dialogue.next_reaction = max(dialogue.next_reaction,now+.65)
     if note_visible or count:
         say_until = 0.
     if preferences['speechEnabled'] and not note_visible and not count:

@@ -1272,7 +1272,7 @@ class Game:
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
             if self.play.juggling():
-                self.play.follow_juggle(now,self.body,self.ball,area,previous_toy[1])
+                self.play.follow_juggle(dt,now,self.body,self.ball,area,previous_toy[1])
             elif not holding_cursor:
                 self._toy_contact(previous_pet,previous_toy,now)
         self._focus_gaze(now)

@@ -62,12 +62,15 @@ class Play:
         self.teases = 0
         self.juggle_target = self.juggle_count = 0
         self.juggle_at = -math.inf
+        self.juggle_airtime = 0.
+        self.juggle_finished_at = None
 
     def juggling(self):
-        return 0 < self.juggle_count < self.juggle_target
+        return self.juggle_count > 0 and self.juggle_finished_at is None
 
     def stop_juggle(self):
         self.juggle_target = self.juggle_count = 0
+        self.juggle_finished_at = None
 
     def juggle_touch(self, now, body, ball):
         toy = ball.body
@@ -78,35 +81,45 @@ class Play:
         ball.kick(vx, -speed)
         self.juggle_count += 1
         self.juggle_at = now
-        self.next_at = max(self.next_at, now+2.4)
+        self.juggle_airtime = 0.
+        if self.juggle_count == self.juggle_target:
+            self.juggle_finished_at = now
+            self.next_at = max(self.next_at, now+2.4)
 
     def start_juggle(self, now, body, ball):
         self.stop_chase()
         self.juggle_target = random.randint(1,100)
         self.juggle_count = 0
+        self.juggle_finished_at = None
         body.vx = 0.
         self.juggle_touch(now,body,ball)
 
-    def follow_juggle(self, now, body, ball, area, previous_y):
+    def follow_juggle(self, dt, now, body, ball, area, previous_y):
         toy = ball.body
+        self.juggle_airtime += dt
         if (not body.grounded or not body.upright() or body.held or not ball.isVisible()
-                or toy.held or ball.dragging or now-self.juggle_at>1.3):
+                or toy.held or ball.dragging):
             self.stop_juggle()
-            return False
+            return
         contact_y = body.y-body.half_h-toy.half_h-8.
-        if contact_y-area[1]<toy.half_h+85 or not area[0]<=toy.x<=area[2]:
-            self.stop_juggle()
-            return False
-        if (now-self.juggle_at>.19 and toy.vy>0. and previous_y <= contact_y <= toy.y
+        if (toy.grounded or self.juggle_airtime>1.3 or contact_y-area[1]<toy.half_h+85
+                or not area[0]<=toy.x<=area[2]):
+            self.juggle_finished_at = now
+            self.next_at = max(self.next_at, now+2.4)
+            return
+        if (self.juggle_airtime>.19 and toy.vy>0. and previous_y <= contact_y <= toy.y
                 and abs(toy.x-body.x)<body.half_w*.8+toy.half_w):
             self.juggle_touch(now,body,ball)
-        return True
 
     def count_text(self, now):
-        age = now-self.juggle_at
-        if not self.juggle_count or not 0.<=age<1.25:
+        if not self.juggle_count:
             return None
-        return str(self.juggle_count), min(1.,.65+age/.14,(1.25-age)/.26)
+        if self.juggling():
+            return str(self.juggle_count), 1.
+        remaining = 1.25-(now-self.juggle_finished_at)
+        if remaining <= 0.:
+            return None
+        return str(self.juggle_count), min(1.,remaining/.26)
 
     def weight(self, key):
         """Peso de uma brincadeira pelo nome (0 se não existir)."""

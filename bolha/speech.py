@@ -88,6 +88,7 @@ class SpeechWindow(QWidget):
         count = game.play.count_text(now)
         if count:
             self.counting = True
+            self.dialogue.next_reaction = max(self.dialogue.next_reaction,now+.65)
             if self.text != count[0]:
                 self.text, self.thought = count[0], False
                 self.setAccessibleDescription(self.text)
@@ -104,7 +105,8 @@ class SpeechWindow(QWidget):
         left, top, right, bottom = game.bounds((game.body.x, game.body.y))
         metrics = QFontMetricsF(QFont('Segoe UI', 10), self)
         pad_x, pad_y, tail = COMPACT_TEXT_PADDING
-        width = min(212, int(right-left-16), max(46, math.ceil(metrics.horizontalAdvance(self.text))+2*pad_x+2))
+        measured = metrics.horizontalAdvance('100' if count else self.text)
+        width = min(212, int(right-left-16), max(46, math.ceil(measured)+2*pad_x+2))
         if width < 46:
             self.hide()
             return
