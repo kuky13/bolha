@@ -57,7 +57,11 @@ A rotação em paisagem não foi confirmada nessa imagem de emulador.
 
 Esses dois pacotes precedem o ajuste de expressões da boca e tempo de leitura.
 A revisão visual mais recente tem testes próprios de fechamento após susto,
-alegria, mastigação e cuspida, além de prévia do desenho Qt.
+alegria, mastigação e cuspida, além de prévia do desenho Qt. A suíte local
+terminou com 715 testes aprovados e 11 exclusivos de Windows ignorados.
+O novo APK de desenvolvimento compilou e passou na auditoria estática.
+Os testes do novo instalador e do emulador precisam rodar para essa revisão
+antes da publicação.
 
 ## Limites da evidência
 
