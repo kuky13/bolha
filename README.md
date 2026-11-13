@@ -15,11 +15,12 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.5.0 aproxima as expressões e as atividades do Android da versão para PC,
+A 0.5.1 acrescenta embaixadinhas com contagem e melhora a exibição de GIFs.
+A série 0.5 aproxima as expressões e as atividades do Android da versão para PC,
 com central de configurações, painel neural e movimento opcional ao chacoalhar.
 No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
 vem desligada. Também é possível abrir pelo código com `python main.py`, como no Pestinha.
-Veja a [validação da versão](docs/VALIDATION-0.5.0.md) e a
+Veja a [validação da versão](docs/VALIDATION-0.5.1.md) e a
 [revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
 *Expressões da 0.5.0 renderizadas pelo Qt em Linux. A validação em Windows é
