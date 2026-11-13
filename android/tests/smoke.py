@@ -114,6 +114,8 @@ def smoke(apk, output):
     finally:
         (output / 'logcat.txt').write_bytes(adb('logcat', '-d', check=False))
         (output / 'janelas.txt').write_text(windows(), encoding='utf-8')
+        if not (output / 'flutuante.png').exists():
+            (output / 'diagnostico.png').write_bytes(adb('exec-out', 'screencap', '-p'))
         (output / 'relatorio.json').write_text(json.dumps({'validado': passed},
             indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 

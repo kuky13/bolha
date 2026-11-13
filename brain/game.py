@@ -1084,8 +1084,13 @@ class Game:
             self.intelligence.clear_goal()
             self.behavior.adaptive_goal = None
         if now-self.last_metrics >= 30:
-            import psutil
-            self.app_rss_mib = psutil.Process().memory_info().rss/1048576
+            try:
+                import psutil
+            except ModuleNotFoundError:
+                # Android does not package the optional desktop RSS probe.
+                self.app_rss_mib = 0.
+            else:
+                self.app_rss_mib = psutil.Process().memory_info().rss/1048576
             import numpy as np
             self.brain_array_mib = sum(v.nbytes for v in vars(self.brain).values() if isinstance(v,np.ndarray) and v.base is None)/1048576
             self.last_metrics = now

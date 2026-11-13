@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [fix/visual-dialogue-044]
-    paths: [.github/workflows/android.yml]
+    paths: [.github/workflows/android.yml, 'android/**', brain/game.py]
 permissions:
   contents: read
 concurrency:
