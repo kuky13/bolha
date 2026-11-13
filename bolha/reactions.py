@@ -2,7 +2,7 @@
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Reações online (memes e GIFs) em memória, sem credenciais e sem gravar arquivos."""
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from html import unescape
 from html.parser import HTMLParser
 import json
@@ -21,7 +21,7 @@ NEKOS_API = 'https://nekos.best/api/v2'
 REACTIONGIFS_HOSTS = frozenset(('reactiongifs.com', 'www.reactiongifs.com'))
 NEKOS_HOSTS = frozenset(('nekos.best', 'www.nekos.best'))
 
-TIMEOUT_SECONDS = 6.0
+TIMEOUT_SECONDS = 3.0
 MAX_JSON_BYTES = 256 * 1024
 MAX_MEDIA_BYTES = 6 * 1024 * 1024
 MAX_TOTAL_MEDIA_BYTES = 18 * 1024 * 1024
@@ -444,11 +444,8 @@ def fetch_reaction_payload(intent, kind='meme', transport=None, recent_urls=(), 
     transport = transport or ReactionTransport()
     intent_key, keywords, categories = map_intent(intent, kind)
     keyword_list = [w for w in keywords if w in SAFE_KEYWORDS] or ['happy']
-    # Prioriza o termo primário do mapeamento; mantém a busca curta e repetível.
-    ordered_keywords = list(keyword_list)
-
     # 1. ReactionGIFs (busca pública WordPress REST API)
-    for keyword in ordered_keywords[:2]:
+    for keyword in keyword_list[:1]:
         api_url = (f'{REACTIONGIFS_API}?search={quote(keyword)}'
                    '&orderby=relevance&per_page=6&_fields=id,link,title,content')
         try:
@@ -466,15 +463,7 @@ def fetch_reaction_payload(intent, kind='meme', transport=None, recent_urls=(), 
                         candidate.media_url, REACTIONGIFS_HOSTS, MAX_MEDIA_BYTES,
                         accept='image/gif,image/*;q=0.9,*/*;q=0.5', upgrade_http=True)
                     validate_media_signature(media_bytes, media_type)
-                    updated = ReactionCandidate(
-                        provider=candidate.provider,
-                        intent=candidate.intent,
-                        query=candidate.query,
-                        title=candidate.title,
-                        media_url=final_media_url,
-                        source_url=candidate.source_url,
-                        attribution=candidate.attribution,
-                    )
+                    updated = replace(candidate, media_url=final_media_url)
                     return ReactionPayload(updated, media_type, media_bytes)
                 except (HTTPError, URLError, TimeoutError, OSError, ValueError):
                     continue
@@ -485,34 +474,30 @@ def fetch_reaction_payload(intent, kind='meme', transport=None, recent_urls=(), 
         filtered = [c for c in cat_list if c in nekos_endpoints]
         if filtered:
             cat_list = filtered
-    category = random.choice(cat_list)
-    nekos_url = f'{NEKOS_API}/{quote(category)}?amount=3'
-    raw_json, _, _ = transport.get_bytes(
-        nekos_url, NEKOS_HOSTS, MAX_JSON_BYTES, accept='application/json')
-    candidates = parse_nekos_results(raw_json, intent_key, category, nekos_endpoints)
-    fresh = [c for c in candidates if c.media_url not in recent_urls] or candidates
-    if not fresh:
-        raise ValueError('Nenhum candidato válido retornado por Nekos.best.')
-    random.shuffle(fresh)
+    # Some categories may be temporarily empty or unavailable. Use a known
+    # GIF category as a final fallback in the same request.
+    categories = list(dict.fromkeys([*cat_list[:2], 'happy']))
     last_error = None
-    for candidate in fresh[:2]:
+    for category in categories:
         try:
-            media_bytes, media_type, final_media_url = transport.get_bytes(
-                candidate.media_url, NEKOS_HOSTS, MAX_MEDIA_BYTES,
-                accept='image/gif,image/*;q=0.9,*/*;q=0.5', upgrade_http=False)
-            validate_media_signature(media_bytes, media_type)
-            updated = ReactionCandidate(
-                provider=candidate.provider,
-                intent=candidate.intent,
-                query=candidate.query,
-                title=candidate.title,
-                media_url=final_media_url,
-                source_url=candidate.source_url,
-                attribution=candidate.attribution,
-            )
-            return ReactionPayload(updated, media_type, media_bytes)
+            raw_json, _, _ = transport.get_bytes(f'{NEKOS_API}/{quote(category)}?amount=3',
+                NEKOS_HOSTS, MAX_JSON_BYTES, accept='application/json')
+            candidates = parse_nekos_results(raw_json, intent_key, category, nekos_endpoints)
         except (HTTPError, URLError, TimeoutError, OSError, ValueError) as error:
             last_error = error
+            continue
+        fresh = [c for c in candidates if c.media_url not in recent_urls] or candidates
+        random.shuffle(fresh)
+        for candidate in fresh[:2]:
+            try:
+                media_bytes, media_type, final_media_url = transport.get_bytes(
+                    candidate.media_url, NEKOS_HOSTS, MAX_MEDIA_BYTES,
+                    accept='image/gif,image/*;q=0.9,*/*;q=0.5')
+                validate_media_signature(media_bytes, media_type)
+                updated = replace(candidate, media_url=final_media_url)
+                return ReactionPayload(updated, media_type, media_bytes)
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError) as error:
+                last_error = error
     raise ValueError(f'Falha ao carregar reação online: {last_error}')
 
 

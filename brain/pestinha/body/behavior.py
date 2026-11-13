@@ -289,16 +289,17 @@ class Behavior:
             self._protest_move(dt, now, left, right)
             return
 
-        if self.adaptive_goal in ('watch', 'rest', 'work'):
+        if self.adaptive_goal in ('watch', 'rest', 'work') and not (
+                self.play and self.play.requested_action):
             body.vx = 0.
             return
 
         # brincar com a bolinha (chutar ou arremessar, conforme o estilo do pet)
         if self.play is not None and self.ball is not None and self.emotion not in STILL and not st.at_desk:
             previous=self.play.next_at
-            action=self.play.tick(now, body, self.ball, cursor, self.emotion, self.play_pull)
+            action=self.play.tick(now, body, self.ball, cursor, self.emotion, self.play_pull, bounds)
             if self.play.next_at!=previous:self.last_play=dict(started=now,action=action)
-            if action:
+            if action and action!='juggle':
                 body.jump(0.0, -180.0)              # pulinho de quem acabou de chutar
 
         if self.adaptive_goal and self.emotion not in STILL:

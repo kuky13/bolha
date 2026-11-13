@@ -60,6 +60,7 @@ class ExpressionLab(QWidget):
         ('Comemorando', 'comemorando'), ('Susto rápido', 'assustado'),
         ('Cochilo e bocejo', 'doze'), ('Espirro', 'sneeze'),
         ('Soluços', 'hiccup'), ('Piscadela', 'wink'),
+        ('Fazendo embaixadinha', 'embaixadinha'),
         ('Correndo', 'correndo'), ('Deitada', 'deitada'),
         ('Rebatendo', 'pingpong_rebatida'), ('Estourando', 'pop'), ('Tímida', 'timido'),
         ('De olho no ponteiro', 'cursor_approach'), ('Bote no ponteiro', 'cursor_pounce'),

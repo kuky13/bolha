@@ -4,6 +4,7 @@
 import copy
 import json
 import math
+import random
 from pathlib import Path
 import shutil
 import time
@@ -21,7 +22,7 @@ EXPRESSION_NAMES = [
     'observando', 'feliz', 'curioso', 'triste', 'bravo', 'entediado', 'held',
     'sleeping', 'caress', 'airborne', 'impact', 'tonto', 'birra', 'sacudir',
     'preparar_bote', 'brinquedo_frustrado', 'brinquedo_susto', 'brinquedo_rebatida',
-    'pingpong_rebatida', 'pouso_em_pe', 'pouso_de_lado', 'pouso_invertido',
+    'pingpong_rebatida', 'embaixadinha', 'pouso_em_pe', 'pouso_de_lado', 'pouso_invertido',
     'deitada', 'correndo', 'comemorando', 'pop', 'pop_return', *QUIRK_SECONDS,
 ]
 game = None
@@ -38,6 +39,7 @@ selected_neuron = None
 last_diagnostic = 0.
 diagnostic = ''
 last_error = ''
+reaction_status = ''
 last_motion = -100.
 preview = None
 say_until = say_started = 0.
@@ -127,6 +129,7 @@ def context(package_name, idle_seconds):
 
 
 def action(kind, target='', x=0., y=0., vx=0., vy=0.):
+    global reaction_status
     if not all(number(value) for value in (x, y, vx, vy)):
         return
     event = dict(type=kind, x=float(x), y=float(y), vx=float(vx), vy=float(vy))
@@ -140,19 +143,25 @@ def action(kind, target='', x=0., y=0., vx=0., vy=0.):
     if kind == 'toy-style':
         configure(dict(toyAppearance='ball' if game.ball.appearance == 'peanut' else 'peanut'))
         return
-    if kind in ('lift', 'kick'):
+    if kind in ('lift', 'kick', 'juggle'):
         event.update(type='play', trick=kind)
-    game.interact(event)
+    accepted = game.interact(event)
+    if kind == 'reaction-now':
+        reaction_status = ('Buscando uma reação…' if accepted else
+            'Ative “Buscar memes e GIFs online” em Comportamento.' if not preferences['onlineReactions'] else
+            'Ative as travessuras em Comportamento.' if not preferences['mischiefEnabled'] else
+            'Não deu para pedir agora. Libere espaço na tela e tente novamente.')
 
 
 def control(value):
-    global preview, selected_neuron, monitor_cache, last_error
+    global preview, selected_neuron, monitor_cache, last_error, reaction_status
     event = json.loads(value) if isinstance(value, str) else value
     if not isinstance(event, dict):
         raise ValueError('Comando precisa ser um objeto.')
     kind = event.get('type')
     if kind == 'suspend':
         game._cancel_holds(time.monotonic())
+        game.play.stop_juggle()
         return
     if kind == 'reaction-failed':
         ident = str(event.get('id', ''))
@@ -162,6 +171,7 @@ def control(value):
             media_cache.pop(ident, None)
             media_requested.discard(ident)
             last_error = 'Não foi possível exibir esta reação online.'
+            reaction_status = last_error
         return
     if kind == 'expression':
         name = event.get('name')
@@ -195,6 +205,7 @@ def motion(ax, ay, shake=False):
         return
     last_motion = now
     game.stop_pingpong()
+    game.play.stop_juggle()
     ax, ay = max(-24., min(24., ax)), max(-24., min(24., ay))
     intensity = min(1., math.hypot(ax, ay) / 22.)
     if game.mesa.sentado and not game.body.held:
@@ -223,7 +234,7 @@ def motion(ax, ay, shake=False):
 
 
 def _update_reactions(now, dt):
-    global last_error
+    global last_error, reaction_status
     active = {key for key, item in game.objects.items() if item.kind == 'meme' and not item.closed}
     media_requested.intersection_update(active)
     for key in list(media_cache):
@@ -243,10 +254,18 @@ def _update_reactions(now, dt):
             continue
         if error or payload is None or sum(len(row[0].data) for row in media_cache.values()) + len(payload.data) > MAX_TOTAL_MEDIA_BYTES:
             last_error = 'Reação online indisponível. ' + str(error or 'Limite de memória atingido.')
+            reaction_status = 'Não foi possível carregar o GIF. Tente novamente.'
             game.mischief_ctl.abort_thing(item)
             continue
         kind = validate_media_signature(payload.data, payload.content_type)
+        left,top,right,bottom = game.bounds()
+        hw,hh = item.width()/2,item.height()/2
+        x = min(hw+14.,max(hw,(right-left)/2))
+        y = min(hh+14.,max(hh,(bottom-top)/2))
+        item.place(random.choice((left+x,right-x)),random.choice((top+y,bottom-y)))
+        game.mischief_ctl.park_reaction(item)
         media_cache[key] = payload, 15., kind
+        reaction_status = 'Reação pronta.'
         item.source_url = payload.candidate.source_url
         item.provider = payload.candidate.provider
         item.attribution = payload.candidate.attribution
@@ -311,9 +330,10 @@ def tick(dt):
         last_gaze = tuple(value+(target-value)*(1.-math.exp(-22.*dt)) for value,target in zip(last_gaze,goal))
         last_ear_gaze = tuple(value+(target-value)*(1.-math.exp(-12.*dt)) for value,target in zip(last_ear_gaze,goal))
     note_visible = game.mischief.has_note()
-    if note_visible:
+    count = game.play.count_text(now) if not game.panel and not note_visible else None
+    if note_visible or count:
         say_until = 0.
-    if preferences['speechEnabled'] and not note_visible:
+    if preferences['speechEnabled'] and not note_visible and not count:
         line = dialogue.update(game, now)
         if line:
             say_text, say_thought = line
@@ -342,9 +362,10 @@ def tick(dt):
         notebook=game.mesa.caderno.snapshot() if game.mesa.caderno.isVisible() else None,
         impactX=impact[0], impactY=impact[1],
         impact=reaction.get('started', 0.) if reaction.get('kind') == 'brinquedo_rebatida' else 0.,
-        text=say_text if preferences['speechEnabled'] and now < say_until and not game.panel else '',
-        thought=say_thought, speechStarted=say_started,
-        speechAlpha=max(0., min(1., (now-say_started)/.22, (say_until-now)/.3)),
+        text=count[0] if count else say_text if preferences['speechEnabled'] and now < say_until and not game.panel else '',
+        thought=False if count else say_thought, speechStarted=say_started,
+        speechCounting=count is not None,
+        speechAlpha=count[1] if count else max(0., min(1., (now-say_started)/.22, (say_until-now)/.3)),
         expressionNames=EXPRESSION_NAMES)
     if game.pingpong:
         match = game.pingpong
@@ -363,6 +384,7 @@ def tick(dt):
             f'Aviso local {last_error or "nenhum"}')
         last_diagnostic = now
     data['diagnostics'] = diagnostic
+    data['reactionStatus'] = reaction_status
     return json.dumps(data, allow_nan=False)
 
 

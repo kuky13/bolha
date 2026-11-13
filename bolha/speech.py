@@ -63,6 +63,7 @@ class SpeechWindow(QWidget):
         self.text = ''
         self.thought = False
         self.started = self.until = 0.
+        self.counting = False
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -84,10 +85,20 @@ class SpeechWindow(QWidget):
             self.dialogue.previous = None
             self.dialogue.next_ambient = None
             return
-        result = self.dialogue.update(game, now)
-        if result:
-            self.present(*result, now=now)
-        if not self.text or now >= self.until:
+        count = game.play.count_text(now)
+        if count:
+            self.counting = True
+            if self.text != count[0]:
+                self.text, self.thought = count[0], False
+                self.setAccessibleDescription(self.text)
+        else:
+            if self.counting:
+                self.counting = False
+                self.until = 0.
+            result = self.dialogue.update(game, now)
+            if result:
+                self.present(*result, now=now)
+        if not self.text or (not count and now >= self.until):
             self.hide()
             return
         left, top, right, bottom = game.bounds((game.body.x, game.body.y))
@@ -103,7 +114,11 @@ class SpeechWindow(QWidget):
             self.hide()
             return
         self.resize(width, height)
-        x = max(left+8, min(right-width-8, game.body.x-width/2))
+        center_x = game.body.x
+        if count:
+            side = 1 if right-center_x >= center_x-left else -1
+            center_x += side*(game.body.half_w+width/2+10.)
+        x = max(left+8, min(right-width-8, center_x-width/2))
         self.anchor = game.body.x-x
         target_y = game.body.y-game.body.half_h-height-8
         toy = game.ball.body
@@ -114,7 +129,7 @@ class SpeechWindow(QWidget):
         self.tail_top = target_y < top+8 or (covers_toy and below_y+height <= bottom-8)
         if self.tail_top:
             target_y = below_y
-        self.alpha = min(1., max(0., (now-self.started)/.22), max(0., (self.until-now)/.30))
+        self.alpha = count[1] if count else min(1., max(0., (now-self.started)/.22), max(0., (self.until-now)/.30))
         eased = 1.-(1.-self.alpha)**3
         y = max(top+8, min(bottom-height-8, target_y+(1.-eased)*6))
         self.move(round(x), round(y))

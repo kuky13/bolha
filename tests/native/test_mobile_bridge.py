@@ -70,6 +70,15 @@ def test_native_media_failure_removes_object_without_punishing_learning(mobile):
     assert 'exibir' in mobile.last_error
 
 
+def test_reaction_button_explains_network_setting_instead_of_failing_silently(mobile, monkeypatch):
+    monkeypatch.setattr(mobile.fetcher,'submit',lambda *_:True)
+    mobile.action('reaction-now')
+    assert 'GIFs online' in json.loads(mobile.tick(.016))['reactionStatus']
+    mobile.configure({'onlineReactions':True})
+    mobile.action('reaction-now')
+    assert json.loads(mobile.tick(.016))['reactionStatus'].startswith('Buscando')
+
+
 def test_screen_off_cancels_held_pet_and_toy_without_throwing(mobile):
     mobile.action('hold-start')
     mobile.action('drag-start', 'toy', 180., 140.)

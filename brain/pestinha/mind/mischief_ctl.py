@@ -158,6 +158,13 @@ class MischiefController:
         self.memory.cancel_thing(thing)
         self.engine._remove(thing)
 
+    def park_reaction(self, thing):
+        if self.behavior.mission and self.behavior.mission[:2] == ('deliver',thing):
+            self.behavior.mission = None
+        thing.carried = False
+        thing.resting = True
+        thing.vy = 0.
+
     def clear_memes(self):
         """Remove reações online quando o usuário desativa a opção."""
         for thing in list(self.engine.things):

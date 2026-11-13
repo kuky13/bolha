@@ -325,7 +325,7 @@ class NativeScene:
             self._status(ident,'canceled','fila indisponível ou cheia')
             self._abort_meme(ident,item)
             return False
-        window.reaction_requested=True;self._reaction_deadlines[str(ident)]=time.monotonic()+20
+        window.reaction_requested=True;self._reaction_deadlines[str(ident)]=time.monotonic()+30
         self._status(ident,'loading','buscando GIF em memória');return True
     def poll_interactions(self):
         for window in list(self.windows.values()):window.poll_interaction()
@@ -373,6 +373,7 @@ class NativeScene:
                 self._abort_meme(ident,item)
                 continue
             self._place_reaction_in_corner(item)
+            self.game.mischief_ctl.park_reaction(item)
             window.set_reaction_media(media)
             self._status(ident,'ready','');self._reaction_deadlines.pop(str(ident),None)
     def sync(self):

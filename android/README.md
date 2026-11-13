@@ -44,6 +44,8 @@ humor, energia e experiências influenciam as respostas.
 
 A boca descansa fechada e abre brevemente no susto, carinho, bocejo, espirro
 e soluço. As falas ficam visíveis por 3,4 a 6,2 segundos conforme o comprimento.
+Na Central, **Atividades → Fazer embaixadinhas** pede uma rodada quando o
+brinquedo estiver perto. O balão conta cada toque e some sozinho.
 
 Para flutuar, toque em **Flutuar** e permita a sobreposição nas configurações
 do Android. Use **Parar** na notificação ou **Parar de flutuar** no app.

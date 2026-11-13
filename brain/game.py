@@ -308,6 +308,9 @@ class Game:
     def interact(self, event, *, now=None):
         now = time.monotonic() if now is None else now
         kind = event.get('type')
+        if (kind in ('hold-start','drag-start','sleep','quiet','hide','panic','ball','pingpong',
+                     'work','notebook','corner') or (kind=='panel' and event.get('value'))):
+            self.play.stop_juggle()
         if kind in ('caress', 'quiet'):
             self.cursor_prank.feedback(self, .8 if kind == 'caress' else -.8, now)
         if kind in ('hold-start', 'drag-start', 'poke', 'panel', 'panic', 'hide',
@@ -362,7 +365,7 @@ class Game:
                             contact=self.drives.contact), neural={k: self.rates.get(k, 0.) for k in ('CHEER','WATCH','DROWSE')}))
             self.intelligence.current_decision = decision
             self.intelligence.history.append(dict(decision))
-            return
+            return accepted
         if kind == 'hover': self.hover = bool(event.get('value')); return
         if kind == 'reset-memory': self.reset_learning(); return
         if kind == 'cursor':
@@ -483,7 +486,7 @@ class Game:
             self.intelligence.history.append(dict(self.intelligence.current_decision))
         elif kind == 'play':
             trick = event.get('trick')
-            explicit_trick = trick in ('kick','lift')
+            explicit_trick = trick in ('kick','lift','juggle')
             distance = math.dist((self.body.x,self.body.y),(self.ball.body.x,self.ball.body.y))
             allowed = (self.visible() and not self.sleep.asleep and not self.body.held and self.body.grounded
                        and not self.mesa.sentado and not self.behavior.mission and not self.state.protest_stage and self.drives.energy > .2
@@ -1011,6 +1014,12 @@ class Game:
         kind=None;duration=1.6
         if attempt and attempt['started']!=self.last_play_attempt:
             self.last_play_attempt=attempt['started']
+            if attempt['action']=='juggle':
+                for thing in list(self.mischief.things):
+                    if thing.kind=='note':
+                        self.mischief_ctl.abort_thing(thing)
+                self.play_reaction = {}
+                return
             if attempt['action']:
                 kind='brinquedo_rebatida';duration=.42
             else:
@@ -1188,6 +1197,7 @@ class Game:
         frozen = self.panicked or self.hidden or not self.available_areas()
         if frozen:
             self.cursor_prank.cancel(self, now)
+            self.play.stop_juggle()
             self.festa.requested=False
             self.stop_pingpong()
             self._cancel_holds(now)
@@ -1202,6 +1212,7 @@ class Game:
             self.intelligence.until += elapsed
             self.paused_at = None; self.last_think = now
         if self.pop_started is not None:
+            self.play.stop_juggle()
             if now >= self.pop_return_at:
                 self._return_from_pop(now)
             else:
@@ -1235,8 +1246,16 @@ class Game:
         manual_play = self.play.requested_action is not None
         shy_return = self._shy_returning(now)
         resting = (self.hover or self.panel or shy_return or self.cursor_prank.active or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
-        self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
-                           self.prefs.get('senseCursor',True))
+        if self.play.juggling() and (self.panel or self.sleep.asleep or self.mesa.sentado
+                or self.state.protest_stage or self.state.castigo or self.body.held or self.ball_stored
+                or self.cursor_prank.active or manual_play):
+            self.play.stop_juggle()
+        if self.play.juggling():
+            self.body.vx = 0.
+            self.behavior.toy_action = None
+        else:
+            self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
+                               self.prefs.get('senseCursor',True))
         if manual_play:
             # A situação pode mudar entre o clique e o próximo quadro.
             self.play.requested_action = None
@@ -1252,9 +1271,13 @@ class Game:
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
-            if not holding_cursor:
+            if self.play.juggling():
+                self.play.follow_juggle(now,self.body,self.ball,area,previous_toy[1])
+            elif not holding_cursor:
                 self._toy_contact(previous_pet,previous_toy,now)
         self._focus_gaze(now)
+        if self.play.juggling():
+            self._look_at_point((self.ball.body.x,self.ball.body.y))
         impacts = self.body.pop_impacts()
         self.landing *= math.exp(-dt * 12)
         for strength in impacts:
@@ -1267,7 +1290,7 @@ class Game:
         self.mischief.energy = self.drives.energy
         self.mischief.contact = self.drives.contact
         perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
-        if not self.cursor_prank.active and not shy_return and not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
+        if not self.play.count_text(now) and not self.cursor_prank.active and not shy_return and not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.rates = self.rates
         self.festa.energy = self.drives.energy
