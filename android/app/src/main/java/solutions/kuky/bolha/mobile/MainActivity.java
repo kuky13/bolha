@@ -164,6 +164,6 @@ public final class MainActivity extends Activity implements Engine.Listener {
         if (!statusLabel.contentEquals(status.getText())) status.setText(statusLabel);
         if (error != null) return;
         if (!FloatingBolha.active) Haptics.frame(this,state);
-        stage.invalidate();
+        stage.frame(state);
     }
 }

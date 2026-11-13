@@ -96,6 +96,9 @@ public final class FloatingBolha extends Service implements Engine.Listener {
         if (!active) return;
         if (error != null || !Settings.canDrawOverlays(this)) { stopSelf(); return; }
         Haptics.frame(this,s);
+        pet.frame(s);
+        toy.frame(s);
+        message.frame(s);
         try {
             layout(pet,petParams,s,"x","y","radius",petAdded);
             petAdded = true;
@@ -133,7 +136,6 @@ public final class FloatingBolha extends Service implements Engine.Listener {
         params.x=x; params.y=y; params.width=width; params.height=height;
         if (!added) windows.addView(view,params);
         else if (changed) windows.updateViewLayout(view,params);
-        view.invalidate();
     }
 
     @Override public void onDestroy() {

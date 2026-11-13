@@ -13,6 +13,7 @@ final class Stage extends View {
     private final Engine engine;
     private final String layer;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private JSONObject frame = new JSONObject();
     private float originX, originY, downX, downY, offsetX, offsetY;
     private String held;
     private VelocityTracker velocity;
@@ -31,6 +32,7 @@ final class Stage extends View {
     }
 
     void origin(float x, float y) { originX = x; originY = y; }
+    void frame(JSONObject state) { frame = state; invalidate(); }
     private float n(JSONObject o, String key, float fallback) { return (float)o.optDouble(key, fallback); }
     private int color(String value) { return Color.parseColor(value); }
 
@@ -39,7 +41,8 @@ final class Stage extends View {
     }
 
     @Override protected void onDraw(Canvas canvas) {
-        JSONObject s = engine.state();
+        // Draw the same snapshot used to position this overlay window.
+        JSONObject s = frame;
         if (layer.isEmpty()) canvas.drawColor(color("#181420"));
         canvas.save();
         canvas.translate(-originX, -originY);
@@ -141,7 +144,7 @@ final class Stage extends View {
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (layer.equals("message")) return false;
         float x = event.getX()+originX, y = event.getY()+originY;
-        JSONObject s = engine.state();
+        JSONObject s = frame;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 float px=n(s,"x",0), py=n(s,"y",0), tx=n(s,"toyX",0), ty=n(s,"toyY",0);
