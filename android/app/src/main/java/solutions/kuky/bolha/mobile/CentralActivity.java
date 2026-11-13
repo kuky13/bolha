@@ -107,6 +107,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
 
     @Override protected void onResume() {
         super.onResume();
+        FloatingBolha.foregroundUi(this,true);
         engine.listen(this);
         command("panel",true);
         command("monitor",section==2);
@@ -117,6 +118,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
     }
 
     @Override protected void onPause() {
+        FloatingBolha.foregroundUi(this,false);
         command("monitor",false);
         command("panel",false);
         engine.remove(this);

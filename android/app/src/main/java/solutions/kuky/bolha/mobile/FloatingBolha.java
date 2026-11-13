@@ -20,11 +20,17 @@ import org.json.JSONObject;
 
 public final class FloatingBolha extends Service implements Engine.Listener {
     static boolean active;
+    private static Activity foregroundUi;
     private Engine engine;
     private WindowManager windows;
     private final Rect area = new Rect();
     private final Map<String,Layer> layers = new HashMap<>();
     private float density;
+
+    static void foregroundUi(Activity activity, boolean resumed) {
+        if (resumed) foregroundUi=activity;
+        else if (foregroundUi==activity) foregroundUi=null;
+    }
 
     private final class Layer {
         final Stage view;
@@ -115,6 +121,8 @@ public final class FloatingBolha extends Service implements Engine.Listener {
     @Override public void frame(JSONObject state,String error) {
         if (!active) return;
         if (error!=null || !Settings.canDrawOverlays(this)) { stopSelf();return; }
+        // A sobreposição nunca deve cobrir os controles do próprio aplicativo.
+        if (foregroundUi!=null) { detachAll();return; }
         Haptics.frame(this,state);
         Set<String> wanted=new HashSet<>();
         try {
@@ -190,6 +198,7 @@ public final class FloatingBolha extends Service implements Engine.Listener {
     }
 
     private void detachAll() {
+        if (layers.isEmpty()) return;
         for (String key:new HashSet<>(layers.keySet())) remove(key);
     }
 

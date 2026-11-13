@@ -67,6 +67,7 @@ public final class MainActivity extends Activity implements Engine.Listener {
 
     @Override protected void onResume() {
         super.onResume();
+        FloatingBolha.foregroundUi(this,true);
         if (waitingPermission) {
             waitingPermission=false;
             if (Settings.canDrawOverlays(this)) prepareOverlay();
@@ -85,6 +86,7 @@ public final class MainActivity extends Activity implements Engine.Listener {
     }
 
     @Override protected void onPause() {
+        FloatingBolha.foregroundUi(this,false);
         engine.remove(this);
         super.onPause();
     }

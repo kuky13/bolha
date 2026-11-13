@@ -512,8 +512,11 @@ def smoke(apk, output, previous_apk=None):
         wait_for('janelas restauradas em retrato', visible_overlay)
 
         activity()
+        wait_for('controles do app livres da sobreposição', lambda: all(name not in windows() for name in PET_WINDOWS))
         tap(control('Parar de flutuar', exact=True, kind='Button', scroll=False))
-        wait_for('remoção das janelas', lambda: all(name not in windows() for name in PET_WINDOWS))
+        control('Flutuar', exact=True, kind='Button', scroll=False)
+        wait_for('serviço flutuante encerrado', lambda: 'isForeground=true' not in
+                 adb('shell', 'dumpsys', 'activity', 'services', PACKAGE).decode())
         control('470 neurônios', scroll=False)
         tap(control('Central da Bolha', exact=True, kind='Button', scroll=False))
         section('Comportamento')
