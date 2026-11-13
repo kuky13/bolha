@@ -23,9 +23,12 @@ ShowUninstDetails show
 BrandingText "Bolha — companhia local"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_FINISHPAGE_RUN_FUNCTION FinishOpenBolha
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Escolha uma pasta exclusiva para a Bolha. Ao clicar Instalar, a pasta será verificada e qualquer impedimento será explicado."
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE PrepareInstallDirectory
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -37,6 +40,7 @@ Var RegistryGuid
 Var DataRoot
 Var Stage
 Var Backup
+Var RollbackFailed
 Var OldExists
 Var ForceRun
 Var ProcessHandle
@@ -49,6 +53,8 @@ Var PreviousVersion
 Var PreviousUninstall
 Var PreviousQuietUninstall
 Var PreviousIcon
+Var InstallerMutex
+Var ConfirmedInstallDirectory
 
 Function .onInit
   ${IfNot} ${RunningX64}
@@ -84,7 +90,25 @@ Function .onInit
       StrCpy $INSTDIR $1
     ${EndIf}
   ${EndIf}
+  ; Uma transação por usuário/produto; testes usam outro GUID.
+  System::Call 'kernel32::CreateMutexW(p0,i0,w "Local\solutions.kuky.bolha.installer-$RegistryGuid")p.r0 ?e'
+  Pop $1
+  StrCpy $InstallerMutex $0
+  ${If} $InstallerMutex == 0
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONSTOP "Não foi possível iniciar a instalação com segurança. Tente novamente."
+    ${EndIf}
+    Abort "Não foi possível iniciar a instalação com segurança. Tente novamente."
+  ${EndIf}
+  ${If} $1 == 183
+    System::Call 'kernel32::CloseHandle(p $InstallerMutex)'
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONINFORMATION "Outro instalador da Bolha já está aberto. Conclua ou feche a outra instalação."
+    ${EndIf}
+    Abort "Outro instalador da Bolha já está aberto. Conclua ou feche a outra instalação."
+  ${EndIf}
   StrCpy $ForceRun "0"
+  ${GetParameters} $0
   ClearErrors
   ${GetOptions} $0 "--force-run" $1
   ${IfNot} ${Errors}
@@ -106,8 +130,99 @@ Function CheckNativeMarker
   ${EndIf}
 FunctionEnd
 
-Function .onVerifyInstDir
-  GetFullPathName $INSTDIR "$INSTDIR"
+!macro RejectInstallDirectory MESSAGE
+  ${IfNot} ${Silent}
+    MessageBox MB_OK|MB_ICONSTOP "${MESSAGE}$\r$\n$\r$\nPasta selecionada: $INSTDIR"
+  ${EndIf}
+  Abort "${MESSAGE}"
+!macroend
+
+Function NormalizeInstallDirectory
+  ; A API Win32 normaliza o destino mesmo quando a pasta ainda não existe.
+  System::Call 'kernel32::GetFullPathNameW(w "$INSTDIR",i${NSIS_MAX_STRLEN},w.r0,p0)i.r1'
+  ${If} $1 == 0
+  ${OrIf} $1 >= ${NSIS_MAX_STRLEN}
+    !insertmacro RejectInstallDirectory "O caminho da instalação é inválido ou muito longo. Escolha outra pasta."
+  ${EndIf}
+  StrCpy $INSTDIR "$0"
+FunctionEnd
+
+Function PrepareInstallDirectory
+  StrCpy $ConfirmedInstallDirectory ""
+  ; Valida uma vez ao clicar Instalar, exibindo o motivo em vez de desativar o botão.
+  Call NormalizeInstallDirectory
+  ${GetRoot} "$INSTDIR" $0
+  ${If} $INSTDIR == $0
+  ${OrIf} $INSTDIR == "$0\"
+  ${OrIf} $INSTDIR == "$WINDIR"
+  ${OrIf} $INSTDIR == "$SYSDIR"
+  ${OrIf} $INSTDIR == "$PROGRAMFILES"
+  ${OrIf} $INSTDIR == "$PROGRAMFILES64"
+  ${OrIf} $INSTDIR == "$COMMONFILES"
+  ${OrIf} $INSTDIR == "$COMMONFILES64"
+    !insertmacro RejectInstallDirectory "Escolha uma pasta pessoal exclusiva para a Bolha, fora da raiz do disco e das pastas do Windows."
+  ${EndIf}
+  StrCpy $0 "$INSTDIR"
+  Call CheckNativeMarker
+  ${If} $TestMode != "1"
+    ReadRegStr $0 HKCU "Software\${APPGUID}" "InstallLocation"
+    ${If} $0 != ""
+      GetFullPathName $0 "$0"
+      ${If} $0 == "$INSTDIR"
+      ${AndIf} ${FileExists} "$INSTDIR\Bolha.exe"
+        StrCpy $Recognized "1"
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  ${If} $Recognized != "1"
+    StrCpy $2 "0"
+    FindFirst $0 $1 "$INSTDIR\*.*"
+    ${DoWhile} $1 != ""
+      ${If} $1 != "."
+      ${AndIf} $1 != ".."
+        StrCpy $2 "1"
+      ${EndIf}
+      FindNext $0 $1
+    ${Loop}
+    FindClose $0
+    ${If} $INSTDIR == "$PROFILE"
+    ${OrIf} $INSTDIR == "$DOCUMENTS"
+    ${OrIf} $INSTDIR == "$APPDATA"
+    ${OrIf} $INSTDIR == "$LOCALAPPDATA"
+    ${OrIf} $INSTDIR == "$DESKTOP"
+      StrCpy $2 "1"
+    ${EndIf}
+    ${If} $2 == "1"
+      ${GetFileName} "$INSTDIR" $0
+      ${If} $0 == "Bolha"
+        ${GetParent} "$INSTDIR" $2
+        StrCpy $2 "$2\Bolha-${VERSION}"
+      ${Else}
+        StrCpy $2 "$INSTDIR\Bolha"
+      ${EndIf}
+      MessageBox MB_YESNO|MB_ICONINFORMATION|MB_DEFBUTTON2 "A pasta escolhida contém arquivos e não é uma instalação reconhecida da Bolha.$\r$\n$\r$\nNenhum arquivo existente será substituído. Deseja instalar em uma pasta exclusiva?$\r$\n$2" IDYES useSuggestedDirectory
+      Abort
+      useSuggestedDirectory:
+      StrCpy $INSTDIR "$2"
+      ; A alternativa precisa estar vazia, inclusive quando já tiver marcador.
+      FindFirst $0 $1 "$INSTDIR\*.*"
+      ${DoWhile} $1 != ""
+        ${If} $1 != "."
+        ${AndIf} $1 != ".."
+          FindClose $0
+          !insertmacro RejectInstallDirectory "A pasta alternativa também contém arquivos. Escolha outra pasta vazia e exclusiva para a Bolha."
+        ${EndIf}
+        FindNext $0 $1
+      ${Loop}
+      FindClose $0
+    ${EndIf}
+  ${EndIf}
+  Call ValidateInstallDirectory
+  StrCpy $ConfirmedInstallDirectory "$INSTDIR"
+FunctionEnd
+
+Function ValidateInstallDirectory
+  Call NormalizeInstallDirectory
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0
   ${OrIf} $INSTDIR == "$0\"
@@ -122,7 +237,7 @@ Function .onVerifyInstDir
   ${OrIf} $INSTDIR == "$PROGRAMFILES64"
   ${OrIf} $INSTDIR == "$COMMONFILES"
   ${OrIf} $INSTDIR == "$COMMONFILES64"
-    Abort "Escolha uma pasta exclusiva para a Bolha."
+    !insertmacro RejectInstallDirectory "Escolha uma pasta exclusiva para a Bolha."
   ${EndIf}
   ; Não atravessa junctions/symlinks em nenhum componente do destino.
   StrCpy $0 "$INSTDIR"
@@ -131,7 +246,7 @@ Function .onVerifyInstDir
     ${If} $1 != -1
       IntOp $2 $1 & 0x400
       ${If} $2 != 0
-        Abort "A pasta de instalação não pode atravessar atalhos ou junctions."
+        !insertmacro RejectInstallDirectory "A pasta de instalação não pode atravessar atalhos ou junctions."
       ${EndIf}
     ${EndIf}
     ${GetParent} "$0" $1
@@ -159,7 +274,7 @@ Function .onVerifyInstDir
       ${If} $1 != "."
       ${AndIf} $1 != ".."
         FindClose $0
-        Abort "A pasta já contém arquivos e não é uma instalação reconhecida da Bolha."
+        !insertmacro RejectInstallDirectory "A pasta já contém arquivos e não é uma instalação reconhecida da Bolha."
       ${EndIf}
       FindNext $0 $1
     ${Loop}
@@ -173,7 +288,13 @@ Function RecoverInterrupted
   ${If} $Backup == ""
     Return
   ${EndIf}
-  GetFullPathName $Backup "$Backup"
+  ; Uma primeira instalação também grava o registro, mas não tem backup.
+  System::Call 'kernel32::GetFullPathNameW(w "$Backup",i${NSIS_MAX_STRLEN},w.r0,p0)i.r1'
+  ${If} $1 == 0
+  ${OrIf} $1 >= ${NSIS_MAX_STRLEN}
+    Abort "Caminho de recuperação inválido. Nenhuma pasta foi alterada."
+  ${EndIf}
+  StrCpy $Backup "$0"
   ${GetParent} "$Backup" $0
   ${GetParent} "$INSTDIR" $1
   ${StrStr} $2 $Backup "$INSTDIR.rollback-"
@@ -181,7 +302,17 @@ Function RecoverInterrupted
   ${OrIf} $2 != "$Backup"
     Abort "Registro de recuperação inválido. Nenhuma pasta foi alterada."
   ${EndIf}
-  System::Call 'kernel32::GetFileAttributesW(w "$Backup")i.r0'
+  System::Call 'kernel32::GetFileAttributesW(w "$Backup")i.r0 ?e'
+  Pop $1
+  ${If} $0 == -1
+    ${If} $1 == 2
+    ${OrIf} $1 == 3
+      ${If} ${FileExists} "$INSTDIR\Bolha.exe"
+        Return
+      ${EndIf}
+    ${EndIf}
+    Abort "Não encontrei um backup acessível para recuperar a instalação. Nenhuma pasta foi alterada."
+  ${EndIf}
   IntOp $0 $0 & 0x400
   ${If} $0 != 0
     Abort "A recuperação não pode atravessar junctions."
@@ -215,20 +346,26 @@ Function RecoverInterrupted
 FunctionEnd
 
 Section "Bolha" SEC_MAIN
+  ; O NSIS relê o campo da página depois do callback LEAVE.
+  ${IfNot} ${Silent}
+  ${AndIf} $ConfirmedInstallDirectory != ""
+    StrCpy $INSTDIR "$ConfirmedInstallDirectory"
+  ${EndIf}
   ReadRegStr $PreviousVersion HKCU "Software\$RegistryGuid" "InstallVersion"
   ReadRegStr $PreviousVersion HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$RegistryGuid" "DisplayVersion"
   ReadRegStr $PreviousUninstall HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$RegistryGuid" "UninstallString"
   ReadRegStr $PreviousQuietUninstall HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$RegistryGuid" "QuietUninstallString"
   ReadRegStr $PreviousIcon HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$RegistryGuid" "DisplayIcon"
-  Call .onVerifyInstDir
+  Call ValidateInstallDirectory
   Call RecoverInterrupted
-  Call .onVerifyInstDir
+  Call ValidateInstallDirectory
   System::Call 'kernel32::GetCurrentProcessId() i.r0'
   System::Call 'kernel32::GetTickCount() i.r1'
   StrCpy $Stage "$INSTDIR.stage-$0-$1"
   StrCpy $Backup "$INSTDIR.rollback-$0-$1"
   StrCpy $Transaction "$INSTDIR.transaction.ini"
   ; Uma instalação interrompida antes da extração não toca a versão anterior.
+  DetailPrint "Preparando os arquivos da Bolha ${VERSION}..."
   ClearErrors
   SetOutPath "$Stage"
   File /r "${BUNDLE}\*.*"
@@ -245,27 +382,43 @@ Section "Bolha" SEC_MAIN
   StrCpy $OldExists "0"
   ${If} ${FileExists} "$INSTDIR\Bolha.exe"
     StrCpy $OldExists "1"
-    ; Espera o processo que solicitou a atualização fechar, sem matar aplicativos existentes.
+    ; O atualizador encerra a origem; instalação manual orienta quem a deixou na bandeja.
+    DetailPrint "Aguardando a Bolha fechar para liberar os arquivos..."
     StrCpy $2 0
     waitOld:
       ClearErrors
       FileOpen $3 "$INSTDIR\Bolha.exe" a
       ${If} ${Errors}
         IntOp $2 $2 + 1
-        ${If} $2 < 120
-          Sleep 500
-          Goto waitOld
+        ${If} ${Silent}
+          ${If} $2 < 120
+            Sleep 500
+            Goto waitOld
+          ${EndIf}
+        ${Else}
+          ${If} $2 < 8
+            Sleep 500
+            Goto waitOld
+          ${EndIf}
+          MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Os arquivos da Bolha estão em uso ou bloqueados.$\r$\n$\r$\nFeche a Bolha pelo ícone perto do relógio, escolhendo Sair. Depois clique em Repetir para continuar.$\r$\n$\r$\nCancelar preserva a versão instalada e seus dados." IDRETRY retryOld
         ${EndIf}
         RMDir /r "$Stage"
         Delete "$Transaction"
-        Abort "Feche a Bolha e tente novamente. A versão anterior foi preservada."
+        SetErrorLevel 2
+        Abort "A instalação foi cancelada: os arquivos continuam em uso. A versão anterior foi preservada."
       ${EndIf}
       FileClose $3
+      Goto oldClosed
+    retryOld:
+      StrCpy $2 0
+      Goto waitOld
+    oldClosed:
   ${EndIf}
   SetOutPath "$TEMP"
   ; Troca no mesmo volume: o pacote anterior inteiro fica disponível para recuperação.
   ${If} ${FileExists} "$INSTDIR\*.*"
     ClearErrors
+    DetailPrint "Guardando a instalação anterior para recuperação..."
     Rename "$INSTDIR" "$Backup"
     ${If} ${Errors}
       RMDir /r "$Stage"
@@ -274,10 +427,20 @@ Section "Bolha" SEC_MAIN
   ${EndIf}
   RMDir "$INSTDIR" ; Não recursivo: permite destino previamente vazio.
   ClearErrors
+  DetailPrint "Instalando o pacote preparado..."
   Rename "$Stage" "$INSTDIR"
   ${If} ${Errors}
-    Rename "$Backup" "$INSTDIR"
-    Abort "A substituição falhou; a versão anterior foi recuperada."
+    ${If} ${FileExists} "$Backup\Bolha.exe"
+      ClearErrors
+      Rename "$Backup" "$INSTDIR"
+      ${If} ${Errors}
+        Abort "Não foi possível restaurar a versão anterior. O backup e o registro de recuperação foram preservados em $Backup."
+      ${EndIf}
+      Delete "$Transaction"
+      Abort "A substituição falhou. A versão anterior foi recuperada."
+    ${EndIf}
+    Delete "$Transaction"
+    Abort "Não foi possível mover os arquivos preparados para a pasta de destino."
   ${EndIf}
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall Bolha.exe"
@@ -293,7 +456,10 @@ Section "Bolha" SEC_MAIN
     Call OpenBolha
     ${If} $Opened != "1"
       Call Rollback
-      Abort "A nova versão não confirmou a abertura. A instalação anterior foi recuperada."
+      ${If} $RollbackFailed == "1"
+        Abort "A recuperação não pôde ser concluída. Arquivos e registro preservados para nova tentativa."
+      ${EndIf}
+      Abort "A nova versão não confirmou a abertura. A instalação foi cancelada."
     ${EndIf}
   ${EndIf}
   ; Só registra a instalação nova após a confirmação, quando ela foi solicitada.
@@ -326,7 +492,11 @@ Function FinishOpenBolha
   ${Else}
     Call Rollback
     StrCpy $SectionSucceeded "0"
-    MessageBox MB_OK|MB_ICONSTOP "A nova versão não confirmou a abertura. A instalação anterior foi recuperada."
+    ${If} $RollbackFailed == "1"
+      MessageBox MB_OK|MB_ICONSTOP "A recuperação não pôde ser concluída. Arquivos e registro preservados para nova tentativa."
+    ${Else}
+      MessageBox MB_OK|MB_ICONSTOP "A nova versão não confirmou a abertura. A instalação foi cancelada."
+    ${EndIf}
   ${EndIf}
 FunctionEnd
 
@@ -340,6 +510,7 @@ Function OpenBolha
   ${If} $Opened == "1"
     Return
   ${EndIf}
+  DetailPrint "Iniciando a Bolha e aguardando confirmação de abertura (até 60 segundos)..."
   CreateDirectory "$DataRoot"
   Delete "$DataRoot\health.json"
   ; CreateProcess fornece HANDLE para encerrar SOMENTE o processo criado por este instalador.
@@ -399,10 +570,22 @@ Function OpenBolha
 FunctionEnd
 
 Function Rollback
+  StrCpy $RollbackFailed "1"
+  DetailPrint "Recuperando a instalação anterior..."
   SetOutPath "$TEMP"
+  ClearErrors
   Rename "$INSTDIR" "$Stage.failed"
+  ${If} ${Errors}
+    DetailPrint "Os arquivos da nova versão ainda estão em uso. Registro preservado em $Transaction."
+    Return
+  ${EndIf}
   ${If} ${FileExists} "$Backup\Bolha.exe"
+    ClearErrors
     Rename "$Backup" "$INSTDIR"
+    ${If} ${Errors}
+      DetailPrint "Não foi possível restaurar o backup em $Backup. Registro preservado em $Transaction."
+      Return
+    ${EndIf}
     ; Evita ciclo de reinstalação no contrato de adiamento Electron/Python (epochms).
     System::Call 'kernel32::GetSystemTimeAsFileTime(*l.r0)'
     System::Int64Op $0 / 10000
@@ -429,6 +612,7 @@ Function Rollback
     ${EndIf}
   ${EndIf}
   Delete "$Transaction"
+  StrCpy $RollbackFailed "0"
 FunctionEnd
 
 Function un.onInit

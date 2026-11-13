@@ -192,6 +192,8 @@ def test_rebatida_real_do_pingpong_comprime_estica_e_fecha_o_efeito(tmp_path,mon
     stretch=motion.update(game,100.13)
     settled=motion.update(game,100.38)
     assert impact['squash']<-.1 and impact['effect']=='rebatida'
+    assert math.dist(impact['impact_point'], (match.pet_x, match.pet_y)) == pytest.approx(match.pet_radius)
+    assert impact['impact_point'][1] > match.pet_y
     assert stretch['squash']>.1 and stretch['ear_raise']>0.
     local = math.degrees(math.atan2(stretch['gaze'][1],stretch['gaze'][0]))
     assert local+game.body.angle+stretch['angle_offset']==pytest.approx(game.play_reaction['heading'])
@@ -253,6 +255,22 @@ def test_rebatida_do_brinquedo_livre_usa_a_direcao_do_rebote(tmp_path):
     aim=math.degrees(math.atan2(pose['gaze'][1],pose['gaze'][0]))
     assert aim+game.body.angle+pose['angle_offset']==pytest.approx(142.)
     assert pose['effect']=='rebatida'
+
+
+def test_marca_do_contato_fica_na_tela_mesmo_se_a_bolha_mudar_de_pose(tmp_path):
+    game = game_at_rest(tmp_path)
+    point = game.body.x, game.body.y-game.body.half_h
+    game.play_reaction = dict(kind='brinquedo_rebatida', started=100., until=100.42,
+                              intensity=.8, heading=25., impact_point=point, impact_angle=-90.)
+    motion = ExpressionMotion(100.)
+    assert motion.update(game,100.02)['impact_point'] == point
+    game.body.x += 20.
+    game.body.angle = 90.
+    game.landing_reaction = dict(kind='pouso_de_lado', started=100., until=100.3, intensity=.7)
+    pose = motion.update(game,100.1)
+    assert pose['impact_point'] == point and pose['impact_angle'] == -90.
+    assert 0. < pose['impact_strength'] < .8
+    assert 'impact_point' not in motion.update(game,100.28)
 
 
 def test_raiva_visual_responde_a_intensidade_tambem_na_previa():

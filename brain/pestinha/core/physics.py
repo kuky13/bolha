@@ -200,7 +200,9 @@ class Body:
             surface = bottom
             if self.platform is not None:
                 plat = next((p for p in platforms if p[0] == self.platform), None)
-                if plat is None or not (plat[1] <= self.x <= plat[2] - CLOSE_BUTTONS) or abs(plat[3] - self.surface) > 4:
+                # Pequenos arrastos verticais mantêm o apoio, sem teleportar com janelas distantes.
+                if (plat is None or not (plat[1] <= self.x <= plat[2] - CLOSE_BUTTONS)
+                        or abs(plat[3] - self.surface) > max(4., ey)):
                     self.grounded = False
                     self.platform = None
                 else:

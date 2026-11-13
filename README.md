@@ -10,16 +10,16 @@ Bolha. Contribuições da comunidade são bem-vindas.
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Bolha 0.4.4 · Windows x64.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/tag/v0.4.4).
+**Windows x64 e versão inicial para Android.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/latest) · [Modo flutuante e build Android](android/README.md).
 
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.4.4 reúne as configurações na
-**Central da Bolha**, com ajustes detalhados recolhidos e uma aba **Testar**
-para expressões e uma rede neural temporária. Também inclui raquete visível
-no pingue-pongue, corrida que acompanha a direção, contato físico do brinquedo
-e intervalos maiores entre fogos espontâneos.
+A 0.4.10 melhora os balões, libera o brinquedo dos cantos e acrescenta bicudas
+e levantadas. A atualização tem progresso e nova tentativa de download. Também
+é possível abrir pelo código com `python main.py`, como no Pestinha.
+Veja a [validação da versão](docs/VALIDATION-0.4.10.md) e a
+[revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
@@ -31,7 +31,7 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 
 ## O que acompanha
 
-- Carinho, segurar, arrasto direto, soltura por gravidade, giro e pouso sobre janelas.
+- Carinho, segurar, arrasto direto, arremessos, giro e pouso sobre janelas.
 - Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
   olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
@@ -64,8 +64,25 @@ não desliga recursos com base no consumo da interface.
 
 ## Instalação e primeiros passos
 
-Instale o `.exe` da página de versões. O instalador já inclui Python, Qt e o cérebro;
-não é necessário instalar Python separadamente.
+### Rodar pelo código, como no Pestinha
+
+No Windows x64, baixe o **Source code (zip)** da página de versões ou clone o
+repositório. Extraia o ZIP inteiro, abra o terminal na pasta que contém
+`main.py` e execute com Python 3.11:
+
+```powershell
+python -m pip install -r requirements.txt
+python main.py
+```
+
+Se o comando `python` apontar para outra versão, use `py -3.11` no lugar de
+`python` nos dois comandos. Para atualizar pelo código, feche a Bolha, baixe a
+versão nova e rode os comandos na pasta extraída. A Bolha usa o mesmo perfil
+em `%APPDATA%\bolha`. A inicialização com o Windows exige o instalador.
+
+### Instalador Windows
+
+O `.exe` da página de versões já inclui Python, Qt e o cérebro.
 
 ### Como interagir
 
@@ -164,7 +181,7 @@ da OneDrip é necessário.
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-build.txt
-.venv\Scripts\python -m bolha
+.venv\Scripts\python main.py
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python scripts/build_native.py
 ```

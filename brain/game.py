@@ -15,7 +15,7 @@ from pestinha.core.emotion import EmotionState
 from pestinha.core.episodic import EpisodicMemory
 from pestinha.core.conditioning import Conditioning
 from pestinha.core.protesto import Protesto
-from pestinha.core.physics import Body
+from pestinha.core.physics import Body, _area_em, _tem_vizinha, _physical_neighbor
 from pestinha.body.behavior import Behavior
 from pestinha.body.pet_state import PetState
 from pestinha.body.brincadeira import Play
@@ -33,7 +33,7 @@ from pestinha.paths import PetPaths, ConteudoPaths
 from pestinha.store import read_json, write_json, preserve_invalid, clear_protection_after_backup
 from pestinha.scene import set_scene, Ball, FloatingThing
 from pestinha.scene import object_scale
-from geometry import fullscreen_monitors
+from geometry import fullscreen_monitors, visible_window_platforms
 from intelligence import Intelligence
 from pingpong import PingPong
 
@@ -128,6 +128,7 @@ class Game:
         self.prev_distance = None
         self.cursor_toy_near = False
         self.cursor_sample = None
+        self.cursor_path_start = None
         self.cursor_velocity = (0., 0.)
         self.last_toy_push = -1e9
         self.next_toy_attention = 0.
@@ -276,15 +277,15 @@ class Game:
             self.blocked.clear()
             if self.prefs.get('senseWindows', True):
                 windows = []
+                platform_windows = []
                 for hwnd, (left, top, right, _bottom), maximized in native.janelas_visiveis(self.excluded):
                     style = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_STYLE)
                     extended = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_EXSTYLE)
                     if extended & native.win32con.WS_EX_LAYERED:
                         continue
                     windows.append(((left, top, right, _bottom), maximized, bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))))
-                    left, top = self.native_point(left, top)
-                    right, _ = self.native_point(right, _bottom)
-                    if not maximized: self.platforms.append((hwnd, left + 10, right, top))
+                    platform_windows.append((hwnd, (left, top, right, _bottom), maximized))
+                self.platforms = visible_window_platforms(platform_windows, self.displays)
                 self.blocked = fullscreen_monitors(windows, self.displays)
             if self.available_areas():
                 if previous_blocked != self.blocked:
@@ -298,8 +299,8 @@ class Game:
         except Exception as error:
             self.native_error = str(error)
 
-    def interact(self, event):
-        now = time.monotonic()
+    def interact(self, event, *, now=None):
+        now = time.monotonic() if now is None else now
         kind = event.get('type')
         if kind == 'pingpong':
             if self.pingpong is not None:
@@ -434,7 +435,16 @@ class Game:
                             source='explicit_user_command', factors=dict(reason='quiet command'))
             self.intelligence.current_decision = decision
             self.intelligence.history.append(dict(decision))
-        elif kind == 'spin': self.body.omega += max(-500, min(500, event.get('value', 0)))
+        elif kind == 'spin':
+            impulse = max(-500, min(500, event.get('value', 0)))
+            if self.body.held:
+                self.body.angle += impulse / 12.
+            elif impulse:
+                self.body.omega += impulse
+                if abs(self.body.omega) >= 480.:
+                    self.state.dizzy_until = now + .8
+                if self.body.grounded:
+                    self.body.jump(self.body.vx, -250.)
         elif kind == 'sleep':
             self.play.stop_chase()
             self.play_reaction = {}
@@ -458,14 +468,17 @@ class Game:
                     refusal_reason=None if allowed else 'low_energy_or_unwilling_mood',factors=dict(emotion=self.state.emotion,energy=self.drives.energy,neural={'SENTAR':self.rates.get('SENTAR',0.)}))
             self.intelligence.history.append(dict(self.intelligence.current_decision))
         elif kind == 'play':
+            trick = event.get('trick')
+            explicit_trick = trick in ('kick','lift')
             distance = math.dist((self.body.x,self.body.y),(self.ball.body.x,self.ball.body.y))
             allowed = (self.visible() and not self.sleep.asleep and not self.body.held and self.body.grounded
                        and not self.mesa.sentado and not self.behavior.mission and not self.state.protest_stage and self.drives.energy > .2
                        and self.body.upright() and not self.state.castigo and not self.behavior.canto
                        and self.behavior.fuga_alvo is None and not self.state.caressing(now)
-                       and not self.ball_stored and self.ball.isVisible() and not self.ball.dragging and distance <= 220
-                       and self.state.emotion in ('feliz','curioso','contente','bravo'))
-            actions = ['throw'] if self.state.emotion == 'bravo' else ['kick']
+                       and not self.ball_stored and self.ball.isVisible() and not self.ball.dragging
+                       and not self.ball.body.held and distance <= 220
+                       and (explicit_trick or self.state.emotion in ('feliz','curioso','contente','bravo')))
+            actions = [trick] if explicit_trick else ['throw'] if self.state.emotion == 'bravo' else ['kick']
             action = self.intelligence.choose('play_request',actions,rates=self.rates,emotion=self.state.emotion,
                     energy=self.drives.energy,contact=self.drives.contact,duration=1.,source='explicit_user_request') if allowed else None
             if action:
@@ -623,6 +636,8 @@ class Game:
                 speed = math.hypot(match.vx,match.vy)/match.speed_scale
                 self.play_reaction['intensity'] = .62+.38*min(1.,speed/780.)
                 self.play_reaction['heading'] = math.degrees(math.atan2(match.vy,match.vx))
+                self.play_reaction['impact_point'] = match.pet_contact
+                self.play_reaction['impact_angle'] = match.pet_contact_angle
         if now-self.last_save >= 30:
             self.save()
             self.last_save = now
@@ -730,6 +745,7 @@ class Game:
 
     def _reset_cursor_motion(self):
         self.cursor_sample = None
+        self.cursor_path_start = None
         self.cursor_velocity = (0., 0.)
         self.mouse_moved_at = -1e9
         self.cursor_toy_near = False
@@ -742,6 +758,7 @@ class Game:
         prev_cursor, prev_now = self.cursor_sample
         dt = now - prev_now
         if math.dist(self.cursor, prev_cursor) > 1.:
+            self.cursor_path_start = self.cursor_sample if .001 <= dt <= .15 else None
             self.cursor_velocity = (((self.cursor[0] - prev_cursor[0]) / dt,
                                      (self.cursor[1] - prev_cursor[1]) / dt)
                                     if .001 <= dt <= .15 else (0., 0.))
@@ -757,22 +774,34 @@ class Game:
         if not self.prefs.get('senseCursor',True) or not self.visible():
             self._reset_cursor_motion()
             return
+        moved=self._track_cursor(now)
+        previous_sample, self.cursor_path_start = self.cursor_path_start, None
         if (self.panel or self.ball_stored or not self.ball.isVisible()
                 or self.ball.dragging or self.ball.body.held
                 or self.body.held or self.held_since is not None
                 or self.state.pressing or self.scene_dragging):
             self.cursor_toy_near = False
             return
-        moved=self._track_cursor(now)
         radius=self.ball.body.half_w+24
-        near=math.dist(self.cursor,(self.ball.body.x,self.ball.body.y))<radius
+        toy_center = self.ball.body.x, self.ball.body.y
+        near=math.dist(self.cursor,toy_center)<radius
+        contact = self.cursor
+        if not near and moved and previous_sample is not None:
+            previous, sampled_at = previous_sample
+            dx, dy = self.cursor[0] - previous[0], self.cursor[1] - previous[1]
+            length_sq = dx*dx + dy*dy
+            if length_sq > 1. and .001 <= now - sampled_at <= .15:
+                # Testa o trajeto do cursor mesmo quando os dois pontos ficam fora do brinquedo.
+                fraction = ((toy_center[0] - previous[0])*dx + (toy_center[1] - previous[1])*dy) / length_sq
+                fraction = max(0., min(1., fraction))
+                contact = previous[0] + fraction*dx, previous[1] + fraction*dy
         if near and not self.cursor_toy_near and now>=self.next_toy_attention:
             self.senses.kick('NOVELTY',.35)
             self.behavior.look_at(self.ball.body.x,self.ball.body.y,now)
             self.next_toy_attention=now+2.5
-        if near and moved:
+        if moved and math.dist(contact, toy_center) < radius:
             pushed_at = push_from_cursor(
-                self.ball,self.cursor,self.cursor_velocity,now,self.last_toy_push,radius=radius)
+                self.ball,contact,self.cursor_velocity,now,self.last_toy_push,radius=radius,max_speed=620.)
             if pushed_at != self.last_toy_push:
                 self.last_toy_push = pushed_at
                 self.ball.last_handled = now
@@ -820,6 +849,68 @@ class Game:
         self.state.gaze = ((dx*math.cos(angle)+dy*math.sin(angle))/distance,
                            (-dx*math.sin(angle)+dy*math.cos(angle))/distance)
 
+    def _toy_contact_position(self, nx, ny, radius):
+        """Separa os círculos sem prensar o brinquedo contra paredes ou costuras."""
+        pet, toy = self.body, self.ball.body
+        areas = self.available_areas() or self.areas
+        monitors = [m for i, m in enumerate(self.monitors) if i not in self.blocked]
+        displays = [d for i, d in enumerate(self.displays) if i not in self.blocked]
+        source = self.bounds((toy.x, toy.y))
+        ex, ey = toy.extents()
+
+        def open_edge(area, side, coordinate, extent):
+            if displays:
+                return _physical_neighbor(areas, displays, area, side, coordinate) is not None
+            return _tem_vizinha(areas, area, side, coordinate, extent, monitors)
+
+        def fits(point):
+            x, y = point
+            area = _area_em(areas, x, y) or source
+            left, top, right, bottom = area
+            return ((x-ex >= left-1e-7 or open_edge(area, 'left', y, ey))
+                    and (x+ex <= right+1e-7 or open_edge(area, 'right', y, ey))
+                    and (y-ey >= top-1e-7 or open_edge(area, 'top', x, ex))
+                    and (y+ey <= bottom+1e-7 or open_edge(area, 'bottom', x, ex)))
+
+        desired = pet.x+nx*radius, pet.y+ny*radius
+        left, top, right, bottom = source
+        x, y = desired
+        side = (1 if x < left+3*ex and not open_edge(source, 'left', y, ey) else
+                -1 if x > right-3*ex and not open_edge(source, 'right', y, ey) else 0)
+        vertical = (1 if y < top+3*ey and not open_edge(source, 'top', x, ex) else
+                    -1 if y > bottom-3*ey and not open_edge(source, 'bottom', x, ex) else 0)
+        corner = side and vertical and nx*side < 0. and ny*vertical < 0.
+        if not corner and fits(desired):
+            return desired, 0
+        # As tangentes à parede deixam o brinquedo contornar a personagem.
+        candidates = [(pet.x+dx*radius, pet.y+dy*radius)
+                      for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1))]
+        for left, top, right, bottom in areas:
+            for x in (left+ex, right-ex):
+                remainder = radius*radius-(x-pet.x)**2
+                if remainder >= 0:
+                    offset = math.sqrt(remainder)
+                    candidates.extend(((x, pet.y-offset), (x, pet.y+offset)))
+            for y in (top+ey, bottom-ey):
+                remainder = radius*radius-(y-pet.y)**2
+                if remainder >= 0:
+                    offset = math.sqrt(remainder)
+                    candidates.extend(((pet.x-offset, y), (pet.x+offset, y)))
+        valid = [point for point in candidates if fits(point)]
+        if valid:
+            if corner:
+                exits = [p for p in valid if (p[0]-pet.x)*side >= 0. or (p[1]-pet.y)*vertical >= 0.]
+                valid = exits or valid
+            x, y = min(valid, key=lambda p: (round(math.dist(p, desired), 8), p[1]))
+            area = _area_em(areas, x, y) or source
+            if x-ex <= area[0]+1. and not open_edge(area, 'left', y, ey):
+                return (x, y), 1
+            if x+ex >= area[2]-1. and not open_edge(area, 'right', y, ey):
+                return (x, y), -1
+            return (x, y), 0
+        # Só ocorre se não houver espaço para os dois círculos na área útil.
+        return (toy.x, toy.y), 0
+
     def _toy_contact(self, previous_pet, previous_toy, now):
         """O contato circular reflete o brinquedo, inclusive entre dois quadros."""
         pet, toy = self.body, self.ball.body
@@ -834,6 +925,7 @@ class Game:
         delta = end[0]-start[0],end[1]-start[1]
         distance = math.hypot(*end)
         normal = end
+        impact_center = pet.x, pet.y
         if math.hypot(*start)>radius:
             a = delta[0]**2+delta[1]**2
             b = 2.*(start[0]*delta[0]+start[1]*delta[1])
@@ -845,18 +937,39 @@ class Game:
             if not 0.<=contact<=1.:
                 return
             normal = start[0]+delta[0]*contact,start[1]+delta[1]*contact
+            impact_center = (previous_pet[0] + (pet.x-previous_pet[0])*contact,
+                             previous_pet[1] + (pet.y-previous_pet[1])*contact)
         elif distance>=radius:
             return
         length=math.hypot(*normal)
         nx,ny=(normal[0]/length,normal[1]/length) if length>1e-8 else (1.,0.)
-        toy.x,toy.y=pet.x+nx*(radius+.5),pet.y+ny*(radius+.5)
-        incoming=(toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny
+        impact_point = impact_center[0] + nx*pet.half_w, impact_center[1] + ny*pet.half_w
+        impact_angle = math.degrees(math.atan2(ny, nx))
+        incoming = (toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny
+        old_position = toy.x, toy.y
+        (toy.x, toy.y), inward = self._toy_contact_position(nx, ny, radius+.5)
+        separation = math.hypot(toy.x-pet.x, toy.y-pet.y)
+        if separation > 1e-8:
+            nx, ny = (toy.x-pet.x)/separation, (toy.y-pet.y)/separation
+        if math.dist(old_position, (toy.x, toy.y)) > .01:
+            toy.grounded = False
+            toy.platform = None
+        # A parede muda a saída, mas conserva o impulso do contato inicial.
+        incoming = min(incoming, (toy.vx-pet.vx)*nx+(toy.vy-pet.vy)*ny)
         if incoming<0.:
             restitution=.78 if incoming < -80. else 0.
             toy.vx-=(1.+restitution)*incoming*nx
             toy.vy-=(1.+restitution)*incoming*ny
             toy.grounded=False;toy.platform=None
-        self.fit(toy,margin=0.)
+        if inward and abs(ny) > .35:
+            # Sem velocidade tangente, a gravidade devolve o brinquedo à mesma fresta.
+            tangent_speed = inward * 380.
+            toy.vx = tangent_speed * abs(ny) + nx * 50.
+            toy.vy = -tangent_speed * nx * math.copysign(1., ny) + ny * 50.
+            if ny < 0.:
+                toy.vy -= 190.  # Dá tempo de passar sobre a Bolha antes de cair.
+            toy.grounded = False
+            toy.platform = None
         self.ball.place()
         if incoming>=-90.:
             return
@@ -872,7 +985,8 @@ class Game:
         self.play_reaction=dict(kind='brinquedo_rebatida' if playing else 'brinquedo_susto',
                                 started=now,until=now+(.42 if playing else .75),
                                 intensity=max(.35,strength),
-                                heading=math.degrees(math.atan2(toy.vy,toy.vx)))
+                                heading=math.degrees(math.atan2(toy.vy,toy.vx)),
+                                impact_point=impact_point, impact_angle=impact_angle)
         self._look_at_point((toy.x,toy.y))
 
     def _play_expression(self,now):
@@ -905,7 +1019,9 @@ class Game:
             intensity=max(.35,min(1.,self.behavior.play_pull+self.state.tone.r.get('CHEER',0)*.3))
             self.play_reaction=dict(kind=kind,started=now,until=now+duration,intensity=intensity)
             if kind=='brinquedo_rebatida':
-                self.play_reaction['heading']=math.degrees(math.atan2(self.ball.body.vy,self.ball.body.vx))
+                pet, toy = self.body, self.ball.body
+                self.play_reaction['heading'] = math.degrees(math.atan2(toy.vy, toy.vx))
+                self.play_reaction['impact_angle'] = math.degrees(math.atan2(toy.y-pet.y, toy.x-pet.x))
             self.next_play_scene=now+12
 
     def reset_learning(self):
@@ -968,8 +1084,13 @@ class Game:
             self.intelligence.clear_goal()
             self.behavior.adaptive_goal = None
         if now-self.last_metrics >= 30:
-            import psutil
-            self.app_rss_mib = psutil.Process().memory_info().rss/1048576
+            try:
+                import psutil
+            except ModuleNotFoundError:
+                # Android does not package the optional desktop RSS probe.
+                self.app_rss_mib = 0.
+            else:
+                self.app_rss_mib = psutil.Process().memory_info().rss/1048576
             import numpy as np
             self.brain_array_mib = sum(v.nbytes for v in vars(self.brain).values() if isinstance(v,np.ndarray) and v.base is None)/1048576
             self.last_metrics = now

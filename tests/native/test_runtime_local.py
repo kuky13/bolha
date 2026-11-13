@@ -49,16 +49,22 @@ def test_aviso_automatico_de_update_preserva_foco_e_adia(qt_application):
     from PySide6.QtWidgets import QPushButton
     from bolha.app import NativeApp
     deferred=[]
-    controller=SimpleNamespace(update_dialog=None,updater=SimpleNamespace(defer=lambda:deferred.append('deferred')))
+    installed=[]
+    controller=SimpleNamespace(update_dialog=None,updater=SimpleNamespace(
+        state={'version':'0.4.10'}, defer=lambda:deferred.append('deferred'),
+        install=lambda:installed.append(True)))
     NativeApp.show_update_countdown(controller,30)
     dialog=controller.update_dialog
     assert dialog.windowFlags()&Qt.WindowType_Mask==Qt.Tool
-    assert dialog.windowFlags()&Qt.WindowStaysOnTopHint
+    assert not dialog.windowFlags()&Qt.WindowStaysOnTopHint
     assert dialog.testAttribute(Qt.WA_ShowWithoutActivating)
-    assert '30 segundos' in controller.update_label.text()
+    assert '0.4.10' in controller.update_label.text() and '30 s.' in controller.update_label.text()
     NativeApp.show_update_countdown(controller,17)
-    assert controller.update_dialog is dialog and '17 segundos' in controller.update_label.text()
-    dialog.findChild(QPushButton).click()
+    assert controller.update_dialog is dialog and '17 s.' in controller.update_label.text()
+    buttons={button.text():button for button in dialog.findChildren(QPushButton)}
+    buttons['Instalar agora'].click()
+    assert installed==[True]
+    buttons['Adiar por uma hora'].click()
     assert deferred==['deferred']
     dialog.close()
     assert deferred==['deferred','deferred']  # fechar o aviso também adia

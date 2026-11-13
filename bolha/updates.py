@@ -4,6 +4,7 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
 import hashlib
+from http.client import IncompleteRead, RemoteDisconnected
 import json
 import logging
 import os
@@ -12,7 +13,7 @@ import re
 import threading
 import time
 import uuid
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -44,6 +45,10 @@ LOG.propagate = False
 
 
 class UpdateCancelled(Exception):
+    pass
+
+
+class DownloadInterrupted(OSError):
     pass
 
 
@@ -90,8 +95,14 @@ class Transport:
         validate_url(url, self.test_base)
         if self.cancelled.is_set():
             raise UpdateCancelled()
-        response = self.opener.open(Request(url, headers={'User-Agent': 'Bolha-native-updater',
-                                                         'Accept': 'application/vnd.github+json'}), timeout=15)
+        request = Request(url, headers={'User-Agent': 'Bolha-native-updater',
+                                        'Accept': 'application/vnd.github+json'})
+        try:
+            response = self.opener.open(request, timeout=15)
+        except URLError as error:
+            if isinstance(error.reason, (TimeoutError, ConnectionResetError)):
+                raise DownloadInterrupted('Conexão interrompida durante a transferência.') from error
+            raise
         validate_url(response.geturl(), self.test_base)
         return response
 
@@ -124,12 +135,13 @@ class Transport:
                     target.write(chunk); digest.update(chunk)
                     if progress: progress(size / release.size * 100)
                 target.flush(); os.fsync(target.fileno())
-            if size != release.size or digest.hexdigest() != release.sha256:
+            if size != release.size:
+                raise DownloadInterrupted('A integridade do instalador não confere: download interrompido.')
+            if digest.hexdigest() != release.sha256:
                 raise ValueError('A integridade do instalador não confere.')
         except BaseException:
             if created: Path(output).unlink(missing_ok=True)
             raise
-
 
 def parse_checksums(content):
     checksums = {}
@@ -216,7 +228,15 @@ def fetch_update(transport, current_version, data_dir, cache_root, progress=None
     except (OSError, ValueError):
         part = installer.with_name(installer.name + '.' + uuid.uuid4().hex + '.part')
         try:
-            transport.download(release, part, progress)
+            for attempt in range(2):
+                try:
+                    transport.download(release, part, progress)
+                    break
+                except (DownloadInterrupted, IncompleteRead, RemoteDisconnected, TimeoutError, ConnectionResetError):
+                    if attempt:
+                        raise
+                    if progress:
+                        progress(0.)
             os.replace(part, installer)
         finally:
             part.unlink(missing_ok=True)
@@ -347,6 +367,9 @@ class Updater(QObject):
         if error:
             if isinstance(error, UpdateCancelled): return
             LOG.warning('Atualização: %s', error)
+            if kind == 'resume':
+                self.check()
+                return
             if kind == 'flushed': self.on_recover()
             self._send({'phase': 'error', 'message': 'Não foi possível atualizar agora. Você pode continuar usando a Bolha.'})
             return
@@ -381,10 +404,13 @@ class Updater(QObject):
 
     def healthy(self):
         # O chamador já confirmou o primeiro desenho e um ciclo saudável do cérebro.
+        import sys
+        if not getattr(sys, 'frozen', False):
+            return
+
         def cleanup():
             cleaned = cleanup_applied_update(self.data_dir, self.version, self.cache_root)
-            import sys
-            if cleaned and getattr(sys, 'frozen', False):
+            if cleaned:
                 return cleanup_recovery(self.data_dir, Path(sys.executable).parent, self.version)
             return cleaned
         self._background('cleanup', cleanup)

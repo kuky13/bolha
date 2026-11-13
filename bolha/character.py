@@ -138,7 +138,7 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     p.setClipPath(clip, Qt.IntersectClip)
     p.setBrush(Qt.NoBrush)
     p.setPen(_pen(width=2.5*detail))
-    # O rosto frontal é simétrico. Ao olhar de lado, o olho mais próximo se abre um pouco.
+    # O olhar desloca o par; as dimensões permanecem iguais, inclusive de perfil.
     profiles = {
         'observando': (5.2, 6.4, 0.0, 0.0, 0.0),
         'contente':   (5.2, 6.0, 0.0, 2.0, .4),
@@ -182,9 +182,8 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     for side in (-1, 1):
         individual = blink_left if side < 0 else blink_right
         closing_eye = closing if individual is None else max(closing,_clamp(individual,0,1))
-        turn = side*gx
         x = side*18*(1.-.12*abs(gx))+gx*7.1
-        y = eye_y+gy*3.6+.65*turn*gy
+        y = eye_y+gy*3.6
         if closing_eye > .94 or emotion == 'feliz' and not intentional:
             happy = emotion == 'feliz' and closing_eye <= .94
             eye = QPainterPath(QPointF(x - 5.3, y + (2 if happy else -1)))
@@ -210,8 +209,8 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
             p.setBrush(QColor(GOLD))
             p.drawPath(eye)
         else:
-            width = rx*(1.+.16*turn)
-            height = (ry * (1 - closing_eye) * max(1.0, opening) + .7 * closing_eye)*(1.+.07*turn)
+            width = rx
+            height = ry * (1 - closing_eye) * max(1.0, opening) + .7 * closing_eye
             eye = QPainterPath()
             eye.addEllipse(QPointF(x, y), width, height)
             if emotion in ('bravo', 'triste', 'entediado', 'sonolento', 'travesso'):
@@ -371,7 +370,7 @@ def _draw_pop_marks(painter, phase, strength):
 
 
 def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', strength=1.0,
-                        angle=0.0, squash=0.0, effect_angle=0.0):
+                        angle=0.0, squash=0.0, effect_angle=0.0, *, at_contact=False):
     """Marcas decorativas presas à pose do corpo, sem hitbox."""
     strength = _clamp(strength, 0, 1)
     if strength == 0 or kind not in ('carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida', 'pop'): return
@@ -439,7 +438,7 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
         painter.rotate(math.degrees(math.atan2(math.sin(direction)/(1.-deformation),
                                                math.cos(direction)/(1.+deformation))))
         progress = _clamp(phase/.24,0.,1.)
-        x, height = 47.+6.*progress, 7.+4.*progress
+        x, height = (-2. if at_contact else 47.)+6.*progress, 7.+4.*progress
         arc = QPainterPath(QPointF(x-2.,-height))
         arc.quadTo(x+7.,0.,x-2.,height)
         painter.setBrush(Qt.NoBrush)

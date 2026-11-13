@@ -33,6 +33,8 @@ class PingPong:
         self._serve_sign = 1
         self._reaction_delay = 0.
         self._last_cursor = None
+        self.pet_contact = None
+        self.pet_contact_angle = 0.
 
     def clear_pointer(self):
         """Retomar uma partida começa com a posição atual do ponteiro."""
@@ -113,6 +115,9 @@ class PingPong:
                 radius = self.pet_radius+self.toy_radius
                 dy = self.ball_y-self.pet_y
                 self.ball_x = self.pet_x + math.sqrt(max(0., radius**2-dy**2))
+                nx, ny = (self.ball_x-self.pet_x)/radius, dy/radius
+                self.pet_contact = (self.pet_x+nx*self.pet_radius, self.pet_y+ny*self.pet_radius)
+                self.pet_contact_angle = math.degrees(math.atan2(ny, nx))
                 self._bounce_from(dy/self.pet_radius,1)
                 self.rally += 1
                 self.best = max(self.best, self.rally)

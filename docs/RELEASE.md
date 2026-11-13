@@ -1,20 +1,12 @@
-# Bolha 0.4.4
+# Bolha 0.4.10
 
-A Bolha agora está publicada como fork comunitário do Pestinha. Esta versão
-registra no código, no README e nos avisos os créditos a mille-okws e aos
-contribuidores do projeto original.
+- Balões compactos com texto inteiro e posicionamento que evita cobrir o brinquedo quando há espaço.
+- Atualizações com progresso, opção de instalar agora e nova tentativa quando a transferência é interrompida. Um instalador pendente inválido provoca nova consulta ao GitHub.
+- Bobinho, bicudas, levantadas e efeito de impacto no ponto de contato. A bola e o amendoim se soltam dos cantos.
+- Balanço ao digitar e giro inspirado no Pestinha, com créditos ao projeto original.
+- Execução pelo código-fonte com Python 3.11, como no Pestinha.
+- Versão Android com brincadeiras por toque, o mesmo código do cérebro, modo flutuante autorizado nas configurações do aparelho e vibração opcional.
 
-O código, as artes, os ícones, os memes e as animações próprias da Bolha usam
-GPL-3.0-or-later. Os guias privados de referência da Drippy não fazem parte do
-repositório nem dos arquivos desta publicação. Dependências de terceiros
-mantêm as próprias licenças, listadas em `packaging/THIRD-PARTY-NOTICES.txt`.
+No Windows, abra **Central da Bolha → App → Verificar atualizações**. O instalador Windows x64 é distribuído sem assinatura digital.
 
-A Bolha 0.4.4 mantém o comportamento da 0.4.3: a Central da Bolha, o teste de
-expressões e sinais, a raquete de pingue-pongue, a corrida direcional e as
-interações com o amendoim e a bolinha.
-
-Na 0.4.3, use **Central da Bolha → App → Verificar atualizações** para receber
-esta versão. O canal publica no repositório `kuky13/bolha`.
-
-O instalador Windows x64 é distribuído sem assinatura digital. A validação
-automatizada do instalador e da atualização acompanha os arquivos da release.
+Para rodar pelo código, baixe **Source code (zip)**, extraia e siga as instruções do [README](https://github.com/kuky13/bolha/blob/v0.4.10/README.md#rodar-pelo-código-como-no-pestinha).

@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import sys
 
-VERSION = '0.4.4'
+VERSION = '0.4.10'
 if getattr(sys, 'frozen', False):
     value = json.loads((Path(sys._MEIPASS) / 'bolha-version.json').read_text(encoding='utf-8'))
     if not isinstance(value, dict) or not re.fullmatch(r'\d+\.\d+\.\d+', str(value.get('version', ''))):

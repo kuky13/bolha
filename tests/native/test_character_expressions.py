@@ -74,6 +74,15 @@ def test_arco_da_rebatida_mantem_direcao_apos_deformar(qt_application,heading,an
     assert math.degrees(math.atan2(y,x))==pytest.approx(heading,abs=1.)
 
 
+@pytest.mark.parametrize('angle', [0., -90., 137.])
+def test_arco_de_contato_nasce_na_coordenada_informada(qt_application, angle):
+    pixels = render(draw_reaction_marks, kind='rebatida', angle=angle, at_contact=True)
+    ys, xs = np.nonzero(pixels[:,:,3])
+    assert len(xs)
+    assert np.min(np.hypot(xs+.5-160., ys+.5-160.)) < 2.
+    assert np.max(np.hypot(xs+.5-160., ys+.5-160.)) < 15.
+
+
 @pytest.mark.parametrize('kind', ['carinho', 'tonto', 'bravo', 'perseguindo', 'comemorando', 'rebatida'])
 def test_reaction_marks_move_fade_and_fit_visual_window(qt_application, kind):
     assert not render(draw_reaction_marks, kind=kind, strength=0).any()

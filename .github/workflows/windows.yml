@@ -4,6 +4,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
+      installer_ui_only:
+        description: 'Testar somente o assistente NSIS com payload descartável, sem compilar/publicar aplicativo'
+        type: boolean
+        default: false
       publish_release:
         description: 'Publicar a versão somente após todos os testes (inclui migrações legadas)'
         type: boolean
@@ -37,8 +41,12 @@ jobs:
             requirements-build.txt
       - name: Dependências nativas e testes
         run: |
-          python -m pip install -r requirements-build.txt
-          python -m pytest -q
+          if ('${{ inputs.installer_ui_only }}' -eq 'true') {
+            python -m pip install psutil==7.2.2 pywin32==311
+          } else {
+            python -m pip install -r requirements-build.txt
+            python -m pytest -q
+          }
         env:
           QT_QPA_PLATFORM: offscreen
       - name: Versão e fixture seguinte
@@ -50,13 +58,29 @@ jobs:
           "BOLHA_VERSION=$bolhaVersion" >> $env:GITHUB_ENV
           "BOLHA_NEXT_VERSION=$bolhaNext" >> $env:GITHUB_ENV
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$bolhaVersion") { throw 'A tag diverge da versão do código.' }
+          if ('${{ inputs.installer_ui_only }}' -eq 'true' -and '${{ inputs.publish_release }}' -eq 'true') { throw 'A fixture do assistente não pode ser publicada.' }
+      - name: Assistente rápido com payload descartável
+        if: inputs.installer_ui_only
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          python scripts/build_installer_fixture.py
+          python scripts/test_windows_directory.py --installer "validation/installer-ui-fixture/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --output validation/windows-directory/report.json
       - name: Compilar e auditar pacote Python/Qt
+        if: ${{ !inputs.installer_ui_only }}
         run: python scripts/build_native.py
+      - name: Assistente de pasta e reinstalação manual
+        if: ${{ !inputs.installer_ui_only }}
+        timeout-minutes: 8
+        shell: pwsh
+        run: python scripts/test_windows_directory.py --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --output validation/windows-directory/report.json
       - name: Empacotar fixture de atualização sem recompilar o aplicativo
+        if: ${{ !inputs.installer_ui_only }}
         shell: pwsh
         run: |
           python scripts/build_native.py --version $env:BOLHA_NEXT_VERSION --output validation/update-feed --reuse-bundle "build/$($env:BOLHA_VERSION)/dist/Bolha"
       - name: Instalação, atualização, recuperação e métricas Windows
+        if: ${{ !inputs.installer_ui_only }}
         timeout-minutes: 9
         shell: pwsh
         run: |
