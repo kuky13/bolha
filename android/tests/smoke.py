@@ -151,13 +151,13 @@ def smoke(apk, output):
         wait_for('remoção das duas janelas', lambda: all(
             name not in windows() for name in ('BolhaMascote', 'BolhaBrinquedo')))
         control('470 neurônios')
-        paused_at = time.time()
+        memory_path = 'files/memory/bolha/nervous.json'
+        previous_save = wait_for('memória inicial disponível', lambda: saved_memory(memory_path, 0))
         adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
         wait_for('memória gravada', lambda: b'"x"' in adb(
             'shell', 'run-as', PACKAGE, 'cat', 'files/memory/position.json', check=False))
-        memory_path = 'files/memory/bolha/nervous.json'
         before = wait_for('gravação concluída antes de encerrar o processo', lambda:
-                          saved_memory(memory_path, paused_at))
+                          saved_memory(memory_path, previous_save['saved_at']))
         assert before['seed'] == 1313
         adb('shell', 'am', 'force-stop', PACKAGE)
         assert not adb('shell', 'pidof', PACKAGE, check=False).strip()
@@ -175,6 +175,8 @@ def smoke(apk, output):
         (output / 'logcat.txt').write_bytes(adb('logcat', '-d', check=False))
         (output / 'janelas.txt').write_text(windows(), encoding='utf-8')
         (output / 'atividades.txt').write_bytes(adb('shell', 'dumpsys', 'activity', 'activities'))
+        (output / 'memoria-final.json').write_bytes(adb('shell', 'run-as', PACKAGE,
+            'cat', 'files/memory/bolha/nervous.json', check=False))
         adb('shell', 'uiautomator', 'dump', WINDOW_XML, check=False)
         (output / 'interface.xml').write_bytes(adb('exec-out', 'cat', WINDOW_XML, check=False))
         if not (output / 'flutuante.png').exists():
