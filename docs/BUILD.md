@@ -91,6 +91,10 @@ A publicação manual recusa uma tag existente; a criação de uma release exist
 falha sem sobrescrever arquivos. Não há `--clobber`, retag ou promoção de arquivos
 de outro commit. Um erro durante a própria publicação deve ser inspecionado antes
 de repetir, pois a API pode ter criado parte do resultado antes de uma falha de rede.
+Se todos os testes passaram e a API recusou somente a publicação, baixe o artefato
+`bolha-windows-<SHA>` da execução, confira `SHA256SUMS.txt` e publique esses mesmos
+arquivos no SHA da execução. Se o GitHub iniciar uma segunda compilação ao criar
+a tag, cancele essa execução duplicada após conferir o SHA e os arquivos públicos.
 A execução por tag permanece disponível e confere a identidade do commit remoto.
 
 O passo usa somente `github.token` como `GH_TOKEN`. Segundo a [documentação do
