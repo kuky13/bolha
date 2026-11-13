@@ -76,14 +76,15 @@ class MischiefEngine:
         """Ações que as regras permitem agora (a memória escolhe entre elas)."""
         if emotion == "dormindo":
             return []                                   # dormindo, nem pensar
+        notes_allowed = perms["bilhetes"] and not self.has_note()
         if emotion == "triste":                         # triste só cola bilhetes tristes
-            return ["bilhete_triste", "nada"] if perms["bilhetes"] and self.notes_sad.has_lines() else []
+            return ["bilhete_triste", "nada"] if notes_allowed and self.notes_sad.has_lines() else []
         online = perms.get("online_reactions", self.online_reactions)
         if working:                                     # programando sem estar sentado: meme de trabalho
             trabalho = perms["memes"] and online
             return ["meme_trabalho", "nada"] if trabalho else []
         memes = perms["memes"] and online
-        notes = perms["bilhetes"] and self.notes.has_lines()
+        notes = notes_allowed and self.notes.has_lines()
         if emotion == "bravo":
             options = ((["meme_canto", "meme"] if memes else []) + (["bilhete_canto"] if notes else []))
             return options + ["nada"] if options else []
@@ -99,10 +100,13 @@ class MischiefEngine:
             ("cross", None)      atravessa a tela e não faz nada
             None                 nada
         """
-        if action in ("meme_canto", "bilhete_canto"):
+        if action.startswith("bilhete"):
+            thing = self._make(action, emotion, small=action == "bilhete_canto")
+            return ("note", thing) if thing else None
+        if action == "meme_canto":
             thing = self._make(action.split("_")[0], emotion, small=True)
             return ("corner", thing) if thing else None
-        if action in ("meme", "meme_trabalho", "foto", "bilhete", "bilhete_triste"):
+        if action in ("meme", "meme_trabalho", "foto"):
             thing = self._make(action, emotion, small=False)
             return ("deliver", thing) if thing else None
         if action == "atravessar":
@@ -158,6 +162,38 @@ class MischiefEngine:
         return thing
 
     # ---------------- colocação ----------------
+
+    def has_note(self):
+        return any(thing.kind == 'note' for thing in self.things)
+
+    def show_note(self, thing, body, bounds, cursor, now):
+        """Keep one short note near the pet and inside its monitor."""
+        if self.has_note():
+            thing.deleteLater()
+            return False
+        left, top, right, bottom = bounds
+        hw, hh = thing.width()/2, thing.height()/2
+        _, ey = body.extents()
+        x0, y0 = body.x, body.y
+        candidates = [(x0+dx, y0+side*(ey+hh+9))
+                      for side in (-1, 1) for dx in (0, hw*.7, -hw*.7)]
+        for x, y in candidates:
+            x = max(left+hw+8, min(right-hw-8, x))
+            y = max(top+hh+8, min(bottom-hh-8, y))
+            if (left <= x-hw and x+hw <= right and top <= y-hh and y+hh <= bottom
+                    and abs(y-y0) >= ey+hh
+                    and all(abs(x-other.x) >= hw+other.width()/2 or abs(y-other.y) >= hh+other.height()/2
+                            for other in self.things)
+                    and (abs(x-cursor[0]) > hw+8 or abs(y-cursor[1]) > hh+8)):
+                thing.expires_at += now-thing.born
+                thing.born = now
+                thing.anchor = .5 + (x0-x)/(2*hw)
+                thing.tail_top = y > y0
+                thing.place(x, y)
+                self._add(thing)
+                return True
+        thing.deleteLater()
+        return False
 
     def show_in_corner(self, thing, bounds, cursor):
         """Põe o objeto num canto da tela (travessura 'de revolta')."""

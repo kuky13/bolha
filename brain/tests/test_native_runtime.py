@@ -101,7 +101,7 @@ def test_renderer_sem_boca_contido_em_todos_os_angulos(qapp):
         for emotion in EMOTIONS:
             for blink in (0,1):
                 image=QImage(160,160,QImage.Format_ARGB32);image.fill(0)
-                p=QPainter(image);draw_character(p,80,80,angle=angle,emotion=emotion,blink=blink);p.end()
+                p=QPainter(image);draw_character(p,80,80,angle=angle,emotion=emotion,blink=blink,mouth_enabled=False);p.end()
                 for y in range(160):
                     for x in range(160):
                         c=image.pixelColor(x,y)
@@ -109,7 +109,7 @@ def test_renderer_sem_boca_contido_em_todos_os_angulos(qapp):
                             assert math.hypot(x-80,y-80)<44.5
     # Região inferior local deve permanecer sem geometria dourada (sem boca).
     image=QImage(160,160,QImage.Format_ARGB32);image.fill(0)
-    p=QPainter(image);draw_character(p,80,80);p.end()
+    p=QPainter(image);draw_character(p,80,80,mouth_enabled=False);p.end()
     assert not any((c:=image.pixelColor(x,y)).red()>180 and c.green()>110 and c.blue()<150 for y in range(91,120) for x in range(45,116))
 
 def test_piscadinha_fechamento_sustentado_e_reset():

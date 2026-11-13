@@ -2,7 +2,7 @@
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Expressões visuais no relógio já existente; nunca modifica o corpo físico."""
 import math
-from .character import WINK_DURATION, wink_state
+from .facial_motion import WINK_DURATION, wink_state, mouth_state
 
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
@@ -19,6 +19,10 @@ def _ease(value):
     return value * value * (3 - 2 * value)
 
 
+def _mouth_pulse(t, duration, attack=.08):
+    return _ease(t/attack) * (1.-_ease((t-attack)/(duration-attack)))
+
+
 def animation_pose(mode, seconds, strength=1.):
     """Quadro determinístico compartilhado pelo aplicativo e pelas prévias Qt.
 
@@ -31,7 +35,40 @@ def animation_pose(mode, seconds, strength=1.):
                 angle_offset=0., zzz_strength=0., zzz_phase=t,
                 effect=None, effect_strength=0., effect_phase=t, effect_angle=0., anger=0.,
                 body_opacity=1.,visual_scale=1.)
-    if mode == 'held':
+    if mode == 'cursor_approach':
+        pose.update(emotion='travesso', eye_open=.83, ear_tilt=-7., ear_raise=1.,
+                    angle_offset=3. * math.sin(t * 3.), mouth_curve=.75)
+    elif mode == 'cursor_pounce':
+        pose.update(emotion='atento', eye_open=1.2, ear_raise=2.7,
+                    squash=-.15 * strength, mouth_open=.44*_mouth_pulse(t,.23),
+                    mouth_curve=.6)
+    elif mode == 'cursor_swallow':
+        progress = _unit(t / .32)
+        pose.update(emotion='travesso', eye_open=1.15-.3*progress, ear_raise=2.,
+                    squash=.11*math.sin(progress*math.pi), mouth_open=1.-_ease(progress),
+                    mouth_curve=.6, cursor_inside=progress < .65)
+    elif mode == 'cursor_chew':
+        chew = .5 + .5 * math.sin(t * math.tau * 2.7)
+        pose.update(emotion='travesso', eye_open=.7, ear_tilt=4.*math.sin(t*5.),
+                    squash=.045*math.sin(t*math.tau*2.7), mouth_open=0.,
+                    mouth_curve=.15+.28*chew, mouth_chew=chew, mouth_width=.84+.18*chew,
+                    mouth_skew=.22*math.sin(t*math.tau*2.7))
+    elif mode == 'cursor_spit':
+        progress = _unit(t / 1.35)
+        pulse = math.sin(math.pi * _unit(t / .35)) if t < .35 else 0.
+        pose.update(emotion='tonto', eye_open=.55+.3*progress,
+                    ear_raise=-2.8*(1.-progress), ear_tilt=12.*math.sin(t*13.)*(1.-progress),
+                    angle_offset=9.*math.sin(t*12.)*(1.-progress),
+                    squash=.13*pulse, mouth_open=.78*_mouth_pulse(t,.32,.04), mouth_curve=-.7,
+                    tongue=.75*pulse,
+                    cursor_spit=_unit(t/.35) if t < .35 else 0.,
+                    effect='tonto', effect_strength=.55*(1.-progress))
+    elif mode == 'cursor_recover':
+        recovery = 1.-_unit(t)
+        pose.update(emotion='contente', mouth_curve=-.25*recovery,
+                    ear_raise=-1.2*recovery,
+                    angle_offset=2.5*math.sin(t*7.)*recovery)
+    elif mode == 'held':
         irritation = _ease((t - .7) / 3.)
         rage = _ease((t - 1.1) / 2.6) * (.55 + .45 * strength)
         pulse = .88 + .12 * math.sin(t * 14)
@@ -239,6 +276,26 @@ def animation_pose(mode, seconds, strength=1.):
     elif mode in ('contente', 'feliz', 'timido', 'observando', 'dramatico'):
         pose.update(ear_raise=.7 * math.sin(t * 3.2), squash=.025 * math.sin(t * 3),
                     angle_offset=1.5 * math.sin(t * 2))
+    for key, value in mouth_state(pose['emotion']).items():
+        pose.setdefault(key, value)
+    if mode in ('caress', 'feliz', 'comemorando'):
+        pose['mouth_open'] = (.2 if mode != 'comemorando' else .38)*_mouth_pulse(t,.46)*strength
+    elif mode in ('assustado', 'airborne', 'impact', 'brinquedo_susto'):
+        pose['mouth_open'] = .43*_mouth_pulse(t,.32,.04)*strength
+        pose['mouth_width'] = .68
+    elif mode == 'doze':
+        pose['mouth_open'] = .32*_mouth_pulse(t-.22,.56,.12)
+        pose['mouth_width'] = .73
+    elif mode in ('hiccup', 'sneeze'):
+        pose['mouth_open'] = .38*min(1., pulse if mode == 'hiccup' else burst)
+        pose['mouth_width'] = .6
+    elif mode == 'held':
+        pose['mouth_open'] = .15*_mouth_pulse(t,.26,.04)
+        pose['mouth_width'] = .9+.18*irritation
+    elif mode in ('wink', 'cursor_approach'):
+        pose['mouth_skew'] = .34*_mouth_pulse(t,.96,.16) if mode == 'wink' else .3
+    elif mode in ('sleeping', 'dormindo', 'timido', 'pop_return'):
+        pose['mouth_width'] = .72
     pose['squash'] = max(-.25, min(.25, pose['squash']))
     return pose
 
@@ -277,12 +334,15 @@ class ExpressionMotion:
         landing_reaction = getattr(game, 'landing_reaction', None) or {}
         play_reaction = getattr(game, 'play_reaction', None) or {}
         pop_age = game.pop_effect_age(now)
+        prank = getattr(game, 'cursor_prank', None)
         if pop_age is not None:
             mode='pop';elapsed=pop_age
         elif held:
             mode = 'held';elapsed = now - self.held_since
             # A irritação neural acelera o gesto; o relógio só interpola seus quadros.
             strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
+        elif prank is not None and prank.active:
+            mode='cursor_'+prank.phase;elapsed=now-prank.started;strength=prank.intensity
         elif arriving:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since
@@ -307,7 +367,8 @@ class ExpressionMotion:
         elif (game.pingpong is None and body.grounded and body.upright() and abs(body.vx)>35.
               and mode in ('observando','contente','curioso','feliz','entediado','atento','neutro')):
             mode='correndo'
-        running = mode in ('correndo','brinquedo_perseguindo') and body.grounded and abs(body.vx)>35.
+        running = (mode in ('correndo','brinquedo_perseguindo') and body.grounded
+                   and body.upright() and abs(body.vx)>35.)
         if running:
             strength=_unit(abs(body.vx)/360.)
             elapsed=self.run_phase
@@ -329,6 +390,11 @@ class ExpressionMotion:
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if (prank is not None and prank.angry_attempt
+                and mode in ('cursor_approach','cursor_pounce','cursor_swallow','cursor_chew')):
+            self.pose.update(emotion='bravo', anger=max(.72, tones['ANGRY']),
+                             eye_open=min(.8,self.pose['eye_open']),
+                             ear_raise=min(-1.8,self.pose['ear_raise']), mouth_curve=-.55)
         if state.at_desk and not held and not game.sleep.asleep:
             # Balanço de digitação do Pestinha (0d1ac98), aplicado só ao desenho.
             self.pose['angle_offset'] += 1.8 * math.sin(now * math.tau * 2.4)
@@ -339,10 +405,12 @@ class ExpressionMotion:
         if running:
             direction=math.copysign(1.,body.vx)
             heading=0. if direction>0 else 180.
-            self.pose['angle_offset']*=direction
-            local_angle=math.radians(heading-body.angle-self.pose['angle_offset'])
+            # Physical roll can contain full turns or lean against the next stride.
+            visual_angle = self.pose['angle_offset']*direction
+            self.pose['angle_offset'] = visual_angle - ((body.angle+180.)%360.-180.)
+            local_angle=math.radians(heading-visual_angle)
             self.pose['gaze']=(math.cos(local_angle)*.86,math.sin(local_angle)*.86)
-            self.pose['effect_angle']=heading-body.angle-self.pose['angle_offset']
+            self.pose['effect_angle'] = heading-visual_angle
         if mode == 'pop_return':
             inward = reaction['inward']
             glance = .47+.22*math.sin(elapsed*5.)*math.exp(-elapsed)
@@ -372,4 +440,5 @@ class ExpressionMotion:
                 self.pose['impact_phase'] = age
                 self.pose['impact_strength'] = play_reaction['intensity'] * (1.-_ease((age-.035)/.22))
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
+        self.pose['mouth_enabled'] = game.prefs.get('mouthEnabled', True)
         return self.pose

@@ -58,7 +58,9 @@ class ObjectWindow(QWidget):
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
         else:
             if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()),item.working)
-            elif item.kind in ('note','sign'):path=bubble_path(QRectF(self.rect()),item.kind=='note')
+            elif item.kind=='note':
+                path=bubble_path(QRectF(self.rect()),True,self.width()*item.anchor,item.tail_top,compact=True)
+            elif item.kind=='sign':path=bubble_path(QRectF(self.rect()))
             else:
                 path=QPainterPath();path.addRoundedRect(QRectF(self.rect()),8,8)
             mask=QRegion(path.toFillPolygon().toPolygon())
@@ -97,7 +99,7 @@ class ObjectWindow(QWidget):
         key=tuple(data[field] for field in ('kind','text','image','angle','working','x','y'))+(
             getattr(item,'appearance',None),
             getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'attribution',None),
-            frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible,
+            frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible,data.get('opacity'),
             int(time.monotonic()*10) if visible and item.kind=='notebook' and item.working else None)
         if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
             self._paint_key=key;self.update()
@@ -239,8 +241,11 @@ class ObjectWindow(QWidget):
             img=self.reaction_media.current_image() if self.reaction_media is not None else None
             if img is not None and not img.isNull():
                 p.drawImage(self._media_rect(img),img)
-        elif kind in ('note','sign'):
-            paint_bubble(p,QRectF(self.rect()),self.item.text,kind=='note')
+        elif kind=='note':
+            paint_bubble(p,QRectF(self.rect()),self.item.text,True,w*self.item.anchor,
+                         self.item.opacity,self.item.tail_top,compact=True)
+        elif kind=='sign':
+            paint_bubble(p,QRectF(self.rect()),self.item.text)
         else:
             scale=min(w/max(1,self.item._base_w),h/max(1,self.item._base_h))
             corner=kind=='corner';p.setPen(QPen(QColor('#846c49'),max(1.,2*scale)));p.setBrush(QColor('#e4cfa1' if corner else '#fff0be'));p.drawRoundedRect(QRectF(1,1,w-2,h-2),7*scale,7*scale)

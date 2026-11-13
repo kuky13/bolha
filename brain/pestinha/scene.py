@@ -130,7 +130,8 @@ def object_scale(item, avatar_size=136, object_scales=None, bounds=None):
 def minimum_object_dimensions(kind):
     if kind in ('ball','paper'):return (48.,48.)
     if kind in ('meme',):return (96.,72.)
-    if kind in ('note','corner'):return (96.,72.)
+    if kind=='note':return (124.,84.)
+    if kind=='corner':return (96.,72.)
     if kind=='notebook':return (80.,50.)
     if kind in ('sign','fireworks'):return (96.,60.)
     return (20.,20.)
@@ -171,7 +172,17 @@ class ImageThing(ObjectThing):
 
 class NoteThing(ObjectThing):
     def __init__(self, text, small=False):
-        super().__init__('note', 150 if small else 190, 120 if small else 145, text)
+        super().__init__('note', 142 if small else 164, 84, text)
+        self.expires_at = self.born + min(8., max(5., 3. + len(text)/10.))
+        self.opacity = 0.
+        self.anchor = .5
+        self.tail_top = False
+
+    def update_opacity(self, now):
+        self.opacity = min(1., max(0., (now-self.born)/.18), max(0., (self.expires_at-now)/.35))
+
+    def snapshot(self):
+        return dict(super().snapshot(), opacity=self.opacity, anchor=self.anchor, tailTop=self.tail_top)
 
 
 class SignThing(ObjectThing):

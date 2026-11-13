@@ -8,13 +8,14 @@ from .migration import atomic_json, prepare_data, read_json
 
 OBJECT_SCALE_TYPES = ('toy','notebook','reaction','note','sign','corner','effects')
 DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
+                mouthEnabled=True, cursorPrankEnabled=False,
                 objectScales={key:1. for key in OBJECT_SCALE_TYPES},
                 toyAppearance='peanut',
                 mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
                 popEnabled=True, popThrowLimit=12,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True)
-BOOLEAN_KEYS = ('roaming','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
+BOOLEAN_KEYS = ('roaming','mouthEnabled','cursorPrankEnabled','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
                 'adaptiveBehavior','learnRoutine','popEnabled')
 SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 

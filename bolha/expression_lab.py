@@ -35,7 +35,11 @@ class ExpressionPreview(QWidget):
                        blink_left=pose['blink_left'], blink_right=pose['blink_right'],
                        eye_open=pose['eye_open'], gaze=pose['gaze'] or (0., 0.),
                        squash=pose['squash'], ear_tilt=pose['ear_tilt'],
-                       ear_raise=pose['ear_raise'], anger=pose['anger'])
+                       ear_raise=pose['ear_raise'], anger=pose['anger'],
+                       mouth_open=pose['mouth_open'], mouth_curve=pose['mouth_curve'],
+                       mouth_chew=pose['mouth_chew'], tongue=pose['tongue'],
+                       mouth_width=pose['mouth_width'], mouth_skew=pose['mouth_skew'],
+                       cursor_inside=pose['cursor_inside'], cursor_spit=pose['cursor_spit'])
         painter.restore()
         if pose['zzz_strength'] > 0:
             draw_sleep_marks(painter, x, y, scale, pose['zzz_phase'], pose['zzz_strength'],
@@ -53,8 +57,14 @@ class ExpressionLab(QWidget):
     EXPRESSIONS = (
         ('Curiosa', 'curioso'), ('Feliz', 'feliz'), ('Brava', 'bravo'),
         ('Segurada', 'held'), ('Dormindo', 'sleeping'), ('Carinho', 'caress'),
+        ('Comemorando', 'comemorando'), ('Susto rápido', 'assustado'),
+        ('Cochilo e bocejo', 'doze'), ('Espirro', 'sneeze'),
+        ('Soluços', 'hiccup'), ('Piscadela', 'wink'),
         ('Correndo', 'correndo'), ('Deitada', 'deitada'),
         ('Rebatendo', 'pingpong_rebatida'), ('Estourando', 'pop'), ('Tímida', 'timido'),
+        ('De olho no ponteiro', 'cursor_approach'), ('Bote no ponteiro', 'cursor_pounce'),
+        ('Engolindo o ponteiro', 'cursor_swallow'), ('Mastigando', 'cursor_chew'),
+        ('Cuspindo com nojo', 'cursor_spit'), ('Se recuperando', 'cursor_recover'),
     )
 
     def __init__(self, parent=None):

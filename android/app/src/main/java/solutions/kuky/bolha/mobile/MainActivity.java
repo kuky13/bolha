@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 package solutions.kuky.bolha.mobile;
 
-import android.app.Activity;
 import android.Manifest;
+import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
-import android.widget.*;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+import java.util.Locale;
 import org.json.JSONObject;
 
 public final class MainActivity extends Activity implements Engine.Listener {
@@ -26,65 +30,63 @@ public final class MainActivity extends Activity implements Engine.Listener {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         waitingPermission = state != null && state.getBoolean("waitingOverlayPermission");
-        getWindow().setStatusBarColor(Color.rgb(24,20,32));
         engine = Engine.get(this);
-        LinearLayout page = new LinearLayout(this);
-        page.setOrientation(LinearLayout.VERTICAL);
-        if (Build.VERSION.SDK_INT >= 30) page.setOnApplyWindowInsetsListener((view, insets) -> {
-            android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars()
-                    | android.view.WindowInsets.Type.displayCutout());
-            view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
-            return insets;
-        });
-        TextView title = new TextView(this);
-        title.setText("Bolha");
-        title.setTextSize(26);
-        title.setTextColor(Color.rgb(255,211,100));
-        title.setPadding(dp(16),dp(8),dp(16),0);
-        page.addView(title);
-        status = new TextView(this);
-        status.setText("Abrindo a Bolha…");
-        status.setPadding(dp(16),0,dp(16),dp(4));
+        LinearLayout page = MobileUi.column(this);
+        MobileUi.applyWindow(this,page);
+        LinearLayout header = MobileUi.row(this);
+        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(18),dp(12),dp(12),dp(6));
+        TextView title = MobileUi.text(this,"Bolha",30,MobileUi.GOLD);
+        header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        header.addView(MobileUi.button(this,"Central da Bolha",() ->
+            startActivity(new Intent(this,CentralActivity.class))));
+        page.addView(header);
+        status = MobileUi.text(this,"Abrindo a Bolha…",14,MobileUi.MUTED);
+        status.setPadding(dp(20),0,dp(20),dp(8));
         page.addView(status);
         stage = new Stage(this,engine,"");
         page.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout play = new LinearLayout(this);
-        add(play,"Carinho",() -> action("caress"));
-        add(play,"Bicuda",() -> action("kick"));
-        add(play,"Jogar para cima",() -> action("lift"));
-        page.addView(play);
-        LinearLayout rest = new LinearLayout(this);
-        add(rest,"Brinquedo",() -> action("ball"));
-        add(rest,"Notebook",() -> action("notebook"));
-        add(rest,"Dormir / acordar",() -> action(engine.state().optBoolean("asleep")?"wake":"sleep"));
-        page.addView(rest);
-        LinearLayout settings = new LinearLayout(this);
-        overlay = add(settings,"Flutuar",this::toggleOverlay);
-        add(settings,"Bola / amendoim",() -> action("toy-style"));
-        Switch haptics = new Switch(this);
-        haptics.setText("Vibração");
-        haptics.setPadding(dp(8),0,dp(12),0);
-        SharedPreferences prefs = getSharedPreferences("options",0);
-        haptics.setChecked(Haptics.enabled(this));
-        haptics.setOnCheckedChangeListener((button,on) -> prefs.edit().putBoolean("haptics",on).apply());
-        settings.addView(haptics);
-        page.addView(settings);
+        TextView help = MobileUi.text(this,"Toque para dar carinho. Arraste e solte para brincar.",13,MobileUi.MUTED);
+        help.setPadding(dp(20),dp(8),dp(20),dp(6));
+        page.addView(help);
+        LinearLayout actions = MobileUi.column(this);
+        actions.setPadding(dp(12),0,dp(12),dp(10));
+        LinearLayout play = MobileUi.row(this);
+        MobileUi.addEqual(play,MobileUi.button(this,"Carinho",() -> action("caress")));
+        MobileUi.addEqual(play,MobileUi.button(this,"Brinquedo",() -> action("ball")));
+        actions.addView(play);
+        LinearLayout rest = MobileUi.row(this);
+        MobileUi.addEqual(rest,MobileUi.button(this,"Dormir / acordar",() ->
+            action(engine.state().optBoolean("asleep")?"wake":"sleep")));
+        overlay = MobileUi.button(this,"Flutuar",this::toggleOverlay);
+        MobileUi.addEqual(rest,overlay);
+        actions.addView(rest);
+        page.addView(actions);
         setContentView(page);
     }
 
     @Override protected void onResume() {
         super.onResume();
+        FloatingBolha.foregroundUi(this,true);
         if (waitingPermission) {
             waitingPermission=false;
             if (Settings.canDrawOverlays(this)) prepareOverlay();
         }
         engine.listen(this);
-        stage.post(() -> {
-            if (!FloatingBolha.active) engine.resize(stage.getWidth(),stage.getHeight());
-        });
+        if (getIntent().getBooleanExtra("floatingRequested",false)) {
+            getIntent().removeExtra("floatingRequested");
+            if (!FloatingBolha.active) stage.post(this::toggleOverlay);
+        }
+        stage.post(this::resizeStage);
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
     }
 
     @Override protected void onPause() {
+        FloatingBolha.foregroundUi(this,false);
         engine.remove(this);
         super.onPause();
     }
@@ -94,33 +96,27 @@ public final class MainActivity extends Activity implements Engine.Listener {
         state.putBoolean("waitingOverlayPermission",waitingPermission);
     }
 
-    private Button add(LinearLayout row,String text,Runnable action) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setOnClickListener(view -> action.run());
-        row.addView(button,new LinearLayout.LayoutParams(0,-2,1));
-        return button;
+    private int dp(float value) { return MobileUi.dp(this,value); }
+
+    private void resizeStage() {
+        if (!FloatingBolha.active) {
+            float density=getResources().getDisplayMetrics().density;
+            engine.resize(stage.getWidth()/density,stage.getHeight()/density);
+        }
     }
 
-    private int dp(float value) { return Math.round(value*getResources().getDisplayMetrics().density); }
-    private void action(String kind) {
-        if (FloatingBolha.active) {
-            Toast.makeText(this,"Pare o modo flutuante para brincar aqui.",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        engine.action(kind,"",0,0,0,0);
-    }
+    private void action(String kind) { engine.action(kind,"",0,0,0,0); }
 
     private void toggleOverlay() {
         if (FloatingBolha.active) {
             stopService(new Intent(this,FloatingBolha.class));
-            stage.postDelayed(() -> engine.resize(stage.getWidth(),stage.getHeight()),150);
+            stage.postDelayed(this::resizeStage,150);
         } else if (!Settings.canDrawOverlays(this)) {
             waitingPermission=true;
-            try { startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:"+getPackageName()))); }
-            catch (android.content.ActivityNotFoundException error) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:"+getPackageName())));
+            } catch (android.content.ActivityNotFoundException error) {
                 waitingPermission=false;
                 Toast.makeText(this,"Abra a permissão de sobreposição nas configurações do Android.",Toast.LENGTH_LONG).show();
             }
@@ -128,23 +124,23 @@ public final class MainActivity extends Activity implements Engine.Listener {
     }
 
     private void prepareOverlay() {
-        SharedPreferences options = getSharedPreferences("options",0);
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED && !options.getBoolean("askedNotifications",false)) {
+        SharedPreferences options=getSharedPreferences("options",0);
+        if (Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                !=PackageManager.PERMISSION_GRANTED && !options.getBoolean("askedNotifications",false)) {
             options.edit().putBoolean("askedNotifications",true).apply();
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS_REQUEST);
         } else launchOverlay();
     }
 
-    @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results) {
         super.onRequestPermissionsResult(request,permissions,results);
-        if (request == NOTIFICATIONS_REQUEST && Settings.canDrawOverlays(this)) launchOverlay();
+        if (request==NOTIFICATIONS_REQUEST && Settings.canDrawOverlays(this)) launchOverlay();
     }
 
     private void launchOverlay() {
-        Intent intent = new Intent(this,FloatingBolha.class);
+        Intent intent=new Intent(this,FloatingBolha.class);
         try {
-            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent); else startService(intent);
+            if (Build.VERSION.SDK_INT>=26) startForegroundService(intent); else startService(intent);
             moveTaskToBack(true);
         } catch (IllegalStateException | SecurityException error) {
             android.util.Log.e("Bolha","Iniciar modo flutuante",error);
@@ -152,17 +148,17 @@ public final class MainActivity extends Activity implements Engine.Listener {
         }
     }
 
-    @Override public void frame(JSONObject state, String error) {
-        String overlayLabel = FloatingBolha.active?"Parar de flutuar":"Flutuar";
+    @Override public void frame(JSONObject state,String error) {
+        String overlayLabel=FloatingBolha.active?"Parar de flutuar":"Flutuar";
         if (!overlayLabel.contentEquals(overlay.getText())) overlay.setText(overlayLabel);
         stage.setVisibility(FloatingBolha.active?View.INVISIBLE:View.VISIBLE);
-        String statusLabel;
-        if (error != null) statusLabel = error;
-        else if (FloatingBolha.active) statusLabel = "A Bolha está flutuando.";
-        else statusLabel = String.format(java.util.Locale.forLanguageTag("pt-BR"),
-                "Energia %.0f%%  ·  %d neurônios",state.optDouble("energy",0)*100,state.optInt("neurons"));
-        if (!statusLabel.contentEquals(status.getText())) status.setText(statusLabel);
-        if (error != null) return;
+        String label;
+        if (error!=null) label=error;
+        else if (FloatingBolha.active) label="A Bolha está flutuando. Você pode continuar por aqui.";
+        else label=String.format(Locale.forLanguageTag("pt-BR"),"Energia %.0f%%  ·  %d neurônios",
+            state.optDouble("energy",0)*100,state.optInt("neurons"));
+        if (!label.contentEquals(status.getText())) status.setText(label);
+        if (error!=null) return;
         if (!FloatingBolha.active) Haptics.frame(this,state);
         stage.frame(state);
     }

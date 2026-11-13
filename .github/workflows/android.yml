@@ -12,7 +12,7 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,19 +45,47 @@ jobs:
           umask 077
           printf '%s' "$BOLHA_ANDROID_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/bolha.keystore"
           echo "BOLHA_ANDROID_KEYSTORE=$RUNNER_TEMP/bolha.keystore" >> "$GITHUB_ENV"
-      - name: Compilar, testar cadência de vibração e verificar APK
+      - name: Compilar, testar gestos e vibração e verificar APK
         env:
           BOLHA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.BOLHA_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
           javac -d "$RUNNER_TEMP/haptics" android/app/src/main/java/solutions/kuky/bolha/mobile/HapticCadence.java android/tests/HapticCadenceTest.java
           java -cp "$RUNNER_TEMP/haptics" solutions.kuky.bolha.mobile.HapticCadenceTest
+          javac -d "$RUNNER_TEMP/motion" android/app/src/main/java/solutions/kuky/bolha/mobile/DragMotion.java android/app/src/main/java/solutions/kuky/bolha/mobile/ShakeMotion.java android/tests/MotionInputTest.java
+          java -cp "$RUNNER_TEMP/motion" solutions.kuky.bolha.mobile.MotionInputTest
           gradle -p android :app:assembleDebug --console=plain --no-daemon
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/bolha-cert.txt"
+          if [[ "$GITHUB_REPOSITORY" == 'kuky13/bolha' ]]; then
+            grep -q '10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-cert.txt"
+          fi
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/bolha-apk.txt"
           grep -q "package: name='solutions.kuky.bolha.mobile'" "$RUNNER_TEMP/bolha-apk.txt"
           grep -q "^native-code: .*'arm64-v8a'.*'x86_64'" "$RUNNER_TEMP/bolha-apk.txt"
+          python android/tests/audit_apk.py "$apk" --report validation/android/audit-apk.json
+      - name: Verificar APK anterior para migração sem apagar dados
+        if: github.repository == 'kuky13/bolha'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          previous="$RUNNER_TEMP/bolha-previous-android"
+          mkdir -p "$previous"
+          gh release download v0.4.10 --repo kuky13/bolha --pattern Bolha-0.4.10-Android.apk --pattern ANDROID-SHA256SUMS.txt --dir "$previous"
+          (cd "$previous" && awk '$2 == "Bolha-0.4.10-Android.apk"' ANDROID-SHA256SUMS.txt > previous-apk.sha256 && test -s previous-apk.sha256 && sha256sum --check previous-apk.sha256)
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous/Bolha-0.4.10-Android.apk" > "$RUNNER_TEMP/bolha-previous-cert.txt"
+          grep -q '10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-previous-cert.txt"
+          echo "BOLHA_TEST_PREVIOUS_APK=$previous/Bolha-0.4.10-Android.apk" >> "$GITHUB_ENV"
+      - name: Guardar o APK candidato e seu checksum para diagnóstico
+        run: |
+          set -euo pipefail
+          mkdir -p validation/android
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          apk="Bolha-${version}-Android.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "validation/android/$apk"
+          (cd validation/android && sha256sum "$apk" > ANDROID-SHA256SUMS.txt)
       - name: Habilitar aceleração do emulador descartável
         run: |
           if [[ ! -c /dev/kvm ]]; then
@@ -83,13 +111,6 @@ jobs:
           disable-linux-hw-accel: auto
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: python android/tests/smoke.py android/app/build/outputs/apk/debug/app-debug.apk validation/android
-      - name: Preparar o APK validado e seu checksum
-        run: |
-          set -euo pipefail
-          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          apk="Bolha-${version}-Android.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "validation/android/$apk"
-          (cd validation/android && sha256sum "$apk" > ANDROID-SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         if: always()
         with:

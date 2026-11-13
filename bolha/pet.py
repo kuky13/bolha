@@ -66,7 +66,13 @@ class PetVisual(QWidget):
                            ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
                            eye_open=pose['eye_open'],squash=squash,
                            body_opacity=game.prefs.get('opacity',1),
-                           anger=pose.get('anger',0.))
+                           anger=pose.get('anger',0.),
+                           mouth_enabled=pose.get('mouth_enabled',True),
+                           mouth_open=pose.get('mouth_open'), mouth_curve=pose.get('mouth_curve'),
+                           mouth_chew=pose.get('mouth_chew',0.), tongue=pose.get('tongue',0.),
+                           mouth_width=pose.get('mouth_width',1.), mouth_skew=pose.get('mouth_skew',0.),
+                           cursor_inside=pose.get('cursor_inside',False),
+                           cursor_spit=pose.get('cursor_spit',0.))
             p.restore()
         if pose['zzz_strength']>0:
             draw_sleep_marks(p,0.,0.,scale,
@@ -106,6 +112,7 @@ class PetWindow(QWidget):
         self.mouse_grab=MouseGrab(self);self.drag_position=None
         self.rubs=deque()
         self.motion=ExpressionMotion(time.monotonic())
+        self._saved_prank_cursor=None
         self.sync()
 
     def floor_pose(self):
@@ -124,8 +131,9 @@ class PetWindow(QWidget):
         self.motion.update(self.game,now,self.press[1] if self.press else None)
         target=self.motion.pose['gaze'] or self.game.state.gaze
         elapsed=max(0.,now-self.gaze_tick)
-        eye_ease=1-math.exp(-22*elapsed)
-        ear_ease=1-math.exp(-12*elapsed)
+        running=self.motion.pose['effect']=='perseguindo'
+        eye_ease=1. if running else 1-math.exp(-22*elapsed)
+        ear_ease=1. if running else 1-math.exp(-12*elapsed)
         self.visual_gaze=tuple(current+(goal-current)*eye_ease for current,goal in zip(self.visual_gaze,target))
         self.visual_ear_gaze=tuple(current+(goal-current)*ear_ease for current,goal in zip(self.visual_ear_gaze,target))
         self.gaze_tick=now
@@ -149,7 +157,35 @@ class PetWindow(QWidget):
         if input_show and not self.isVisible():self.show()
         if not input_show:
             if self.isVisible():self.cancel_interaction();self.hide()
+        self._sync_prank_cursor(input_show)
         self.visual.update()
+
+    def _restore_prank_cursor(self):
+        if self._saved_prank_cursor is not None:
+            self.setCursor(self._saved_prank_cursor)
+            self._saved_prank_cursor=None
+
+    def _sync_prank_cursor(self,input_show):
+        prank=getattr(self.game,'cursor_prank',None)
+        inside=self.mask().contains(self.mapFromGlobal(QPointF(*self.game.cursor).toPoint()))
+        hidden=bool(prank and prank.hidden_cursor and input_show and inside)
+        if hidden and self._saved_prank_cursor is None:
+            self._saved_prank_cursor=self.cursor()
+            self.setCursor(Qt.BlankCursor)
+        elif not hidden:
+            self._restore_prank_cursor()
+            if prank and prank.hidden_cursor:
+                prank.pointer_moved(self.game,time.monotonic())
+
+    def _release_prank_cursor(self,moved_to=None):
+        prank=getattr(self.game,'cursor_prank',None)
+        if prank is None or not prank.hidden_cursor:return False
+        if moved_to is not None and prank.anchor is not None:
+            if math.dist((moved_to.x(),moved_to.y()),prank.anchor)<=1.:return False
+        prank.pointer_moved(self.game,time.monotonic())
+        self._restore_prank_cursor()
+        self.sync()
+        return True
 
     def paintEvent(self,event):
         # Alpha1 é invisível ao usuário, mas fornece entrada na região nativa.
@@ -160,6 +196,8 @@ class PetWindow(QWidget):
         if not self.press:self.game.hover=False
 
     def mousePressEvent(self,event):
+        if self._release_prank_cursor():
+            event.accept();return
         if event.button()!=Qt.LeftButton or self.press is not None or not self.game.visible():return
         if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
@@ -171,6 +209,7 @@ class PetWindow(QWidget):
         except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
 
     def mouseMoveEvent(self,event):
+        if self._release_prank_cursor(event.globalPosition()):return
         if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
         if self.press is None:
@@ -221,8 +260,13 @@ class PetWindow(QWidget):
         else:self._release_at(pos)
 
     def contextMenuEvent(self,event):self.cancel_interaction();self.menu_requested.emit(event.globalPos())
-    def wheelEvent(self,event):self.game.interact(dict(type='spin',value=event.angleDelta().y()/120*100))
+    def wheelEvent(self,event):
+        if not self._release_prank_cursor():
+            self.game.interact(dict(type='spin',value=event.angleDelta().y()/120*100))
     def cancel_interaction(self):
+        self._restore_prank_cursor()
+        prank=getattr(self.game,'cursor_prank',None)
+        if prank is not None and prank.active:prank.cancel(self.game,time.monotonic())
         active=self.press is not None
         self.press=None;self.dragging=False;self.drag_position=None
         self.mouse_grab.stop()

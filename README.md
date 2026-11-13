@@ -5,24 +5,25 @@ do sistema de pet virtual criado por [mille-okws](https://github.com/mille-okws)
 e colaboradores. Adaptamos o cérebro, a física e a aplicação para a personagem
 Bolha. Contribuições da comunidade são bem-vindas.
 
-![Bolha Qt sem boca, com olhos e orelhinhas](docs/images/bolha-qt.png)
+![A Bolha em repouso, piscando, recebendo carinho, levando um susto, bocejando, soluçando, dormindo e mastigando](docs/images/bolha-050-expressoes.png)
 
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Windows x64 e versão inicial para Android.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/latest) · [Modo flutuante e build Android](android/README.md).
+**Windows x64 e Android.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/latest) · [Modo flutuante e build Android](android/README.md).
 
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.4.10 melhora os balões, libera o brinquedo dos cantos e acrescenta bicudas
-e levantadas. A atualização tem progresso e nova tentativa de download. Também
-é possível abrir pelo código com `python main.py`, como no Pestinha.
-Veja a [validação da versão](docs/VALIDATION-0.4.10.md) e a
+A 0.5.0 aproxima as expressões e as atividades do Android da versão para PC,
+com central de configurações, painel neural e movimento opcional ao chacoalhar.
+No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
+vem desligada. Também é possível abrir pelo código com `python main.py`, como no Pestinha.
+Veja a [validação da versão](docs/VALIDATION-0.5.0.md) e a
 [revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
-*Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
-composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
+*Expressões da 0.5.0 renderizadas pelo Qt em Linux. A validação em Windows é
+separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
 [GPL-3.0-or-later](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
 Qt de Pestinha, de mille-okws e contribuidores, sob
@@ -32,9 +33,11 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 ## O que acompanha
 
 - Carinho, segurar, arrasto direto, arremessos, giro e pouso sobre janelas.
-- Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
-  olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
+- Esfera vetorial escura com olhos dourados, orelhinhas e boca expressiva opcional. Corpo,
+  olhos, orelhas e boca giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
+- A boca fica fechada em repouso, no sono e durante a mastigação de brincadeira.
+  Susto, alegria, bocejo, espirro e soluço têm gestos breves próprios.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
 - Irritação gradual ao segurar com rubor vermelho forte, reações ao soltar, sono
   com olhos fechando, respiração e “zzz”, corações no carinho e efeitos de
@@ -50,11 +53,17 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
   moldura, some após 15 segundos de exibição e mostra a origem no botão direito.
 - Tamanhos separados para a personagem, o brinquedo, o notebook, as reações,
   os bilhetes, os cartazes, o cantinho e os efeitos.
+- Bilhetes curtos aparecem perto da Bolha, um por vez, e somem sozinhos em
+  5 a 8 segundos. Enquanto um bilhete está na tela, as falas aguardam.
+  Os balões de fala e pensamento duram entre 3,4 e 6,2 segundos, conforme o texto.
 - Painel com os 470 neurônios, filtros, conexões reais do grupo selecionado,
   decisões recentes, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por
   contexto. Carinho reforça preferências; ausência de resposta é neutra.
 - Opções para desligar o comportamento adaptativo e apagar todo o aprendizado.
+- No PC, brincadeira opcional com o ponteiro: o cérebro escolhe se aproxima,
+  dá o bote e mastiga de brincadeira. Mover o mouse ou clicar restaura o cursor
+  imediatamente; a Bolha reage com nojo ou tontura. O ponteiro nunca é movido ou bloqueado.
 
 Veja [a política atual e os testes](docs/VALIDATION-0.4.0.md) e
 [o histórico da implementação da inteligência](docs/INTELLIGENCE.md).

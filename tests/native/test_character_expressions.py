@@ -27,21 +27,24 @@ def gold(pixels):
             & (pixels[:, :, 2] < 150) & (pixels[:, :, 3] > 32))
 
 
-def test_every_expression_stays_inside_deformed_rotating_body(qt_application):
+@pytest.mark.parametrize('mouth_enabled', [False, True])
+def test_every_expression_stays_inside_deformed_rotating_body(qt_application, mouth_enabled):
     for radius, squash in ((24, -.25), (40, -.25), (68, .25), (100, -.25)):
         scale = radius / 49
         for angle in (0, 45, 135, 270):
             cosine, sine = math.cos(math.radians(angle)), math.sin(math.radians(angle))
             for emotion in EMOTIONS:
                 pixels = render(draw_character, scale=scale, squash=squash, angle=angle,
-                                emotion=emotion, gaze=(1, -1), ear_tilt=10)
+                                emotion=emotion, gaze=(1, -1), ear_tilt=10,
+                                mouth_enabled=mouth_enabled)
                 ys, xs = np.nonzero(gold(pixels))
                 assert len(xs), emotion
                 dx, dy = (xs + .5 - 160) / scale, (ys + .5 - 160) / scale
                 local_x = (dx*cosine + dy*sine) / (1+squash)
                 local_y = (-dx*sine + dy*cosine) / (1-squash)
                 assert np.all(np.hypot(local_x, local_y) < FACE_RADIUS + 2), emotion
-                assert np.all(local_y < 12), 'Nenhuma expressão acrescenta boca.'
+                if not mouth_enabled:
+                    assert np.all(local_y < 12), 'A opção sem boca preserva olhos e orelhas.'
 
 
 def test_angry_and_sad_eyes_have_opposite_readable_lids(qt_application):

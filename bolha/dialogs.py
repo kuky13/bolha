@@ -166,6 +166,8 @@ class SettingsDialog(QDialog):
         layout.addLayout(form)
         self._check('roaming', 'Passear pela tela', layout,
                     'O passeio pausa durante o arrasto, o carinho e o uso dos painéis.')
+        self._check('mouthEnabled', 'Mostrar a boca nas expressões', layout,
+                    'Olhos, orelhas e boca acompanham a mesma rotação e deformação do corpo.')
         self._check('mischiefEnabled', 'Trazer memes e bilhetes', layout)
         appearance = self._details('Tamanhos e aparência', layout)
         advanced_form = QFormLayout()
@@ -189,6 +191,10 @@ class SettingsDialog(QDialog):
 
     def _behavior_tab(self):
         layout = self._details('Comportamento e aprendizado', self._general_layout)
+        self._check('cursorPrankEnabled', 'Brincar de comer o ponteiro', layout,
+                    'O cérebro pode tentar após 2 minutos sem interação ou com raiva intensa. '
+                    'Há pelo menos 5 minutos entre tentativas. Mexer ou clicar devolve o ponteiro. '
+                    'Exige as leituras de ponteiro e inatividade e o comportamento adaptativo.')
         self._check('popEnabled', 'Estourar após muitos arremessos fortes', layout,
                     'A contagem considera arremessos fortes numa janela de 1 minuto. A Bolha volta após 30 segundos.')
         pop_form = QFormLayout()
@@ -733,11 +739,19 @@ class NeuralDialog(QDialog):
                                 'celebration':'comemorar', 'toy_play':'brincar com o brinquedo',
                                 'toy_return':'devolver o brinquedo',
                                 'sleep_cycle':'sono', 'mischief':'travessura', 'paper_throw':'jogar papel',
+                                'cursor_prank_intent':'brincar com o ponteiro',
+                                'cursor_prank_bote':'decidir o bote no ponteiro',
+                                'cursor_prank_capture':'decidir se engole o ponteiro',
+                                'cursor_prank_swallow':'decidir se mastiga o ponteiro',
+                                'cursor_prank_release':'reagir ao ponteiro escapando',
+                                'cursor_prank_recover':'se recuperar da brincadeira',
+                                'cursor_prank_finish':'encerrar a perseguição do ponteiro',
                                 'punishment_sign':'mostrar cartaz', 'punishment_sign_text':'texto do cartaz',
                                 'accept_punishment':'aceitar o perdão', 'escape_punishment':'fugir do castigo'}
                 source_names = {'lif+episodic_policy':'rede e memória de experiências',
                                 'lif_policy':'atividade neural', 'expression_policy':'expressão atual',
                                 'explicit_user_request':'pedido manual', 'lif_hazard':'atividade neural',
+                                'cursor_prank_policy':'rede e memória da brincadeira',
                                 'user_feedback':'interação com você'}
                 action = str(current.get('action') or 'Sem ação registrada')
                 target = current.get('target')
@@ -745,6 +759,11 @@ class NeuralDialog(QDialog):
                     target = f'posição {target:.0f} px'
                 elif target is None:
                     target = 'nenhum'
+                elif action.startswith('cursor_prank_'):
+                    target = {'watch':'só observar', 'approach':'se aproximar', 'pounce':'dar o bote',
+                              'wait':'esperar', 'swallow':'engolir', 'chew':'mastigar',
+                              'spit':'cuspir', 'queasy':'ficar enjoada', 'shake_off':'se sacudir',
+                              'recover':'se recuperar', 'give_up':'desistir'}.get(str(target),target)
                 labels = {'energy':'energia', 'contact':'carência', 'emotion':'emoção',
                           'memory':'memória', 'habit':'hábito', 'estimate':'previsão aprendida',
                           'familiarity':'familiaridade', 'attention':'busca de atenção', 'rest':'descanso'}
@@ -768,6 +787,10 @@ class NeuralDialog(QDialog):
                          f"Alvo: {target} · Decidido por: {source_names.get(str(current.get('source')), 'cérebro da Bolha')}",
                          f"Intensidade {_number(current.get('intensity')):.2f} · duração {_number(current.get('duration')):.1f} s",
                          'Sinais associados: ' + (influence_text or 'nenhum fator numérico registrado.')]
+                if isinstance(factors, dict) and action.startswith('cursor_prank_'):
+                    idle = _number(factors.get('idleSeconds'))
+                    context = 'raiva intensa' if factors.get('angryAttempt') else 'ponteiro em repouso'
+                    lines.append(f'Contexto: {context} · inatividade {idle:.0f} s')
                 blocked = current.get('refusal_reason') or current.get('blocked_reason')
                 if not blocked and current.get('action') == 'request_refused':
                     blocked = 'A recusa ainda não tem um motivo registrado.'

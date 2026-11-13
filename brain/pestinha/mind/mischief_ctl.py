@@ -106,7 +106,10 @@ class MischiefController:
 
         plan = self.engine.plan(action, emotion)
         thing = plan[1] if plan else None
-        if plan and plan[0] == "corner":
+        if plan and plan[0] == "note":
+            if not self.engine.show_note(thing, body, bounds, cursor, now):
+                return None
+        elif plan and plan[0] == "corner":
             if not self.engine.show_in_corner(thing, bounds, cursor):
                 return None
         elif plan:
@@ -138,8 +141,18 @@ class MischiefController:
         self.memory.drop_open_things()
         self.engine.clear()
 
+    def expire_notes(self, now):
+        for thing in list(self.engine.things):
+            if thing.kind == 'note':
+                if now >= thing.expires_at:
+                    self.abort_thing(thing)
+                else:
+                    thing.update_opacity(now)
+
     def abort_thing(self, thing):
-        """Remove uma reação online que falhou sem penalizar a memória nem ocupar limite."""
+        """Remove um objeto sem penalizar nem ocupar limite."""
+        if thing.kind == 'note' and getattr(thing, 'dragging', False):
+            thing.app.scene_dragging = False
         if self.behavior.mission and self.behavior.mission[0] == "deliver" and self.behavior.mission[1] is thing:
             self.behavior.mission = None
         self.memory.cancel_thing(thing)

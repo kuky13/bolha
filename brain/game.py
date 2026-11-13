@@ -36,6 +36,7 @@ from pestinha.scene import object_scale
 from geometry import fullscreen_monitors, visible_window_platforms
 from intelligence import Intelligence
 from pingpong import PingPong
+from cursor_prank import CursorPrank
 
 POP_EFFECT_SECONDS = .75
 POP_RETURN_SECONDS = 30.
@@ -159,6 +160,7 @@ class Game:
         self.last_intelligence = self.last_metrics = 0.
         self.app_rss_mib = 0.
         self.brain_array_mib = 0.
+        self.cursor_prank = CursorPrank()
 
     def available_areas(self):
         return [area for i, area in enumerate(self.areas) if i not in self.blocked]
@@ -202,6 +204,10 @@ class Game:
         ):
             self.stop_pingpong()
         self.prefs.update(prefs)
+        if not (self.prefs.get('cursorPrankEnabled', False)
+                and self.prefs.get('senseCursor', True) and self.prefs.get('senseIdle', True)
+                and self.prefs.get('adaptiveBehavior', True)):
+            self.cursor_prank.cancel(self, time.monotonic())
         if not self.prefs.get('popEnabled',True):
             self.strong_throws.clear()
             if self.pop_started is not None:
@@ -302,6 +308,11 @@ class Game:
     def interact(self, event, *, now=None):
         now = time.monotonic() if now is None else now
         kind = event.get('type')
+        if kind in ('caress', 'quiet'):
+            self.cursor_prank.feedback(self, .8 if kind == 'caress' else -.8, now)
+        if kind in ('hold-start', 'drag-start', 'poke', 'panel', 'panic', 'hide',
+                    'sleep', 'pingpong', 'corner', 'work', 'notebook') and self.cursor_prank.active:
+            self.cursor_prank.cancel(self, now)
         if kind == 'pingpong':
             if self.pingpong is not None:
                 self.stop_pingpong()
@@ -356,6 +367,8 @@ class Game:
         if kind == 'reset-memory': self.reset_learning(); return
         if kind == 'cursor':
             if self.prefs.get('senseCursor', True):
+                if math.dist(self.cursor, (event['x'], event['y'])) > 1.:
+                    self.cursor_prank.pointer_moved(self, now)
                 self.cursor = (event['x'], event['y'])
                 self._track_cursor(now)
             else:
@@ -382,6 +395,7 @@ class Game:
             body = target.body if target and hasattr(target, 'body') else self.body
             if target and not hasattr(target, 'body'):
                 self.scene_dragging = kind != 'drag-end'
+                target.dragging = self.scene_dragging
                 target.place(event['x'], event['y'])
                 return
             moved = math.hypot(event['x']-body.x, event['y']-body.y) >= 3.
@@ -826,6 +840,9 @@ class Game:
         if (self.panel or self.sleep.asleep or self.state.dizzy(now) or self.state.caressing(now)
                 or self.state.at_desk or self.state.castigo or self.state.protest_stage==3):
             return
+        if self.cursor_prank.active and self.prefs.get('senseCursor',True):
+            self._look_at_point(self.cursor)
+            return
         reaction = self.release_reaction
         released_angry = reaction.get('until',0)>now and reaction.get('kind') in ('bravo','birra')
         toy_angry = (self.play_reaction.get('until',0)>now
@@ -1042,6 +1059,8 @@ class Game:
         self.save()
 
     def adapt(self, now):
+        if self.cursor_prank.active:
+            return
         if now-self.last_intelligence < 1: return
         self.last_intelligence = now
         allowed = ['watch', 'rest']
@@ -1164,9 +1183,11 @@ class Game:
     def tick(self, dt, now=None):
         now = time.monotonic() if now is None else now
         dt = min(.05, max(0.,dt))
+        self.mischief_ctl.expire_notes(now)
         if not self.panicked and not self.hidden: self.read_context(now)
         frozen = self.panicked or self.hidden or not self.available_areas()
         if frozen:
+            self.cursor_prank.cancel(self, now)
             self.festa.requested=False
             self.stop_pingpong()
             self._cancel_holds(now)
@@ -1213,22 +1234,26 @@ class Game:
         self.castigo.act(now,self.body,area,self.cursor if self.prefs.get('senseCursor',True) else (1e9,1e9),self.state,self.rates,self.sleep.asleep)
         manual_play = self.play.requested_action is not None
         shy_return = self._shy_returning(now)
-        resting = (self.hover or self.panel or shy_return or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
+        resting = (self.hover or self.panel or shy_return or self.cursor_prank.active or now < self.quiet_until or not self.prefs.get('roaming',True)) and not manual_play
         self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
                            self.prefs.get('senseCursor',True))
         if manual_play:
             # A situação pode mudar entre o clique e o próximo quadro.
             self.play.requested_action = None
-        self._play_expression(now)
+        holding_cursor = self.cursor_prank.update(self, dt, now)
+        if not self.cursor_prank.active:
+            self._play_expression(now)
         previous_pet=self.body.x,self.body.y
         previous_toy=self.ball.body.x,self.ball.body.y
-        self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
+        if not holding_cursor:
+            self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
         self._track_landing(now)
         if self.body.grounded:self.in_flight=False
         if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
-            self._toy_contact(previous_pet,previous_toy,now)
+            if not holding_cursor:
+                self._toy_contact(previous_pet,previous_toy,now)
         self._focus_gaze(now)
         impacts = self.body.pop_impacts()
         self.landing *= math.exp(-dt * 12)
@@ -1242,13 +1267,13 @@ class Game:
         self.mischief.energy = self.drives.energy
         self.mischief.contact = self.drives.contact
         perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
-        if not shy_return and not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
+        if not self.cursor_prank.active and not shy_return and not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
             self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.rates = self.rates
         self.festa.energy = self.drives.energy
         self.festa.contact = self.drives.contact
         self.festa.tick(now,self.rates,self.state.emotion,self.body,
-                        not shy_return and self.visible() and not self.sleep.asleep
+                        not self.cursor_prank.active and not shy_return and self.visible() and not self.sleep.asleep
                         and not self.body.held and not self.panel and now>=self.quiet_until,dt)
         self.revolucao.rates = self.rates
         self.revolucao.energy = self.drives.energy
@@ -1280,6 +1305,7 @@ class Game:
                 'lying' if not self.body.upright() else 'idle')
         data = dict(ready=True,blocked=list(self.blocked),panicked=self.panicked,x=self.body.x,y=self.body.y,angle=self.body.angle,emotion=self.state.emotion,visible=self.visible(),held=self.body.held,caressing=self.state.feliz_fechado(now),gaze=self.state.gaze,objects=objects,energy=self.drives.energy,stimulation=self.drives.stimulation,lonely=self.drives.contact,protest=self.protest.stage,castigo=self.castigo.dentro,escapes=self.castigo.vitorias['fugir'],activity=self.activity,motors=self.rates,learned=[],neurons=self.brain.N,error=self.native_error,
                     pose=pose,grounded=self.body.grounded,surface=self.body.surface if self.body.grounded else self.bounds()[3],vx=self.body.vx,vy=self.body.vy,landing=self.landing)
+        data['cursorPrank'] = self.cursor_prank.snapshot()
         if self.monitor_open:
             if now - self.last_monitor_snapshot >= .25:
                 data.update(
