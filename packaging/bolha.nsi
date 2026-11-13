@@ -40,6 +40,7 @@ Var RegistryGuid
 Var DataRoot
 Var Stage
 Var Backup
+Var RollbackFailed
 Var OldExists
 Var ForceRun
 Var ProcessHandle
@@ -429,8 +430,17 @@ Section "Bolha" SEC_MAIN
   DetailPrint "Instalando o pacote preparado..."
   Rename "$Stage" "$INSTDIR"
   ${If} ${Errors}
-    Rename "$Backup" "$INSTDIR"
-    Abort "A substituição falhou; a versão anterior foi recuperada."
+    ${If} ${FileExists} "$Backup\Bolha.exe"
+      ClearErrors
+      Rename "$Backup" "$INSTDIR"
+      ${If} ${Errors}
+        Abort "Não foi possível restaurar a versão anterior. O backup e o registro de recuperação foram preservados em $Backup."
+      ${EndIf}
+      Delete "$Transaction"
+      Abort "A substituição falhou. A versão anterior foi recuperada."
+    ${EndIf}
+    Delete "$Transaction"
+    Abort "Não foi possível mover os arquivos preparados para a pasta de destino."
   ${EndIf}
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall Bolha.exe"
@@ -446,7 +456,10 @@ Section "Bolha" SEC_MAIN
     Call OpenBolha
     ${If} $Opened != "1"
       Call Rollback
-      Abort "A nova versão não confirmou a abertura. A instalação anterior foi recuperada."
+      ${If} $RollbackFailed == "1"
+        Abort "A recuperação não pôde ser concluída. Arquivos e registro preservados para nova tentativa."
+      ${EndIf}
+      Abort "A nova versão não confirmou a abertura. A instalação foi cancelada."
     ${EndIf}
   ${EndIf}
   ; Só registra a instalação nova após a confirmação, quando ela foi solicitada.
@@ -479,7 +492,11 @@ Function FinishOpenBolha
   ${Else}
     Call Rollback
     StrCpy $SectionSucceeded "0"
-    MessageBox MB_OK|MB_ICONSTOP "A nova versão não confirmou a abertura. A instalação anterior foi recuperada."
+    ${If} $RollbackFailed == "1"
+      MessageBox MB_OK|MB_ICONSTOP "A recuperação não pôde ser concluída. Arquivos e registro preservados para nova tentativa."
+    ${Else}
+      MessageBox MB_OK|MB_ICONSTOP "A nova versão não confirmou a abertura. A instalação foi cancelada."
+    ${EndIf}
   ${EndIf}
 FunctionEnd
 
@@ -553,11 +570,22 @@ Function OpenBolha
 FunctionEnd
 
 Function Rollback
+  StrCpy $RollbackFailed "1"
   DetailPrint "Recuperando a instalação anterior..."
   SetOutPath "$TEMP"
+  ClearErrors
   Rename "$INSTDIR" "$Stage.failed"
+  ${If} ${Errors}
+    DetailPrint "Os arquivos da nova versão ainda estão em uso. Registro preservado em $Transaction."
+    Return
+  ${EndIf}
   ${If} ${FileExists} "$Backup\Bolha.exe"
+    ClearErrors
     Rename "$Backup" "$INSTDIR"
+    ${If} ${Errors}
+      DetailPrint "Não foi possível restaurar o backup em $Backup. Registro preservado em $Transaction."
+      Return
+    ${EndIf}
     ; Evita ciclo de reinstalação no contrato de adiamento Electron/Python (epochms).
     System::Call 'kernel32::GetSystemTimeAsFileTime(*l.r0)'
     System::Int64Op $0 / 10000
@@ -584,6 +612,7 @@ Function Rollback
     ${EndIf}
   ${EndIf}
   Delete "$Transaction"
+  StrCpy $RollbackFailed "0"
 FunctionEnd
 
 Function un.onInit

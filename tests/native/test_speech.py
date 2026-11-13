@@ -176,6 +176,23 @@ def test_silhueta_tem_ponta_de_fala_ou_pontos_de_pensamento(thought, tail_top):
     assert path.elementCount() > 20
 
 
+def test_balao_muda_de_lado_quando_o_brinquedo_bloqueia_o_espaco(qt_application, tmp_path):
+    game = Game(tmp_path, CONTENT)
+    game.body.x, game.body.y = 640., 360.
+    window = SpeechWindow(game)
+    window.dialogue.next_ambient = 1000.
+    window.present('Agora é minha vez!', now=100.)
+    window.sync(101.)
+    assert not window.tail_top
+
+    game.ball.show()
+    game.ball.body.x, game.ball.body.y = 640., float(window.geometry().center().y())
+    window.sync(101.1)
+    assert window.tail_top
+    assert window.geometry().top() > game.body.y + game.body.half_h
+    window.close()
+
+
 def test_reacao_de_brincadeira_expirada_nao_dispara_fala(tmp_path):
     game = Game(tmp_path, CONTENT)
     dialogue = Dialogue()

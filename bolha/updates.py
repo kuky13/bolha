@@ -13,7 +13,7 @@ import re
 import threading
 import time
 import uuid
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -95,8 +95,14 @@ class Transport:
         validate_url(url, self.test_base)
         if self.cancelled.is_set():
             raise UpdateCancelled()
-        response = self.opener.open(Request(url, headers={'User-Agent': 'Bolha-native-updater',
-                                                         'Accept': 'application/vnd.github+json'}), timeout=15)
+        request = Request(url, headers={'User-Agent': 'Bolha-native-updater',
+                                        'Accept': 'application/vnd.github+json'})
+        try:
+            response = self.opener.open(request, timeout=15)
+        except URLError as error:
+            if isinstance(error.reason, (TimeoutError, ConnectionResetError)):
+                raise DownloadInterrupted('Conexão interrompida durante a transferência.') from error
+            raise
         validate_url(response.geturl(), self.test_base)
         return response
 
@@ -136,7 +142,6 @@ class Transport:
         except BaseException:
             if created: Path(output).unlink(missing_ok=True)
             raise
-
 
 def parse_checksums(content):
     checksums = {}
@@ -399,10 +404,13 @@ class Updater(QObject):
 
     def healthy(self):
         # O chamador já confirmou o primeiro desenho e um ciclo saudável do cérebro.
+        import sys
+        if not getattr(sys, 'frozen', False):
+            return
+
         def cleanup():
             cleaned = cleanup_applied_update(self.data_dir, self.version, self.cache_root)
-            import sys
-            if cleaned and getattr(sys, 'frozen', False):
+            if cleaned:
                 return cleanup_recovery(self.data_dir, Path(sys.executable).parent, self.version)
             return cleaned
         self._background('cleanup', cleanup)

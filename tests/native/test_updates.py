@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from threading import Thread
 from unittest.mock import patch
+from urllib.error import URLError
 import pytest
 from bolha.migration import read_json
 from bolha.updates import Transport, find_release, fetch_update, parse_checksums, validate_url, verify_file
@@ -138,21 +139,42 @@ def test_final_cache_write_failure_cleans_only_own_partial(feed,tmp_path):
     assert not (tmp_path/'data/pending-update.json').exists()
 
 
-def test_interrupted_download_retries_once_and_keeps_verified_copy(feed, tmp_path):
-    from bolha.updates import DownloadInterrupted
-
-    base, _, data, _ = feed
+@pytest.mark.parametrize('failure', ['partial', 'timeout'])
+def test_interrupted_download_retries_once_and_keeps_verified_copy(feed, tmp_path, failure):
+    base, files, data, release = feed
     transport = Transport(base)
-    original = transport.download
-    with patch.object(transport, 'download') as download:
-        def retry(release, path, progress):
-            if download.call_count == 1:
-                raise DownloadInterrupted('interrompido')
-            return original(release, path, progress)
-        download.side_effect = retry
+    open_url = transport.opener.open
+    url = release['assets'][0]['browser_download_url']
+    route = '/' + release['assets'][0]['name']
+    attempts = 0
+
+    def open_with_failure(request, *, timeout):
+        nonlocal attempts
+        if request.full_url == url:
+            attempts += 1
+            if attempts == 1:
+                if failure == 'timeout':
+                    raise URLError(TimeoutError('conexão caiu'))
+                files[route] = (200, {'Content-Length': str(len(data))}, data[:25])
+            else:
+                files[route] = (200, {'Content-Length': str(len(data))}, data)
+        return open_url(request, timeout=timeout)
+
+    with patch.object(transport.opener, 'open', side_effect=open_with_failure):
         result = fetch_update(transport, '0.2.1', tmp_path/'data', tmp_path/'cache')
-        assert download.call_count == 2
+    assert attempts == 2
     assert Path(result['installer']).read_bytes() == data
+    assert not list(tmp_path.rglob('*.part'))
+
+
+def test_source_launch_preserves_installed_update_state(tmp_path):
+    from bolha.updates import Updater
+
+    updater = Updater(tmp_path, '0.4.4', lambda: True, lambda: None)
+    with patch.object(updater, '_background') as background:
+        updater.healthy()
+        background.assert_not_called()
+    updater.stop()
 
 
 def test_bad_pending_cache_restarts_automatic_check(tmp_path):

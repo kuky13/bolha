@@ -64,8 +64,25 @@ não desliga recursos com base no consumo da interface.
 
 ## Instalação e primeiros passos
 
-Instale o `.exe` da página de versões. O instalador já inclui Python, Qt e o cérebro;
-não é necessário instalar Python separadamente.
+### Rodar pelo código, como no Pestinha
+
+No Windows x64, baixe o **Source code (zip)** da página de versões ou clone o
+repositório. Extraia o ZIP inteiro, abra o terminal na pasta que contém
+`main.py` e execute com Python 3.11:
+
+```powershell
+python -m pip install -r requirements.txt
+python main.py
+```
+
+Se o comando `python` apontar para outra versão, use `py -3.11` no lugar de
+`python` nos dois comandos. Para atualizar pelo código, feche a Bolha, baixe a
+versão nova e rode os comandos na pasta extraída. A Bolha usa o mesmo perfil
+em `%APPDATA%\bolha`. A inicialização com o Windows exige o instalador.
+
+### Instalador Windows
+
+O `.exe` da página de versões já inclui Python, Qt e o cérebro.
 
 ### Como interagir
 
@@ -164,7 +181,7 @@ da OneDrip é necessário.
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-build.txt
-.venv\Scripts\python -m bolha
+.venv\Scripts\python main.py
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python scripts/build_native.py
 ```
