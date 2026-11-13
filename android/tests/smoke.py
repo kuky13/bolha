@@ -21,17 +21,19 @@ def wait_for(label, predicate, seconds=25):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         result = predicate()
-        if result:
+        if result is not None and result is not False:
             return result
         time.sleep(.4)
     raise AssertionError(f'Tempo esgotado: {label}')
 
 
 def hierarchy():
-    result = adb('shell', 'uiautomator', 'dump', WINDOW_XML, check=False)
-    if b'dumped to' not in result:
+    adb('shell', 'rm', '-f', WINDOW_XML)
+    adb('shell', 'uiautomator', 'dump', WINDOW_XML, check=False)
+    try:
+        return ET.fromstring(adb('exec-out', 'cat', WINDOW_XML, check=False)).iter('node')
+    except ET.ParseError:
         return ()
-    return ET.fromstring(adb('exec-out', 'cat', WINDOW_XML)).iter('node')
 
 
 def control(text):
