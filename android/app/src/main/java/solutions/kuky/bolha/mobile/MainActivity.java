@@ -2,8 +2,10 @@
 package solutions.kuky.bolha.mobile;
 
 import android.app.Activity;
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -14,6 +16,7 @@ import android.widget.*;
 import org.json.JSONObject;
 
 public final class MainActivity extends Activity implements Engine.Listener {
+    private static final int NOTIFICATIONS_REQUEST = 1;
     private Engine engine;
     private Stage stage;
     private TextView status;
@@ -22,6 +25,7 @@ public final class MainActivity extends Activity implements Engine.Listener {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        waitingPermission = state != null && state.getBoolean("waitingOverlayPermission");
         getWindow().setStatusBarColor(Color.rgb(24,20,32));
         engine = Engine.get(this);
         LinearLayout page = new LinearLayout(this);
@@ -70,9 +74,9 @@ public final class MainActivity extends Activity implements Engine.Listener {
 
     @Override protected void onResume() {
         super.onResume();
-        if (waitingPermission) {
+        if (waitingPermission && Settings.canDrawOverlays(this)) {
             waitingPermission=false;
-            if (Settings.canDrawOverlays(this)) launchOverlay();
+            prepareOverlay();
         }
         engine.listen(this);
         stage.post(() -> {
@@ -83,6 +87,11 @@ public final class MainActivity extends Activity implements Engine.Listener {
     @Override protected void onPause() {
         engine.remove(this);
         super.onPause();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putBoolean("waitingOverlayPermission",waitingPermission);
     }
 
     private Button add(LinearLayout row,String text,Runnable action) {
@@ -115,13 +124,32 @@ public final class MainActivity extends Activity implements Engine.Listener {
                 waitingPermission=false;
                 Toast.makeText(this,"Abra a permissão de sobreposição nas configurações do Android.",Toast.LENGTH_LONG).show();
             }
+        } else prepareOverlay();
+    }
+
+    private void prepareOverlay() {
+        SharedPreferences options = getSharedPreferences("options",0);
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED && !options.getBoolean("askedNotifications",false)) {
+            options.edit().putBoolean("askedNotifications",true).apply();
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS_REQUEST);
         } else launchOverlay();
+    }
+
+    @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request,permissions,results);
+        if (request == NOTIFICATIONS_REQUEST && Settings.canDrawOverlays(this)) launchOverlay();
     }
 
     private void launchOverlay() {
         Intent intent = new Intent(this,FloatingBolha.class);
-        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent); else startService(intent);
-        moveTaskToBack(true);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent); else startService(intent);
+            moveTaskToBack(true);
+        } catch (IllegalStateException | SecurityException error) {
+            android.util.Log.e("Bolha","Iniciar modo flutuante",error);
+            Toast.makeText(this,"Não foi possível iniciar o modo flutuante.",Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override public void frame(JSONObject state, String error) {

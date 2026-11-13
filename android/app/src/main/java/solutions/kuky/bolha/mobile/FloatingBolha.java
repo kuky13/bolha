@@ -45,10 +45,14 @@ public final class FloatingBolha extends Service implements Engine.Listener {
         pet = new Stage(this,engine,"pet");
         toy = new Stage(this,engine,"toy");
         message = new Stage(this,engine,"message");
-        petParams = params();
-        toyParams = params();
-        messageParams = params();
+        petParams = params("BolhaMascote");
+        toyParams = params("BolhaBrinquedo");
+        messageParams = params("BolhaMensagem");
         messageParams.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        if (Build.VERSION.SDK_INT >= 31) {
+            android.hardware.input.InputManager input = getSystemService(android.hardware.input.InputManager.class);
+            messageParams.alpha = input.getMaximumObscuringOpacityForTouch();
+        }
         active = true;
         updateArea();
         engine.listen(this);
@@ -56,13 +60,14 @@ public final class FloatingBolha extends Service implements Engine.Listener {
     }
 
     @SuppressWarnings("deprecation")
-    private WindowManager.LayoutParams params() {
+    private WindowManager.LayoutParams params(String title) {
         int type = Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
         WindowManager.LayoutParams value = new WindowManager.LayoutParams(1,1,type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT);
         value.gravity = Gravity.TOP | Gravity.LEFT;
+        value.setTitle(title);
         return value;
     }
 

@@ -21,6 +21,11 @@ Instale o Android SDK Platform 35, Build Tools 35.0.0, JDK 21 e Gradle 8.14.3.
 Configure `ANDROID_HOME` e execute `gradle -p android :app:assembleDebug` na raiz.
 O APK fica em `android/app/build/outputs/apk/debug/app-debug.apk`.
 
+O workflow Android executa o teste de cadência de vibração em Java, instala
+o APK em um emulador Android 15 e testa sobreposição, encerramento e persistência.
+O emulador verifica o controle e a lógica de vibração. A intensidade do pulso
+depende do aparelho.
+
 Código e artes próprios sob GPL-3.0-or-later. Veja [NOTICE.md](../NOTICE.md)
 para autoria e licenças. A interface Android tem controles por toque e não
 inclui a bandeja, sensores de janelas, painel neural, atualizador silencioso

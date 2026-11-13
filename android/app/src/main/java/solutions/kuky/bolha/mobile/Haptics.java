@@ -9,28 +9,19 @@ import android.os.Vibrator;
 import org.json.JSONObject;
 
 final class Haptics {
-    private static boolean angry;
-    private static long lastAnger = -6000, lastTap;
-    private static double lastImpact;
+    private static final HapticCadence cadence = new HapticCadence();
 
     static boolean enabled(Context context) {
         return context.getSharedPreferences("options",0).getBoolean("haptics",true);
     }
 
     static void frame(Context context, JSONObject state) {
-        boolean nextAngry = state.optString("emotion").equals("bravo");
-        long now = SystemClock.uptimeMillis();
-        if (nextAngry && !angry && now-lastAnger >= 6000) {
-            lastAnger = now;
-            pulse(context, 36, 52);
+        switch (cadence.frame(state.optString("emotion").equals("bravo"),
+                state.optDouble("impact",0),SystemClock.uptimeMillis())) {
+            case ANGER: pulse(context,36,52); break;
+            case IMPACT: pulse(context,17,36); break;
+            default: break;
         }
-        angry = nextAngry;
-        double impact = state.optDouble("impact",0);
-        if (impact > 0 && impact != lastImpact && now-lastTap >= 160) {
-            lastTap = now;
-            pulse(context, 17, 36);
-        }
-        lastImpact = impact;
     }
 
     @SuppressWarnings("deprecation")
