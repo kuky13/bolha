@@ -56,9 +56,45 @@ def windows():
     return adb('shell', 'dumpsys', 'window', 'windows').decode()
 
 
+def overlay_frames():
+    frames = {}
+    for block in re.split(r'(?=  Window #\d+ Window\{)', windows()):
+        header = block.splitlines()[0] if block else ''
+        for name in ('BolhaMascote', 'BolhaBrinquedo'):
+            if not re.search(r'\b' + name + r'\}:$', header):
+                continue
+            visible = all(value in block for value in (
+                'mHasSurface=true', 'isOnScreen=true', 'isVisible=true',
+                'Surface: shown=true', 'mDrawState=HAS_DRAWN'))
+            frame = re.search(r'\bframe=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]', block)
+            if visible and frame:
+                frames[name] = tuple(map(int, frame.groups()))
+    return frames
+
+
 def visible_overlay():
-    dump = windows()
-    return all(name in dump for name in ('BolhaMascote', 'BolhaBrinquedo'))
+    return len(overlay_frames()) == 2
+
+
+def drag_overlay(name, output):
+    bounds = overlay_frames()[name]
+    x, y = (bounds[0]+bounds[2])//2, (bounds[1]+bounds[3])//2
+    target_x = 300 if x > 500 else 700
+    target_y = max(300, y-330)
+    gesture = subprocess.Popen(['adb', 'shell', 'input', 'swipe', str(x), str(y),
+                                str(target_x), str(target_y), '1800'])
+    try:
+        def moved():
+            frame = overlay_frames().get(name)
+            return frame is not None and abs((frame[0]+frame[2])/2-x) > 35
+        wait_for('arrasto de ' + name, moved, seconds=8)
+        (output / ('arrasto-' + name + '.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
+        assert gesture.wait(timeout=8) == 0
+        wait_for('soltura de ' + name, visible_overlay)
+    finally:
+        if gesture.poll() is None:
+            gesture.terminate()
+            gesture.wait(timeout=3)
 
 
 def foreground_app(package):
@@ -96,27 +132,44 @@ def smoke(apk, output):
         adb('shell', 'appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'allow')
         adb('shell', 'pm', 'grant', PACKAGE, 'android.permission.POST_NOTIFICATIONS')
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-        wait_for('ativação ao retornar das configurações', visible_overlay)
-        adb('shell', 'am', 'start', '-W', '-a', 'android.settings.SETTINGS')
-        wait_for('mascote e brinquedo sobre outro aplicativo', lambda:
-                 visible_overlay() and foreground_app('com.android.settings'))
+        wait_for('criação das janelas após autorizar a sobreposição', lambda:
+                 all(name in windows() for name in ('BolhaMascote', 'BolhaBrinquedo')))
+        adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
+        wait_for('mascote e brinquedo visíveis sobre o launcher', lambda:
+                 visible_overlay() and foreground_app('com.android.launcher3'))
         services = adb('shell', 'dumpsys', 'activity', 'services', PACKAGE).decode()
         assert 'FloatingBolha' in services and 'isForeground=true' in services, services
+        (output / 'janelas-flutuantes.txt').write_text(windows(), encoding='utf-8')
         (output / 'flutuante.png').write_bytes(adb('exec-out', 'screencap', '-p'))
-        passed.append('Permissão Android; mascote e brinquedo sobre outro app; serviço em primeiro plano')
+        passed.append('Permissão Android; mascote e brinquedo desenhados e visíveis sobre o launcher; serviço em primeiro plano')
+        for name in ('BolhaMascote', 'BolhaBrinquedo'):
+            drag_overlay(name, output)
+        passed.append('Arrasto e soltura da mascote e do brinquedo sobre outro aplicativo')
 
         activity()
         tap(control('Parar de flutuar'))
         wait_for('remoção das duas janelas', lambda: all(
             name not in windows() for name in ('BolhaMascote', 'BolhaBrinquedo')))
         control('470 neurônios')
+        paused_at = time.time()
         adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
         wait_for('memória gravada', lambda: b'"x"' in adb(
             'shell', 'run-as', PACKAGE, 'cat', 'files/memory/position.json', check=False))
+        memory_path = 'files/memory/bolha/nervous.json'
+        before = wait_for('gravação concluída antes de encerrar o processo', lambda:
+                          saved_memory(memory_path, paused_at))
+        assert before['seed'] == 1313
+        adb('shell', 'am', 'force-stop', PACKAGE)
+        assert not adb('shell', 'pidof', PACKAGE, check=False).strip()
         activity()
         control('470 neurônios')
         assert control('Vibração').get('checked') == 'false'
-        passed.append('Sobreposição encerrada; sessão, memória e preferência recuperadas')
+        adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
+        after = wait_for('aprendizado preservado após reiniciar o processo', lambda:
+            preserved_memory(memory_path, before))
+        (output / 'memoria-reaberta.json').write_text(json.dumps(after, ensure_ascii=False,
+            indent=2) + '\n', encoding='utf-8')
+        passed.append('Sobreposição encerrada; processo reiniciado; semente, aprendizado e preferência recuperados')
         print('\n'.join(passed))
     finally:
         (output / 'logcat.txt').write_bytes(adb('logcat', '-d', check=False))
@@ -128,6 +181,22 @@ def smoke(apk, output):
             (output / 'diagnostico.png').write_bytes(adb('exec-out', 'screencap', '-p'))
         (output / 'relatorio.json').write_text(json.dumps({'validado': passed},
             indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+
+def saved_memory(path, since):
+    try:
+        saved = json.loads(adb('shell', 'run-as', PACKAGE, 'cat', path, check=False))
+    except json.JSONDecodeError:
+        return None
+    return saved if saved.get('saved_at', 0) > since else None
+
+
+def preserved_memory(path, before):
+    after = saved_memory(path, before['saved_at'])
+    if (after is not None and after.get('seed') == before['seed']
+            and after.get('learned') == before['learned']):
+        return after
+    return None
 
 
 if __name__ == '__main__':

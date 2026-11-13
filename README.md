@@ -10,16 +10,16 @@ Bolha. Contribuições da comunidade são bem-vindas.
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
 
-**Windows x64 e Android.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/latest) · [Modo flutuante e build Android](android/README.md).
+**Windows x64 e versão inicial para Android.** [Baixar no GitHub](https://github.com/kuky13/bolha/releases/latest) · [Modo flutuante e build Android](android/README.md).
 
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.4.4 reúne as configurações na
-**Central da Bolha**, com ajustes detalhados recolhidos e uma aba **Testar**
-para expressões e uma rede neural temporária. Também inclui raquete visível
-no pingue-pongue, corrida que acompanha a direção, contato físico do brinquedo
-e intervalos maiores entre fogos espontâneos.
+A 0.4.10 melhora os balões, libera o brinquedo dos cantos e acrescenta bicudas
+e levantadas. A atualização tem progresso e nova tentativa de download. Também
+é possível abrir pelo código com `python main.py`, como no Pestinha.
+Veja a [validação da versão](docs/VALIDATION-0.4.10.md) e a
+[revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
 *Imagem da versão 0.3.0: execução Qt capturada em Linux offscreen, com fundo
 composto para apresentar janelas transparentes. A validação em Windows é separada. A personagem Bolha
@@ -31,7 +31,7 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 
 ## O que acompanha
 
-- Carinho, segurar, arrasto direto, soltura por gravidade, giro e pouso sobre janelas.
+- Carinho, segurar, arrasto direto, arremessos, giro e pouso sobre janelas.
 - Esfera vetorial escura com olhos dourados e orelhinhas, sem boca. Corpo,
   olhos e orelhas giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
