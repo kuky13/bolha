@@ -60,8 +60,11 @@ A revisão visual mais recente tem testes próprios de fechamento após susto,
 alegria, mastigação e cuspida, além de prévia do desenho Qt. A suíte local
 terminou com 715 testes aprovados e 11 exclusivos de Windows ignorados.
 O novo APK de desenvolvimento compilou e passou na auditoria estática.
-Os testes do novo instalador e do emulador precisam rodar para essa revisão
-antes da publicação.
+Os dois pacotes da revisão `5140599` passaram: [Windows 43437150067](https://github.com/kuky13/bolha/actions/runs/43437150067)
+com 726 testes e 24 cenários do instalador, e [Android 43437150002](https://github.com/kuky13/bolha/actions/runs/43437150002)
+com 11 verificações no Android 15, incluindo migração, memória, arrasto e
+aceleração simulada. Os checksums Windows e Android e a assinatura do APK
+foram verificados. Paisagem e hardware físico continuam pendentes.
 
 ## Limites da evidência
 
