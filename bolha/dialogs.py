@@ -243,10 +243,17 @@ class SettingsDialog(QDialog):
         self.update_label = _label()
         self.update_label.setAccessibleName('Estado da atualização')
         layout.addWidget(self.update_label)
+        self.update_progress = QProgressBar()
+        self.update_progress.setAccessibleName('Progresso do download da atualização')
+        layout.addWidget(self.update_progress)
+        self.update_progress.hide()
         row = QHBoxLayout()
         self.check_update = _button('Verificar atualizações', self._check_update)
         self.defer_update = _button('Adiar por 1 hora', self._defer_update)
+        self.install_update = _button('Instalar agora', self._install_update)
+        self.install_update.hide()
         row.addWidget(self.check_update)
+        row.addWidget(self.install_update)
         row.addWidget(self.defer_update)
         layout.addLayout(row)
         layout.addWidget(_label('Consulta ao abrir e a cada seis horas.'))
@@ -362,6 +369,10 @@ class SettingsDialog(QDialog):
         self.controller.updater.defer()
         self.refresh_update()
 
+    def _install_update(self):
+        self.controller.updater.install()
+        self.refresh_update()
+
     def refresh_update(self, *_):
         if not self.isVisible():
             return
@@ -379,6 +390,10 @@ class SettingsDialog(QDialog):
             seconds = max(0, math.ceil((deadline-time.time()*1000)/1000))
             text += f' Instalação em {seconds} s.' if seconds <= 60 else f' Instalação em {math.ceil(seconds/60)} min.'
         self.update_label.setText(text)
+        self.update_progress.setVisible(phase == 'downloading')
+        self.update_progress.setValue(int(max(0., min(100., _number(state.get('percent'))))))
+        self.check_update.setText('Tentar novamente' if phase == 'error' else 'Verificar atualizações')
+        self.install_update.setVisible(phase == 'ready')
         self.check_update.setEnabled(phase in ('idle', 'error'))
         self.defer_update.setVisible(phase == 'ready')
         self.defer_update.setEnabled(phase == 'ready')

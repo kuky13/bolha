@@ -317,22 +317,25 @@ class NativeApp:
     def on_recover(self):self.updating=False;self.last_tick=time.monotonic();self.pet.sync();self.scene.sync()
     def update_changed(self,state):
         phase=state.get('phase')
-        if phase=='ready' and state.get('installAt') and not getattr(self,'update_notified',False):
-            self.update_notified=True
+        if phase=='ready' and state.get('installAt') and state.get('version') != getattr(self,'update_notified',None):
+            self.update_notified=state.get('version')
             remaining=max(0,round((state['installAt']-time.time()*1000)/1000))
             message=('Instalação em '+str(remaining)+' segundos.') if remaining<=30 else 'O adiamento salvo foi mantido.'
             self.tray.showMessage('Bolha','Atualização pronta. '+message+' Você pode adiar por uma hora no menu da bandeja.',QSystemTrayIcon.Information,15000)
         if phase=='error':self.warn('Atualização: '+str(state.get('error',state.get('message','não foi possível concluir'))))
     def show_update_countdown(self,remaining):
         if self.update_dialog is None:
-            dialog=QDialog(None,Qt.Tool|Qt.WindowStaysOnTopHint)
+            dialog=QDialog(None,Qt.Tool)
             dialog.setAttribute(Qt.WA_ShowWithoutActivating)
             dialog.setWindowTitle('Atualização da Bolha');layout=QVBoxLayout(dialog)
-            self.update_label=QLabel();layout.addWidget(self.update_label)
+            self.update_label=QLabel();self.update_label.setWordWrap(True);layout.addWidget(self.update_label)
+            install=QPushButton('Instalar agora');install.clicked.connect(lambda:self.updater.install());layout.addWidget(install)
             button=QPushButton('Adiar por uma hora');button.clicked.connect(lambda:self.updater.defer());layout.addWidget(button)
             dialog.rejected.connect(lambda:self.updater.defer());self.update_dialog=dialog
-        self.update_label.setText(f'Uma nova versão está pronta.\nInstalação em {remaining} segundos.\nSeu aprendizado e preferências serão preservados.')
-        self.update_dialog.show()
+        version = self.updater.state.get('version', '')
+        self.update_label.setText(f'Bolha {version} pronta para instalar.\nA Bolha vai reabrir em {remaining} s.')
+        if not self.update_dialog.isVisible():
+            self.update_dialog.show()
     def metrics(self):
         import psutil
         def p95(values):return round(sorted(values)[max(0,int(len(values)*.95)-1)],2) if values else 0

@@ -214,9 +214,14 @@ class SpeechWindow(QWidget):
         x = max(left+8, min(right-width-8, game.body.x-width/2))
         self.anchor = game.body.x-x
         target_y = game.body.y-game.body.half_h-height-8
-        self.tail_top = target_y < top+8
+        toy = game.ball.body
+        covers_toy = game.ball.isVisible() and (
+            x-toy.half_w < toy.x < x+width+toy.half_w
+            and target_y-toy.half_h < toy.y < target_y+height+toy.half_h)
+        below_y = game.body.y+game.body.half_h+8
+        self.tail_top = target_y < top+8 or (covers_toy and below_y+height <= bottom-8)
         if self.tail_top:
-            target_y = game.body.y+game.body.half_h+8
+            target_y = below_y
         self.alpha = min(1., max(0., (now-self.started)/.22), max(0., (self.until-now)/.30))
         eased = 1.-(1.-self.alpha)**3
         y = max(top+8, min(bottom-height-8, target_y+(1.-eased)*6))

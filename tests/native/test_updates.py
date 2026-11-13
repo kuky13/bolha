@@ -62,7 +62,7 @@ def test_bad_checksum_never_commits_download(feed,tmp_path):
 def test_truncated_download_never_commits(feed,tmp_path):
     base,files,data,_=feed
     files['/Bolha-Setup-0.3.0-x64.exe']=(200,{},data[:25])
-    with pytest.raises(ValueError,match='integridade'):fetch_update(Transport(base),'0.2.1',tmp_path/'data',tmp_path/'cache')
+    with pytest.raises(OSError,match='integridade'):fetch_update(Transport(base),'0.2.1',tmp_path/'data',tmp_path/'cache')
     assert not list(tmp_path.rglob('*.part'))
 
 
@@ -136,3 +136,32 @@ def test_final_cache_write_failure_cleans_only_own_partial(feed,tmp_path):
         with pytest.raises(PermissionError):fetch_update(Transport(base),'0.2.1',tmp_path/'data',tmp_path/'cache')
     assert not list(tmp_path.rglob('*.part'))
     assert not (tmp_path/'data/pending-update.json').exists()
+
+
+def test_interrupted_download_retries_once_and_keeps_verified_copy(feed, tmp_path):
+    from bolha.updates import DownloadInterrupted
+
+    base, _, data, _ = feed
+    transport = Transport(base)
+    original = transport.download
+    with patch.object(transport, 'download') as download:
+        def retry(release, path, progress):
+            if download.call_count == 1:
+                raise DownloadInterrupted('interrompido')
+            return original(release, path, progress)
+        download.side_effect = retry
+        result = fetch_update(transport, '0.2.1', tmp_path/'data', tmp_path/'cache')
+        assert download.call_count == 2
+    assert Path(result['installer']).read_bytes() == data
+
+
+def test_bad_pending_cache_restarts_automatic_check(tmp_path):
+    from bolha.updates import Updater
+
+    updater = Updater(tmp_path, '0.4.4', lambda: True, lambda: None)
+    updater._checking = True
+    with patch.object(updater, 'check') as check:
+        updater._apply(('resume', None, ValueError('cache inválido')))
+        check.assert_called_once()
+    assert not updater._checking
+    updater.stop()

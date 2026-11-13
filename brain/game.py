@@ -435,7 +435,16 @@ class Game:
                             source='explicit_user_command', factors=dict(reason='quiet command'))
             self.intelligence.current_decision = decision
             self.intelligence.history.append(dict(decision))
-        elif kind == 'spin': self.body.omega += max(-500, min(500, event.get('value', 0)))
+        elif kind == 'spin':
+            impulse = max(-500, min(500, event.get('value', 0)))
+            if self.body.held:
+                self.body.angle += impulse / 12.
+            elif impulse:
+                self.body.omega += impulse
+                if abs(self.body.omega) >= 480.:
+                    self.state.dizzy_until = now + .8
+                if self.body.grounded:
+                    self.body.jump(self.body.vx, -250.)
         elif kind == 'sleep':
             self.play.stop_chase()
             self.play_reaction = {}

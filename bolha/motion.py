@@ -329,6 +329,9 @@ class ExpressionMotion:
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if state.at_desk and not held and not game.sleep.asleep:
+            # Balanço de digitação do Pestinha (0d1ac98), aplicado só ao desenho.
+            self.pose['angle_offset'] += 1.8 * math.sin(now * math.tau * 2.4)
         if mode == 'pouso_de_lado' and landing_reaction.get('angle',0.) < 0.:
             self.pose['angle_offset'] *= -1.
         if mode == 'deitada':

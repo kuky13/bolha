@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+plugins {
+    id 'com.android.application' version '8.10.1'
+    id 'com.chaquo.python' version '17.0.0'
+}
+def projectRoot = rootProject.projectDir.parentFile
+def sharedVersion = (new File(projectRoot, 'pyproject.toml').text =~ /(?m)^version = "([^"]+)"/)[0][1]
+def parts = sharedVersion.tokenize('.').collect { it.toInteger() }
+android {
+    namespace 'solutions.kuky.bolha.mobile'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'solutions.kuky.bolha.mobile'
+        minSdk 24
+        targetSdk 35
+        versionCode parts[0]*1000000 + parts[1]*1000 + parts[2]
+        versionName sharedVersion
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
+    }
+    sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/bolha-assets')
+}
+chaquopy {
+    defaultConfig {
+        version '3.11'
+        pip { install 'numpy==1.26.2' }
+    }
+    sourceSets.main.srcDir new File(projectRoot, 'brain')
+    sourceSets.main.exclude '**/tests/**', '**/__pycache__/**'
+}
+def sharedAssets = tasks.register('sharedAssets', Sync) {
+    into layout.buildDirectory.dir('generated/bolha-assets')
+    from(new File(projectRoot, 'assets/bolha/content')) { into 'content' }
+    from(projectRoot) { include 'LICENSE', 'NOTICE.md' }
+    from(new File(projectRoot, 'licenses')) { into 'licenses' }
+}
+tasks.named('preBuild').configure { dependsOn sharedAssets }

@@ -4,6 +4,7 @@
 from concurrent.futures import Future
 from dataclasses import dataclass
 import hashlib
+from http.client import IncompleteRead, RemoteDisconnected
 import json
 import logging
 import os
@@ -44,6 +45,10 @@ LOG.propagate = False
 
 
 class UpdateCancelled(Exception):
+    pass
+
+
+class DownloadInterrupted(OSError):
     pass
 
 
@@ -124,7 +129,9 @@ class Transport:
                     target.write(chunk); digest.update(chunk)
                     if progress: progress(size / release.size * 100)
                 target.flush(); os.fsync(target.fileno())
-            if size != release.size or digest.hexdigest() != release.sha256:
+            if size != release.size:
+                raise DownloadInterrupted('A integridade do instalador não confere: download interrompido.')
+            if digest.hexdigest() != release.sha256:
                 raise ValueError('A integridade do instalador não confere.')
         except BaseException:
             if created: Path(output).unlink(missing_ok=True)
@@ -216,7 +223,15 @@ def fetch_update(transport, current_version, data_dir, cache_root, progress=None
     except (OSError, ValueError):
         part = installer.with_name(installer.name + '.' + uuid.uuid4().hex + '.part')
         try:
-            transport.download(release, part, progress)
+            for attempt in range(2):
+                try:
+                    transport.download(release, part, progress)
+                    break
+                except (DownloadInterrupted, IncompleteRead, RemoteDisconnected, TimeoutError, ConnectionResetError):
+                    if attempt:
+                        raise
+                    if progress:
+                        progress(0.)
             os.replace(part, installer)
         finally:
             part.unlink(missing_ok=True)
@@ -347,6 +362,9 @@ class Updater(QObject):
         if error:
             if isinstance(error, UpdateCancelled): return
             LOG.warning('Atualização: %s', error)
+            if kind == 'resume':
+                self.check()
+                return
             if kind == 'flushed': self.on_recover()
             self._send({'phase': 'error', 'message': 'Não foi possível atualizar agora. Você pode continuar usando a Bolha.'})
             return
