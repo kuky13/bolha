@@ -86,6 +86,10 @@ def test_gag_frames_have_shared_mouth_state_and_neutral_frames_keep_small_mouth(
         assert -1. <= pose['mouth_curve'] <= 1.
         assert 0. <= pose['tongue'] <= 1.
     assert animation_pose('cursor_swallow', .05)['mouth_open'] > .6
+    assert animation_pose('cursor_swallow', .32)['mouth_open'] == 0.
     assert animation_pose('cursor_chew', .2)['mouth_chew'] > 0.
-    assert animation_pose('cursor_spit', .4)['tongue'] > 0.
+    assert animation_pose('cursor_chew', .2)['mouth_open'] == 0.
+    assert animation_pose('cursor_spit', .12)['tongue'] > 0.
+    assert animation_pose('cursor_spit', .4)['tongue'] == 0.
+    assert animation_pose('cursor_spit', .4)['mouth_open'] == 0.
     assert animation_pose('observando', 0.)['mouth_open'] == 0.

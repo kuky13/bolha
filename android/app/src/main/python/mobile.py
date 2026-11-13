@@ -11,7 +11,7 @@ import time
 from game import Game
 from pestinha.sense.senses import detect_activity
 from bolha import VERSION
-from bolha.dialogue import Dialogue
+from bolha.dialogue import Dialogue, speech_duration
 from bolha.migration import atomic_json, read_json
 from bolha.motion import ExpressionMotion, animation_pose, QUIRK_SECONDS
 from bolha.preferences import defaults, sanitize, number
@@ -318,7 +318,7 @@ def tick(dt):
         if line:
             say_text, say_thought = line
             say_started = now
-            say_until = now + max(2.6, min(5., 1.7+len(say_text)/18.))
+            say_until = now + speech_duration(say_text)
     _update_reactions(now, dt)
     data = game.snapshot()
     _neural_snapshot(data)

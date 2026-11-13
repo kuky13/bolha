@@ -239,18 +239,23 @@ final class BolhaRenderer {
         float opening=unit(number(pose,"mouth_open",0));
         float curve=clamp(number(pose,"mouth_curve",.3f),-1,1);
         float chew=unit(number(pose,"mouth_chew",0));
-        float width=7.5f+10*opening, height=2.5f+12*opening, y=18+chew*.6f;
-        if (opening<.08f) {
-            path.reset(); path.moveTo(-width,y); path.quadTo(0,y+7*curve,width,y);
+        float width=(7.2f+9.5f*opening)*clamp(number(pose,"mouth_width",1),.55f,1.2f);
+        float height=16*opening, y=18+chew*.75f, middle=y+6*curve;
+        float slant=2.5f*clamp(number(pose,"mouth_skew",0),-1,1);
+        if (opening<=.025f) {
+            path.reset(); path.moveTo(-width,y+slant); path.quadTo(0,middle,width,y-slant);
             stroke(GOLD,2); canvas.drawPath(path,paint);
         } else {
-            Path mouth=new Path(); mouth.addOval(-width,y-height,width,y+height,Path.Direction.CW);
-            fill(color("#0c0910")); canvas.drawPath(mouth,paint);
-            stroke(GOLD,1.8f); canvas.drawPath(mouth,paint);
+            Path mouth=new Path(); mouth.moveTo(-width,y+slant);
+            mouth.quadTo(0,middle-height*.8f,width,y-slant);
+            mouth.quadTo(0,middle+height*1.2f,-width,y+slant); mouth.close();
+            fill(color("#2f1026")); canvas.drawPath(mouth,paint);
+            stroke(GOLD,1.75f); canvas.drawPath(mouth,paint);
             float tongue=unit(number(pose,"tongue",0));
-            if (tongue>0) {
-                canvas.save(); canvas.clipPath(mouth); fill(alpha(color("#f697b5"),tongue));
-                canvas.drawOval(-width*.55f,y+height*.2f,width*.7f,y+height*1.2f,paint); canvas.restore();
+            if ((curve>.4f && opening>.23f) || tongue>.05f) {
+                canvas.save(); canvas.clipPath(mouth); fill(color("#f9b3bd"));
+                float spot=y+height*.55f+3, radius=height*.32f+1;
+                canvas.drawOval(-width*.55f,spot-radius,width*.55f,spot+radius,paint); canvas.restore();
             }
         }
         if (chew>0) {

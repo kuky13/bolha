@@ -259,6 +259,21 @@ def test_corrida_compensa_rolagem_oposta_e_voltas_completas(tmp_path, velocity, 
     assert pose['gaze'][0]*velocity>0.
 
 
+@pytest.mark.parametrize('mode', ['feliz', 'caress', 'comemorando', 'airborne', 'assustado', 'impact', 'held'])
+def test_boca_abre_no_gesto_e_fecha_antes_da_emocao_terminar(mode):
+    assert animation_pose(mode,.08)['mouth_open'] > .1
+    assert animation_pose(mode,.6)['mouth_open'] == 0.
+    assert animation_pose(mode,15.)['mouth_open'] == 0.
+
+
+def test_boca_descansa_fechada_e_cada_mania_tem_ritmo_proprio():
+    for mode in ('curioso','travesso','dormindo','sleeping','bravo','tonto'):
+        assert animation_pose(mode,1.5)['mouth_open'] == 0.
+    for mode, highlight in (('doze',.34),('sneeze',.95),('hiccup',.35)):
+        assert animation_pose(mode,highlight)['mouth_open'] > .2
+        assert animation_pose(mode,1.5)['mouth_open'] < .025
+
+
 def test_rebatida_do_brinquedo_livre_usa_a_direcao_do_rebote(tmp_path):
     game=game_at_rest(tmp_path)
     game.body.angle=-20.

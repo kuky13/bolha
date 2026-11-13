@@ -19,6 +19,10 @@ def _ease(value):
     return value * value * (3 - 2 * value)
 
 
+def _mouth_pulse(t, duration, attack=.08):
+    return _ease(t/attack) * (1.-_ease((t-attack)/(duration-attack)))
+
+
 def animation_pose(mode, seconds, strength=1.):
     """Quadro determinístico compartilhado pelo aplicativo e pelas prévias Qt.
 
@@ -36,31 +40,33 @@ def animation_pose(mode, seconds, strength=1.):
                     angle_offset=3. * math.sin(t * 3.), mouth_curve=.75)
     elif mode == 'cursor_pounce':
         pose.update(emotion='atento', eye_open=1.2, ear_raise=2.7,
-                    squash=-.15 * strength, mouth_open=.4, mouth_curve=.6)
+                    squash=-.15 * strength, mouth_open=.44*_mouth_pulse(t,.23),
+                    mouth_curve=.6)
     elif mode == 'cursor_swallow':
         progress = _unit(t / .32)
         pose.update(emotion='travesso', eye_open=1.15-.3*progress, ear_raise=2.,
-                    squash=.11*math.sin(progress*math.pi), mouth_open=.85*(1.-progress)+.15,
-                    mouth_curve=.6, cursor_inside=progress < .8)
+                    squash=.11*math.sin(progress*math.pi), mouth_open=1.-_ease(progress),
+                    mouth_curve=.6, cursor_inside=progress < .65)
     elif mode == 'cursor_chew':
         chew = .5 + .5 * math.sin(t * math.tau * 2.7)
         pose.update(emotion='travesso', eye_open=.7, ear_tilt=4.*math.sin(t*5.),
-                    squash=.045*math.sin(t*math.tau*2.7), mouth_open=.025+.08*chew,
-                    mouth_curve=.3, mouth_chew=chew)
+                    squash=.045*math.sin(t*math.tau*2.7), mouth_open=0.,
+                    mouth_curve=.15+.28*chew, mouth_chew=chew, mouth_width=.84+.18*chew,
+                    mouth_skew=.22*math.sin(t*math.tau*2.7))
     elif mode == 'cursor_spit':
         progress = _unit(t / 1.35)
         pulse = math.sin(math.pi * _unit(t / .35)) if t < .35 else 0.
         pose.update(emotion='tonto', eye_open=.55+.3*progress,
                     ear_raise=-2.8*(1.-progress), ear_tilt=12.*math.sin(t*13.)*(1.-progress),
                     angle_offset=9.*math.sin(t*12.)*(1.-progress),
-                    squash=.13*pulse, mouth_open=.65*(1.-progress), mouth_curve=-.7,
-                    tongue=.75*math.sin(math.pi*progress),
+                    squash=.13*pulse, mouth_open=.78*_mouth_pulse(t,.32,.04), mouth_curve=-.7,
+                    tongue=.75*pulse,
                     cursor_spit=_unit(t/.35) if t < .35 else 0.,
                     effect='tonto', effect_strength=.55*(1.-progress))
     elif mode == 'cursor_recover':
         recovery = 1.-_unit(t)
         pose.update(emotion='contente', mouth_curve=-.25*recovery,
-                    mouth_open=.08*recovery, ear_raise=-1.2*recovery,
+                    ear_raise=-1.2*recovery,
                     angle_offset=2.5*math.sin(t*7.)*recovery)
     elif mode == 'held':
         irritation = _ease((t - .7) / 3.)
@@ -272,6 +278,24 @@ def animation_pose(mode, seconds, strength=1.):
                     angle_offset=1.5 * math.sin(t * 2))
     for key, value in mouth_state(pose['emotion']).items():
         pose.setdefault(key, value)
+    if mode in ('caress', 'feliz', 'comemorando'):
+        pose['mouth_open'] = (.2 if mode != 'comemorando' else .38)*_mouth_pulse(t,.46)*strength
+    elif mode in ('assustado', 'airborne', 'impact', 'brinquedo_susto'):
+        pose['mouth_open'] = .43*_mouth_pulse(t,.32,.04)*strength
+        pose['mouth_width'] = .68
+    elif mode == 'doze':
+        pose['mouth_open'] = .32*_mouth_pulse(t-.22,.56,.12)
+        pose['mouth_width'] = .73
+    elif mode in ('hiccup', 'sneeze'):
+        pose['mouth_open'] = .38*min(1., pulse if mode == 'hiccup' else burst)
+        pose['mouth_width'] = .6
+    elif mode == 'held':
+        pose['mouth_open'] = .15*_mouth_pulse(t,.26,.04)
+        pose['mouth_width'] = .9+.18*irritation
+    elif mode in ('wink', 'cursor_approach'):
+        pose['mouth_skew'] = .34*_mouth_pulse(t,.96,.16) if mode == 'wink' else .3
+    elif mode in ('sleeping', 'dormindo', 'timido', 'pop_return'):
+        pose['mouth_width'] = .72
     pose['squash'] = max(-.25, min(.25, pose['squash']))
     return pose
 

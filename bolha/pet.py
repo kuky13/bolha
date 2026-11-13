@@ -70,6 +70,7 @@ class PetVisual(QWidget):
                            mouth_enabled=pose.get('mouth_enabled',True),
                            mouth_open=pose.get('mouth_open'), mouth_curve=pose.get('mouth_curve'),
                            mouth_chew=pose.get('mouth_chew',0.), tongue=pose.get('tongue',0.),
+                           mouth_width=pose.get('mouth_width',1.), mouth_skew=pose.get('mouth_skew',0.),
                            cursor_inside=pose.get('cursor_inside',False),
                            cursor_spit=pose.get('cursor_spit',0.))
             p.restore()

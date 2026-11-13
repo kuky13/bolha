@@ -9,7 +9,7 @@ from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPainterPath, 
 from PySide6.QtWidgets import QWidget
 from .pet import FLAGS
 
-from .dialogue import Dialogue, LINES, THOUGHTS, SPEECH_INTERVAL, AMBIENT_MIN_INTERVAL
+from .dialogue import Dialogue, LINES, THOUGHTS, SPEECH_INTERVAL, AMBIENT_MIN_INTERVAL, speech_duration
 
 COMPACT_TEXT_PADDING = (11, 8, 12)
 BUBBLE_TEXT_FLAGS = Qt.AlignCenter | Qt.TextWordWrap
@@ -72,7 +72,7 @@ class SpeechWindow(QWidget):
     def present(self, text, thought=False, now=None):
         self.text, self.thought = str(text), bool(thought)
         self.started = time.monotonic() if now is None else now
-        self.until = self.started + max(2.6, min(5., 1.7 + len(self.text)/18.))
+        self.until = self.started + speech_duration(self.text)
         self.setAccessibleDescription(self.text)
 
     def sync(self, now=None):

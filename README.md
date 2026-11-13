@@ -5,7 +5,7 @@ do sistema de pet virtual criado por [mille-okws](https://github.com/mille-okws)
 e colaboradores. Adaptamos o cérebro, a física e a aplicação para a personagem
 Bolha. Contribuições da comunidade são bem-vindas.
 
-![Bolha Qt com olhos dourados, orelhinhas e um pequeno sorriso](docs/images/bolha-qt-050.png)
+![A Bolha em repouso, piscando, recebendo carinho, levando um susto, bocejando, soluçando, dormindo e mastigando](docs/images/bolha-050-expressoes.png)
 
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
@@ -22,8 +22,8 @@ vem desligada. Também é possível abrir pelo código com `python main.py`, com
 Veja a [validação da versão](docs/VALIDATION-0.5.0.md) e a
 [revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
-*Imagem da versão 0.5.0: desenho Qt real capturado em Linux offscreen sobre
-fundo transparente. A validação em Windows é separada. A personagem Bolha
+*Expressões da 0.5.0 renderizadas pelo Qt em Linux. A validação em Windows é
+separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
 [GPL-3.0-or-later](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
 Qt de Pestinha, de mille-okws e contribuidores, sob
@@ -36,6 +36,8 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 - Esfera vetorial escura com olhos dourados, orelhinhas e boca expressiva opcional. Corpo,
   olhos, orelhas e boca giram juntos; as expressões continuam dentro da esfera.
   O chão é físico e invisível.
+- A boca fica fechada em repouso, no sono e durante a mastigação de brincadeira.
+  Susto, alegria, bocejo, espirro e soluço têm gestos breves próprios.
 - Emoções, energia, carência, aprendizado, condicionamento e memória local.
 - Irritação gradual ao segurar com rubor vermelho forte, reações ao soltar, sono
   com olhos fechando, respiração e “zzz”, corações no carinho e efeitos de
@@ -53,6 +55,7 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
   os bilhetes, os cartazes, o cantinho e os efeitos.
 - Bilhetes curtos aparecem perto da Bolha, um por vez, e somem sozinhos em
   5 a 8 segundos. Enquanto um bilhete está na tela, as falas aguardam.
+  Os balões de fala e pensamento duram entre 3,4 e 6,2 segundos, conforme o texto.
 - Painel com os 470 neurônios, filtros, conexões reais do grupo selecionado,
   decisões recentes, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por

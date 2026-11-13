@@ -42,6 +42,9 @@ quedas e pousos, rebatidas, estouro e retorno tímido pelo canto. Os pedidos de
 atividades usam o mesmo modelo de comportamento da edição para computador;
 humor, energia e experiências influenciam as respostas.
 
+A boca descansa fechada e abre brevemente no susto, carinho, bocejo, espirro
+e soluço. As falas ficam visíveis por 3,4 a 6,2 segundos conforme o comprimento.
+
 Para flutuar, toque em **Flutuar** e permita a sobreposição nas configurações
 do Android. Use **Parar** na notificação ou **Parar de flutuar** no app.
 O serviço em primeiro plano mantém uma notificação enquanto as janelas estão

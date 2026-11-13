@@ -4,18 +4,17 @@
 import math
 
 MOUTH_PROFILES = {
-    'feliz': (.16, 1.), 'contente': (0., .65), 'curioso': (.18, 0.),
-    'bravo': (0., -.6), 'triste': (0., -.6), 'assustado': (.5, 0.),
-    'dramatico': (.3, -.25), 'dormindo': (.06, 0.), 'sonolento': (.12, 0.),
-    'timido': (0., .4), 'entediado': (0., -.2), 'travesso': (.1, .7),
-    'tonto': (.22, -.35), 'comemorando': (.42, 1.),
+    'feliz': .88, 'contente': .55, 'curioso': .12, 'atento': .04,
+    'bravo': -.55, 'triste': -.72, 'assustado': -.12, 'dramatico': -.35,
+    'dormindo': .12, 'sonolento': -.08, 'timido': .3, 'entediado': -.14,
+    'travesso': .66, 'tonto': -.38, 'comemorando': .95,
 }
 
-
 def mouth_state(emotion):
-    opening, curve = MOUTH_PROFILES.get(emotion, (0., .25))
-    return dict(mouth_open=opening, mouth_curve=curve, mouth_chew=0., tongue=0.,
+    return dict(mouth_open=0., mouth_curve=MOUTH_PROFILES.get(emotion, .25),
+                mouth_chew=0., mouth_width=1., mouth_skew=0., tongue=0.,
                 cursor_inside=False, cursor_spit=0.)
+
 
 def _clamp(value, low, high):
     try:

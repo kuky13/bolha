@@ -56,6 +56,12 @@ LINES = {
 THOUGHTS = frozenset(('pensamento', 'sono', 'curioso', 'triste', 'ambiente'))
 SPEECH_INTERVAL = 45.
 AMBIENT_MIN_INTERVAL = 300.
+
+
+def speech_duration(text):
+    return max(3.4, min(6.2, 2.45 + len(text)/17.))
+
+
 class Dialogue:
     """A apresentação observa transições reais; a escolha usa a política do cérebro."""
     def __init__(self):

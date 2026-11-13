@@ -55,6 +55,10 @@ do brinquedo em resposta à aceleração simulada; encerramento pelo botão
 desobstruído e reabertura com o perfil salvo. SHA-256 e assinatura conferidos.
 A rotação em paisagem não foi confirmada nessa imagem de emulador.
 
+Esses dois pacotes precedem o ajuste de expressões da boca e tempo de leitura.
+A revisão visual mais recente tem testes próprios de fechamento após susto,
+alegria, mastigação e cuspida, além de prévia do desenho Qt.
+
 ## Limites da evidência
 
 O kukybook26 estava offline na consulta ao Remote Desktop Commander. Não foi

@@ -240,7 +240,7 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
 
 
 def _mouth(p, emotion, opening=None, curve=None, chew=0., tongue=0.,
-           cursor_inside=False, cursor_spit=0.):
+           cursor_inside=False, cursor_spit=0., width_scale=1., skew=0.):
     defaults = mouth_state(emotion)
     opening = _clamp(defaults['mouth_open'] if opening is None else opening, 0., 1.)
     curve = _clamp(defaults['mouth_curve'] if curve is None else curve, -1., 1.)
@@ -249,28 +249,30 @@ def _mouth(p, emotion, opening=None, curve=None, chew=0., tongue=0.,
     clip = QPainterPath()
     clip.addEllipse(QPointF(0., 0.), FACE_RADIUS, FACE_RADIUS)
     p.setClipPath(clip, Qt.IntersectClip)
-    width = 7.5 + 10. * opening
-    height = 2.5 + 12. * opening
-    y = 18. + chew * 1.5
-    if opening > .055:
+    width = (7.2 + 9.5 * opening) * _clamp(width_scale,.55,1.2)
+    height = 16. * opening
+    y = 18. + chew * .75
+    slant = 2.5*_clamp(skew,-1.,1.)
+    middle = y + 6.*curve
+    if opening > .025:
         mouth = QPainterPath()
-        mouth.moveTo(-width, y - 1.5)
-        mouth.quadTo(0., y - height * .7, width, y - 1.5)
-        mouth.quadTo(width * .8, y + height, 0., y + height)
-        mouth.quadTo(-width * .8, y + height, -width, y - 1.5)
+        mouth.moveTo(-width, y+slant)
+        mouth.quadTo(0., middle-height*.8, width, y-slant)
+        mouth.quadTo(0., middle+height*1.2, -width, y+slant)
+        mouth.closeSubpath()
         p.setPen(_pen(width=1.75))
         p.setBrush(QColor('#2f1026'))
         p.drawPath(mouth)
-        if curve > .4:
+        if (curve > .4 and opening > .23) or tongue > .05:
             p.save()
             p.setClipPath(mouth, Qt.IntersectClip)
             p.setPen(Qt.NoPen)
             p.setBrush(_color('#f9b3bd', .9))
-            p.drawEllipse(QPointF(0., y + height), width * .55, max(2., height * .38))
+            p.drawEllipse(QPointF(0., y+height*.55+3.), width*.55, height*.32+1.)
             p.restore()
     else:
-        mouth = QPainterPath(QPointF(-width, y))
-        mouth.quadTo(0., y + 7. * curve, width, y)
+        mouth = QPainterPath(QPointF(-width, y+slant))
+        mouth.quadTo(0., middle, width, y-slant)
         p.setPen(_pen(width=2.))
         p.setBrush(Qt.NoBrush)
         p.drawPath(mouth)
@@ -280,10 +282,6 @@ def _mouth(p, emotion, opening=None, curve=None, chew=0., tongue=0.,
             cheek = QPainterPath(QPointF(side * 25., 10.))
             cheek.quadTo(side * (28. + chew * 4.), 17., side * 25., 22.)
             p.drawPath(cheek)
-    if tongue > 0:
-        p.setPen(_pen('#e9a0af', width=1.2))
-        p.setBrush(QColor('#d58fa4'))
-        p.drawRoundedRect(QRectF(-3., y + 3., 6., 3. + 8. * tongue), 2.5, 2.5)
     if cursor_inside or cursor_spit > 0:
         p.save()
         p.translate(0. if cursor_inside else 25. * _clamp(cursor_spit, 0., 1.), y - 2.)
@@ -304,7 +302,7 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
                    ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, body_opacity=1.0,
                    blink_left=None, blink_right=None, anger=None, ear_gaze=None,
                    mouth_enabled=True, mouth_open=None, mouth_curve=None, mouth_chew=0.,
-                   tongue=0., cursor_inside=False, cursor_spit=0.):
+                   tongue=0., cursor_inside=False, cursor_spit=0., mouth_width=1., mouth_skew=0.):
     """Pinta a expressão inteira com a mesma transformação do corpo.
 
     ``blink``: 0 aberto, 1 fechado; ``eye_open``: abertura 0..1.3;
@@ -328,7 +326,7 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
               blink_left,blink_right,anger,detail=max(1.,min(1.3,.7/max(.05,scale))),ear_gaze=ear_gaze)
     if mouth_enabled or cursor_inside or cursor_spit > 0:
         _mouth(painter, emotion, mouth_open, mouth_curve, mouth_chew, tongue,
-               cursor_inside, cursor_spit)
+               cursor_inside, cursor_spit, mouth_width, mouth_skew)
     painter.restore()
 
 

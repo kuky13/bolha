@@ -144,12 +144,12 @@ def test_balao_curto_ocupa_menos_espaco_e_fica_menos_tempo(qt_application, tmp_p
     short_width, short_height = window.width(), window.height()
     assert 46 <= short_width < 100
     assert short_height < 60
-    assert window.until - window.started < 3.
+    assert 3.3 < window.until - window.started < 3.5
     window.present('Será que minhas orelhas parecem duas montanhas?', thought, now=105.)
     window.sync(106.)
     assert short_width < window.width() <= 212
     assert window.height() > short_height
-    assert window.until - window.started > 3.
+    assert 4.5 < window.until - window.started <= 6.2
     window.close()
 
 

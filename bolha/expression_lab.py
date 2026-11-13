@@ -38,6 +38,7 @@ class ExpressionPreview(QWidget):
                        ear_raise=pose['ear_raise'], anger=pose['anger'],
                        mouth_open=pose['mouth_open'], mouth_curve=pose['mouth_curve'],
                        mouth_chew=pose['mouth_chew'], tongue=pose['tongue'],
+                       mouth_width=pose['mouth_width'], mouth_skew=pose['mouth_skew'],
                        cursor_inside=pose['cursor_inside'], cursor_spit=pose['cursor_spit'])
         painter.restore()
         if pose['zzz_strength'] > 0:
@@ -56,6 +57,9 @@ class ExpressionLab(QWidget):
     EXPRESSIONS = (
         ('Curiosa', 'curioso'), ('Feliz', 'feliz'), ('Brava', 'bravo'),
         ('Segurada', 'held'), ('Dormindo', 'sleeping'), ('Carinho', 'caress'),
+        ('Comemorando', 'comemorando'), ('Susto rápido', 'assustado'),
+        ('Cochilo e bocejo', 'doze'), ('Espirro', 'sneeze'),
+        ('Soluços', 'hiccup'), ('Piscadela', 'wink'),
         ('Correndo', 'correndo'), ('Deitada', 'deitada'),
         ('Rebatendo', 'pingpong_rebatida'), ('Estourando', 'pop'), ('Tímida', 'timido'),
         ('De olho no ponteiro', 'cursor_approach'), ('Bote no ponteiro', 'cursor_pounce'),
