@@ -54,9 +54,46 @@ os gestos da roda adaptados, além das mudanças de rosto e plataformas que aind
 precisam de integração específica. O upstream foi conferido no commit
 `0bb768a2be024221ee1da62cc335362279d912d6`.
 
+## Android
+
+A [execução Android 15](https://github.com/kuky13/bolha/actions/runs/43360872645)
+validou o commit `abc54f9389a36f83eb3c31f80d8823ead78615c9` com Chaquopy 17.2.0,
+Python 3.13 e NumPy 2.3.2. Passaram a compilação, a assinatura do APK, o teste
+de cadência da vibração e os seguintes cenários no emulador x86_64 de 4 KiB.
+
+- Abertura com 470 neurônios e comandos de carinho, sono e troca de brinquedo.
+- Gravação da preferência de vibração desligada.
+- Autorização de sobreposição, serviço em primeiro plano e mascote e brinquedo
+  efetivamente desenhados sobre o launcher, com superfícies visíveis verificadas.
+- Arrasto e soltura da mascote e do brinquedo, com deslocamento das janelas e
+  capturas durante os gestos.
+- Encerramento da sobreposição e reinício real do processo, recuperando semente,
+  aprendizado e preferência de vibração.
+
+O teste anterior permitia janelas ocultas e foi corrigido. A revisão das capturas
+também encontrou recorte da mascote em movimento. A janela e seu desenho agora
+recebem o mesmo estado da física, evitando a leitura de um quadro mais recente
+durante a pintura.
+
+As 89 bibliotecas ARM64 incluídas atendem ao alinhamento ELF de pelo menos
+16 KiB. A inspeção do APK também aprovou o alinhamento ZIP e a assinatura v2.
+O certificado da chave de teste própria do projeto tem SHA-256
+`10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22`.
+O pipeline usa essa chave preservada para permitir futuras atualizações.
+
+O APK e o ZIP de fontes Android possuem um manifesto próprio,
+`ANDROID-SHA256SUMS.txt`, na página da versão. O ZIP Android contém a revisão
+usada nessa compilação. O Source code automático da tag corresponde à edição
+Windows.
+
 ## Limites da validação
 
 A validação gráfica Windows ocorreu em runner descartável. Arrasto real,
 monitores físicos com escalas diferentes e comportamento com todos os
 aplicativos do usuário precisam de verificação no computador de uso.
 O instalador Windows é distribuído sem assinatura digital.
+O Android é uma edição inicial. O painel neural, os GIFs online e parte das
+atividades e animações Qt ainda precisam de adaptação para a interface móvel.
+Vibração física, gerenciamento de bateria de fabricantes e execução ARM64 com
+páginas de 16 KiB precisam de validação em aparelhos físicos. O binário x86_64
+é destinado aos emuladores de 4 KiB.
