@@ -314,10 +314,19 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         actionRow("Carinho","caress","Dormir / acordar","toggle-sleep");
         actionRow("Mostrar / guardar brinquedo","ball","Bicuda","kick");
         actionRow("Jogar para cima","lift","Pingue-pongue","pingpong");
+        button("Fazer embaixadinhas",() -> {
+            command("panel",false);action("juggle");finish();
+        });
         actionRow("Notebook","notebook","Vem trabalhar comigo","work");
         actionRow("Comemorar","celebrate","Trazer uma travessura","mischief");
         actionRow("Cantinho do castigo","corner","Pedir sossego","quiet");
-        button("Pedir meme ou GIF",() -> action("reaction-now"));
+        button("Pedir meme ou GIF",() -> {
+            if (!preferences.optBoolean("onlineReactions") || !preferences.optBoolean("mischiefEnabled")) {
+                status.setText("Ative as travessuras e os GIFs online em Comportamento.");
+                return;
+            }
+            action("reaction-now");finish();
+        });
         divider("Testar expressões");
         description("Veja as poses e os efeitos sem criar uma nova experiência de aprendizado.");
         expressionPreview=new Stage(this,engine,"preview");

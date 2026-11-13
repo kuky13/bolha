@@ -157,6 +157,8 @@ public final class MainActivity extends Activity implements Engine.Listener {
         else if (FloatingBolha.active) label="A Bolha está flutuando. Você pode continuar por aqui.";
         else label=String.format(Locale.forLanguageTag("pt-BR"),"Energia %.0f%%  ·  %d neurônios",
             state.optDouble("energy",0)*100,state.optInt("neurons"));
+        String reaction=state.optString("reactionStatus");
+        if (!reaction.isEmpty() && !reaction.equals("Reação pronta.")) label+="\n"+reaction;
         if (!label.contentEquals(status.getText())) status.setText(label);
         if (error!=null) return;
         if (!FloatingBolha.active) Haptics.frame(this,state);

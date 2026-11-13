@@ -1,17 +1,10 @@
-# Bolha 0.5.0
+# Bolha 0.5.1
 
-- Android com as poses e a boca expressiva da versão para PC, notebook, brinquedo, balões e reações em GIF carregadas somente na memória.
-- Arrasto por coordenadas de toque estáveis, com área de toque adaptada e arremesso ao soltar em movimento.
-- Central Android organizada em aparência, comportamento, cérebro, atividades, privacidade e aplicativo. Painel com os 470 neurônios e conexões reais.
-- Chacoalhar opcional, desligado inicialmente, com sensibilidade ajustável e reação escolhida pelo cérebro. Objetos segurados continuam presos ao dedo.
-- PC: brincadeira de comer o ponteiro, desligada inicialmente. O cérebro considera ociosidade, irritação, necessidades e aprendizado antes de se aproximar e dar o bote. Mover ou clicar restaura o cursor imediatamente.
-- Boca fechada em repouso, sorrisos de canto e aberturas curtas para alegria, susto, bocejo, espirro e soluço. Na brincadeira com o ponteiro, o bote e a cuspida são rápidos e a mastigação acontece de boca fechada.
-- Balões de fala e pensamento ficam visíveis de 3,4 a 6,2 segundos, conforme o tamanho do texto, sem aumentar a frequência das falas.
-- A corrida vira para o lado do movimento, mesmo após um quique. Os bilhetes trazem textos mais curtos, aparecem um por vez e desaparecem sozinhos, sem se sobrepor às falas.
-- Preferências, memória e identidade dos pacotes preservadas. Projeto aberto sob GPL-3.0-or-later, baseado no Pestinha de mille-okws e colaboradores.
+- Embaixadinhas com a bola ou o amendoim. O cérebro pode iniciar uma rodada e a meta é sorteada de 1 a 100, com a mesma chance para cada número. O balão conta os toques reais, fica estável entre eles e some suavemente depois do último acerto.
+- A Bolha sorri e abre a boca ao correr atrás do brinquedo, rebater ou dar uma embaixadinha. A pose permanece apoiada no chão durante a contagem.
+- É possível pedir uma rodada em **Brincar → Fazer embaixadinhas** no Windows ou em **Central → Atividades** no Android, com o brinquedo ao alcance.
+- GIFs permanecem em memória e no canto escolhido. A busca tenta outra categoria se o provedor alternativo falhar; no Android, a Central avisa quando a busca online está desligada.
 
-No Windows, abra **Central da Bolha → App → Verificar atualizações**. O instalador Windows x64 é distribuído sem assinatura digital.
+No Windows, use **Central da Bolha → App → Verificar atualizações** ou baixe o instalador x64, que é distribuído sem assinatura digital. No Android, instale o APK sobre a versão anterior para manter os dados.
 
-Para rodar pelo código, baixe **Source code (zip)**, extraia e siga as instruções do [README](https://github.com/kuky13/bolha/blob/v0.5.0/README.md#rodar-pelo-código-como-no-pestinha).
-
-No Android, instale o APK sobre a versão anterior para manter os dados. A sobreposição e o acesso ao nome do aplicativo ativo exigem permissões opcionais nas configurações do aparelho. A atualização do APK continua sendo confirmada pelo Android.
+Projeto aberto sob GPL-3.0-or-later, baseado no [Pestinha](https://github.com/mille-okws/pestinha), de mille-okws e colaboradores. Para rodar pelo código, siga as [instruções de instalação](https://github.com/kuky13/bolha/blob/v0.5.1/README.md#rodar-pelo-código-como-no-pestinha).

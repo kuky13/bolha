@@ -7,7 +7,7 @@ from .facial_motion import WINK_DURATION, wink_state, mouth_state
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
 LANDING_POSES = ('pouso_em_pe', 'pouso_de_lado', 'pouso_invertido')
-FLOOR_POSES = (*LANDING_POSES, 'deitada')
+FLOOR_POSES = (*LANDING_POSES, 'deitada', 'embaixadinha')
 
 
 def _unit(value):
@@ -157,6 +157,12 @@ def animation_pose(mode, seconds, strength=1.):
                     squash=(-.20*impact+.17*stretch)*strength,
                     angle_offset=(-5.5*impact+7.5*stretch)*strength,
                     effect='rebatida', effect_strength=strength*(1.-_ease((t-.035)/.22)))
+    elif mode == 'embaixadinha':
+        tap = _mouth_pulse(t,.29,.045)
+        pose.update(emotion='contente', eye_open=1.-.35*tap,
+                    squash=-.075*tap, ear_raise=2.8*tap,
+                    ear_tilt=-10.*tap, gaze=(0.,-.75), mouth_open=.54*tap,
+                    mouth_curve=.9, mouth_width=1.06)
     elif mode == 'pop':
         rupture = t-.13
         squeeze = _ease(t/.075)*(1.-_ease((t-.075)/.055))
@@ -283,6 +289,14 @@ def animation_pose(mode, seconds, strength=1.):
     elif mode in ('assustado', 'airborne', 'impact', 'brinquedo_susto'):
         pose['mouth_open'] = .43*_mouth_pulse(t,.32,.04)*strength
         pose['mouth_width'] = .68
+    elif mode in ('pingpong_rebatida','brinquedo_rebatida'):
+        pose['mouth_open'] = (.35+.16*strength)*_mouth_pulse(t,.38,.065)
+        pose['mouth_curve'] = .8
+        pose['mouth_width'] = 1.06
+    elif mode == 'brinquedo_perseguindo':
+        pose['mouth_curve'] = .76
+        # A largada muda o sorriso; na corrida, respiradas curtas seguem a passada.
+        pose['mouth_open'] = .27*_mouth_pulse(t%1.18,.28,.065)
     elif mode == 'doze':
         pose['mouth_open'] = .32*_mouth_pulse(t-.22,.56,.12)
         pose['mouth_width'] = .73
@@ -343,6 +357,8 @@ class ExpressionMotion:
             strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
         elif prank is not None and prank.active:
             mode='cursor_'+prank.phase;elapsed=now-prank.started;strength=prank.intensity
+        elif game.play.count_text(now) is not None:
+            mode='embaixadinha';elapsed=now-game.play.juggle_at
         elif arriving:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since

@@ -16,6 +16,7 @@ Na revolução, além da bolinha, ele arremessa bolinhas de papel no cursor.
 """
 
 import math
+import random
 
 from ..core.physics import GRAVITY
 from ..ajustes import (
@@ -59,6 +60,66 @@ class Play:
         self.toy_in_reach = False
         self.last_tease = -math.inf
         self.teases = 0
+        self.juggle_target = self.juggle_count = 0
+        self.juggle_at = -math.inf
+        self.juggle_airtime = 0.
+        self.juggle_finished_at = None
+
+    def juggling(self):
+        return self.juggle_count > 0 and self.juggle_finished_at is None
+
+    def stop_juggle(self):
+        self.juggle_target = self.juggle_count = 0
+        self.juggle_finished_at = None
+
+    def juggle_touch(self, now, body, ball):
+        toy = ball.body
+        contact_y = body.y - body.half_h - toy.half_h - 8.
+        speed = math.sqrt(2.*GRAVITY*(max(0.,toy.y-contact_y)+random.uniform(42.,62.)))
+        flight = (speed+math.sqrt(max(0.,speed**2+2.*GRAVITY*(contact_y-toy.y))))/max(1.,GRAVITY)
+        vx = max(-300.,min(300., (body.x-toy.x)/max(.18,flight)*1.12))
+        ball.kick(vx, -speed)
+        self.juggle_count += 1
+        self.juggle_at = now
+        self.juggle_airtime = 0.
+        if self.juggle_count == self.juggle_target:
+            self.juggle_finished_at = now
+            self.next_at = max(self.next_at, now+2.4)
+
+    def start_juggle(self, now, body, ball):
+        self.stop_chase()
+        self.juggle_target = random.randint(1,100)
+        self.juggle_count = 0
+        self.juggle_finished_at = None
+        body.vx = 0.
+        self.juggle_touch(now,body,ball)
+
+    def follow_juggle(self, dt, now, body, ball, area, previous_y):
+        toy = ball.body
+        self.juggle_airtime += dt
+        if (not body.grounded or not body.upright() or body.held or not ball.isVisible()
+                or toy.held or ball.dragging):
+            self.stop_juggle()
+            return
+        contact_y = body.y-body.half_h-toy.half_h-8.
+        if (toy.grounded or self.juggle_airtime>1.3 or contact_y-area[1]<toy.half_h+85
+                or not area[0]<=toy.x<=area[2]):
+            self.juggle_finished_at = now
+            self.next_at = max(self.next_at, now+2.4)
+            return
+        if (self.juggle_airtime>.19 and toy.vy>0. and previous_y <= contact_y <= toy.y
+                and abs(toy.x-body.x)<body.half_w*.8+toy.half_w):
+            self.juggle_touch(now,body,ball)
+
+    def count_text(self, now):
+        if not self.juggle_count:
+            return None
+        if self.juggling():
+            return str(self.juggle_count), 1.
+        remaining = 1.25-(now-self.juggle_finished_at)
+        if remaining <= 0.:
+            return None
+        return str(self.juggle_count), min(1.,remaining/.26)
 
     def weight(self, key):
         """Peso de uma brincadeira pelo nome (0 se não existir)."""
@@ -68,6 +129,7 @@ class Play:
         """Um movimento do jogador convida para brincar e pode tirar a bola do alcance."""
         if self.weight('bola') <= 0.:
             return None
+        self.stop_juggle()
         self.volley_left = 0
         started = now >= self.chase_until
         if started:
@@ -154,7 +216,7 @@ class Play:
                 return 'hop'
         return 'chase'
 
-    def tick(self, now, body, ball, cursor, emotion, pull=1.0):
+    def tick(self, now, body, ball, cursor, emotion, pull=1.0, area=None):
         """
         Devolve 'kick' ou 'throw' quando brinca com a bolinha, senão None.
         pull (0..1): quanto a rede quer brincar agora (distração acima do foco). Zero, ele trabalha.
@@ -164,6 +226,11 @@ class Play:
             return None
         if ball.dragging or ball.body.held:
             return None
+        toy = ball.body
+        juggling_space = (area is not None and body.platform is None and body.grounded and toy.grounded
+                          and abs(toy.x-body.x) <= body.half_w+toy.half_w+22.
+                          and body.y-area[1] >= body.half_h+2*toy.half_h+100.
+                          and toy.y-body.y > body.half_h*.3)
         if math.hypot(ball.body.x - body.x, ball.body.y - body.y) > REACH * (1.4 if happy else 1.0):
             return None
         if self.requested_action:
@@ -177,6 +244,11 @@ class Play:
             if action == 'lift':
                 self.lift(now, body, ball, start=True)
                 return 'lift'
+            if action == 'juggle':
+                if juggling_space:
+                    self.start_juggle(now,body,ball)
+                    return 'juggle'
+                return None
             if action == 'throw':
                 return self.throw_at(ball, cursor, FLIGHT_TIME, ball.body.x, ball.body.y) and 'throw'
         if pull <= 0.0:
@@ -184,9 +256,13 @@ class Play:
         if math.hypot(ball.body.x-body.x, ball.body.y-body.y) > body.half_w+ball.body.half_w+12.:
             return None
         choices = ['kick'] if emotion in ("feliz", "curioso", "contente") and self.weight("bola") > 0 else []
+        if choices and juggling_space and self.energy>.35:
+            choices.append('juggle')
         if emotion == 'bravo' and self.weight('arremesso') > 0: choices.append('throw')
         choices.append('wait')
-        weights = {'kick': .7*self.weight('bola')*pull, 'throw': .6*self.weight('arremesso')*pull, 'wait': .15}
+        tone_cheer = max(0.,min(1.,self.rates.get('CHEER',0.)/20.))
+        weights = {'kick': .7*self.weight('bola')*pull, 'juggle': (.35+.46*tone_cheer)*pull,
+                   'throw': .6*self.weight('arremesso')*pull, 'wait': .15}
         if self.policy:
             action = self.policy.choose('toy_play', choices, rates=self.rates, emotion=emotion,
                                         energy=self.energy, contact=self.contact,
@@ -200,6 +276,10 @@ class Play:
             side = 1 if ball.body.x >= body.x else -1          # chuta para o lado oposto a ele
             ball.kick(side * 500.0, -410.0)
             return "kick"
+
+        if action == 'juggle':
+            self.start_juggle(now,body,ball)
+            return 'juggle'
 
         if action == 'throw':
             return self.throw_at(ball, cursor, FLIGHT_TIME, ball.body.x, ball.body.y) and "throw"

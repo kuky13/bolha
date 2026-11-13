@@ -210,6 +210,8 @@ class NativeApp:
             elif self.game.sleep.asleep:reason='Acorde a Bolha antes de pedir uma reação.'
             else:reason='Não foi possível iniciar: libere um objeto da tela e tente novamente.'
             self.scene._status('request','canceled',reason)
+            if hasattr(self,'tray'):
+                self.tray.showMessage('Reação da Bolha',reason,QSystemTrayIcon.Information,4200)
         return self.reaction_status()
     def reaction_status(self):
         return dict(self.scene.reaction_status)
@@ -230,7 +232,8 @@ class NativeApp:
                            ('Notebook de brincadeira','notebook'),('Vem trabalhar comigo','work')):
             action=play.addAction(label)
             action.triggered.connect(lambda checked=False,k=kind:self.interact(k))
-        for label, trick in (('Dar uma bicuda', 'kick'), ('Jogar para cima', 'lift')):
+        for label, trick in (('Dar uma bicuda', 'kick'), ('Jogar para cima', 'lift'),
+                             ('Fazer embaixadinhas', 'juggle')):
             action = play.addAction(label)
             action.triggered.connect(lambda checked=False, move=trick: self.interact('play', trick=move))
         interactions=menu.addMenu('Interagir')

@@ -274,6 +274,13 @@ def test_boca_descansa_fechada_e_cada_mania_tem_ritmo_proprio():
         assert animation_pose(mode,1.5)['mouth_open'] < .025
 
 
+@pytest.mark.parametrize('mode', ['embaixadinha','brinquedo_rebatida','pingpong_rebatida'])
+def test_boca_sorri_e_abre_no_toque_sem_ficar_aberta(mode):
+    pose=animation_pose(mode,.08)
+    assert pose['mouth_curve']>.6 and pose['mouth_open']>.3
+    assert animation_pose(mode,.4)['mouth_open']==0.
+
+
 def test_rebatida_do_brinquedo_livre_usa_a_direcao_do_rebote(tmp_path):
     game=game_at_rest(tmp_path)
     game.body.angle=-20.

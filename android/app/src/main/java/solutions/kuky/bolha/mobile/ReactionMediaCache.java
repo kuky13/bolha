@@ -8,6 +8,8 @@ import android.graphics.Movie;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.os.SystemClock;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,6 +31,7 @@ final class ReactionMediaCache {
     }
 
     private final Engine engine;
+    private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, Media> images = new HashMap<>();
     private final Set<String> requested = new HashSet<>();
     private final ThreadPoolExecutor decoder = new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,
@@ -67,7 +70,7 @@ final class ReactionMediaCache {
                         try { decoded=Media.decode(bytes); }
                         catch (RuntimeException error) { decoded=null; }
                         Media result=decoded;
-                        view.post(() -> {
+                        main.post(() -> {
                             if (!alive.contains(id)) { if (result!=null) result.close(); return; }
                             if (result==null) failed(id);
                             else images.put(id,result);

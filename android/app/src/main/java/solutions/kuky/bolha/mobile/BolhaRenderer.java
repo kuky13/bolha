@@ -73,7 +73,7 @@ final class BolhaRenderer {
         float squash = clamp(number(pose, "squash", 0), -.25f, .25f);
         float angle = number(state, "angle", 0) + number(pose, "angle_offset", 0);
         String mode = state.optString("poseMode");
-        boolean floor = mode.equals("deitada") || mode.startsWith("pouso_");
+        boolean floor = mode.equals("deitada") || mode.equals("embaixadinha") || mode.startsWith("pouso_");
         float floorSquash = floor ? squash : 0;
         float clearance = Math.max(0, number(state, "surface", y + radius) - y - radius);
         float shift = radius * floorSquash * Math.max(0, 1 - clearance / 24f);

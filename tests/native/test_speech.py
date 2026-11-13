@@ -10,6 +10,24 @@ from bolha.speech import Dialogue, LINES, SpeechWindow, bubble_path
 CONTENT = Path(__file__).resolve().parents[2]/'assets/bolha/content'
 
 
+def test_juggle_balloon_keeps_position_when_number_grows(qt_application,tmp_path,monkeypatch):
+    game = Game(tmp_path,CONTENT)
+    window = SpeechWindow(game)
+    try:
+        frames = iter((('9',1.),('10',1.),('100',1.),None))
+        monkeypatch.setattr(game.play,'count_text',lambda _:next(frames))
+        rects = []
+        for number, now in zip(('9','10','100'),(100.,100.5,101.)):
+            window.sync(now)
+            assert window.isVisible() and window.text==number
+            rects.append(window.geometry())
+        assert rects[0]==rects[1]==rects[2]
+        window.sync(101.5)
+        assert not window.isVisible()
+    finally:
+        window.close()
+
+
 def test_note_and_speech_do_not_compete_for_screen(qt_application, tmp_path):
     game = Game(tmp_path, CONTENT)
     window = SpeechWindow(game)

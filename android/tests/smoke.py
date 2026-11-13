@@ -348,12 +348,12 @@ def migrate_previous(apk, output):
     activity()
     control('470 neurônios', scroll=False)
     tap(control('Carinho', exact=True, kind='Button', scroll=False))
-    legacy_haptics = control('Vibração', exact=True)
-    if legacy_haptics.get('checked') == 'true':
-        tap(legacy_haptics)
-    assert control('Vibração', exact=True).get('checked') == 'false'
-    wait_for('preferência antiga de vibração salva', lambda: b'name="haptics" value="false"' in
-             adb('shell', 'run-as', PACKAGE, 'cat', 'shared_prefs/options.xml', check=False))
+    tap(control('Central da Bolha', exact=True, kind='Button', scroll=False))
+    section('Comportamento')
+    set_switch('Vibração', False)
+    wait_for('preferência antiga de vibração salva', lambda: preference('hapticsEnabled', False))
+    tap(control('Voltar', exact=True, kind='Button', scroll=False))
+    control('470 neurônios', scroll=False)
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
     before = wait_for('memória gravada pelo APK anterior', lambda: saved_memory(MEMORY_PATH, 0))
     assert before['seed'] == 1313 and before.get('learned'), before

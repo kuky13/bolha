@@ -138,11 +138,17 @@ final class Stage extends View {
         float width = Math.min(230,Math.max(60,right-left-16));
         TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         paint.setTextSize(12 * context.getResources().getConfiguration().fontScale);
-        float measured = paint.measureText(text) + 22;
+        boolean counting=state.optBoolean("speechCounting");
+        float measured = paint.measureText(counting?"100":text) + 22;
         width = Math.min(width,Math.max(60,measured));
         StaticLayout layout = StaticLayout.Builder.obtain(text,0,text.length(),paint,Math.max(1,(int)width-22)).setIncludePad(false).build();
         float height = layout.getHeight() + 28;
-        float x = Math.max(left+8,Math.min(right-width-8,n(state,"x",left+width/2)-width/2));
+        float centerX = n(state,"x",left+width/2);
+        if (counting) {
+            float side=right-centerX>=centerX-left?1:-1;
+            centerX+=side*(n(state,"radius",68)+width/2+10);
+        }
+        float x = Math.max(left+8,Math.min(right-width-8,centerX-width/2));
         float y = n(state,"y",top)-n(state,"radius",68)-height-8;
         if (y < top+8) y = n(state,"y",top)+n(state,"radius",68)+8;
         y = Math.max(top+8,Math.min(bottom-height-8,y));

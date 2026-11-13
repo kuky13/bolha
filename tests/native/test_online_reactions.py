@@ -179,6 +179,39 @@ def test_limites_de_payload_assinatura_e_redirecionamento_bloqueado():
         validate_media_signature(SYNTHETIC_TWO_FRAME_GIF, 'text/plain')
 
 
+def test_fallback_continua_quando_categoria_do_humor_falha():
+    calls = []
+    class Transport:
+        def get_bytes(self, url, *args, **kwargs):
+            calls.append(url)
+            if '/happy/001.gif' in url:
+                return SYNTHETIC_TWO_FRAME_GIF, 'image/gif', url
+            if '/happy?' in url:
+                result = {'results':[{'url':'https://nekos.best/api/v2/happy/001.gif'}]}
+                return json.dumps(result).encode(), 'application/json', url
+            raise OSError('Categoria indisponível')
+    payload = fetch_reaction_payload('timido', transport=Transport())
+    assert any('/blush?' in url for url in calls)
+    assert payload.candidate.intent == 'timido' and payload.candidate.query == 'happy'
+
+
+def test_reacao_carregada_deixa_de_ser_carregada_pela_bolha(qt_application, tmp_path):
+    game = Game(tmp_path, CONTENT)
+    item = game.mischief.create_online_reaction()
+    game.behavior.mission = ('deliver',item,750.,time.monotonic()+5.)
+    item.carried = True
+    scene = NativeScene(game, reaction_fetcher=ImmediateFetcher(payload=make_payload()))
+    try:
+        scene.sync()
+        before = item.x, item.y
+        game.mischief.tick(.1,760.)
+        assert not game.behavior.mission and not item.carried
+        assert item.resting and (item.x,item.y)==before
+        assert scene.windows[item.id].isVisible()
+    finally:
+        scene.close()
+
+
 def test_qbuffer_qmovie_em_memoria_reproduz_pausa_e_libera_sem_arquivos(qt_application, tmp_path, monkeypatch):
     import tempfile
     monkeypatch.setattr(tempfile, 'NamedTemporaryFile', lambda *a, **kw: (_ for _ in ()).throw(AssertionError('NamedTemporaryFile proibido')))
