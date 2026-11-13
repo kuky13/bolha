@@ -6,6 +6,7 @@ sensor injection is recorded separately from validation on a physical phone.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import struct
@@ -566,7 +567,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('apk', type=Path)
     parser.add_argument('output', type=Path)
-    parser.add_argument('--previous-apk', type=Path,
+    parser.add_argument('--previous-apk', type=Path, default=os.environ.get('BOLHA_TEST_PREVIOUS_APK'),
                         help='Instala e migra um APK anterior antes do restante do teste; preserva os dados.')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)

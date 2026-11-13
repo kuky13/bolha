@@ -62,4 +62,8 @@ def sharedAssets = tasks.register('sharedAssets', Sync) {
     from(new File(projectRoot, 'licenses/BOLHA-ASSETS.md')) { into 'licenses' }
     from(new File(rootProject.projectDir, 'licenses')) { into 'licenses/android' }
 }
-tasks.named('preBuild').configure { dependsOn sharedAssets }
+tasks.named('preBuild').configure { dependsOn sharedAssets, sharedPython }
+// Chaquopy resolves source paths without carrying the producer task dependency.
+tasks.matching { it.name.startsWith('merge') && it.name.endsWith('PythonSources') }.configureEach {
+    dependsOn sharedPython
+}

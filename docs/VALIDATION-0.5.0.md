@@ -23,8 +23,21 @@ e brincadeira do ponteiro escolhida pela política neural, com feedback e memór
 
 ## Validação dos pacotes
 
-Os relatórios Windows e Android da candidata serão registrados aqui após a
-execução dos workflows. A candidata ainda não é uma release estável publicada.
+O [workflow Windows 43413057303](https://github.com/kuky13/bolha/actions/runs/43413057303)
+terminou com sucesso: suíte, assistente de pasta, reinstalação, atualização,
+recuperação, métricas e migrações da versão nativa anterior e das versões
+Electron 0.1.0 e 0.2.1. O aplicativo Windows foi compilado no commit `67aa708`;
+as correções posteriores até esta revisão afetam somente o Android e este relatório.
+
+A primeira execução do emulador encontrou o pacote `bolha` ausente: o Gradle
+não havia executado o produtor dos fontes compartilhados em um ambiente limpo.
+A dependência foi corrigida e uma compilação limpa executou as 47 tarefas com
+sucesso. Uma nova guarda verifica os oito módulos necessários e as bibliotecas
+ELF antes de iniciar o emulador. Os 88 ELF ARM64, incluindo CPython e NumPy,
+atendem ao alinhamento de 16 KiB. Cinco casos sintéticos da guarda passaram.
+
+O novo teste do emulador continua pendente. A candidata ainda não é uma release
+estável publicada.
 
 O pipeline Windows verifica instalador, atualização, adiamento, recuperação,
 migração da versão nativa anterior e das versões Electron 0.1.0 e 0.2.1.
