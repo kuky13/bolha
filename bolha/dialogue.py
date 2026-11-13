@@ -110,5 +110,3 @@ class Dialogue:
         if text:
             self.next_reaction = now + SPEECH_INTERVAL
         return (text, category in THOUGHTS) if text else None
-
-
