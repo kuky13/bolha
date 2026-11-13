@@ -9,8 +9,8 @@ e brincadeira do ponteiro escolhida pela política neural, com feedback e memór
 ## Verificado localmente
 
 - Linux, Python 3.11, Qt/PySide6 6.11.3: suíte completa com 700 testes aprovados
-  e 11 verificações exclusivas de Windows ignoradas. Ajustes posteriores de
-  interface neural e ciclo de vida também passaram nos testes focados.
+  e 11 verificações exclusivas de Windows ignoradas. Com corrida e bilhetes,
+  a suíte passou a 707 testes aprovados e 11 ignorados.
 - Sete testes do bridge Android: preferências e escala após rotação/reabertura,
   arremesso em dp, sensor opcional sem soltar o objeto segurado, 470 neurônios
   e pesos reais, prévias sem alterar a emoção, falha de mídia sem penalizar
@@ -28,7 +28,11 @@ terminou com sucesso: suíte, assistente de pasta, reinstalação, atualização
 recuperação, métricas e migrações da versão nativa anterior e das versões
 Electron 0.1.0 e 0.2.1. O aplicativo Windows foi compilado no commit `67aa708`;
 esta execução cobre a candidata antes das correções de corrida e bilhetes.
-Os pacotes finais precisam incluir essas correções.
+O [workflow Windows 43427853641](https://github.com/kuky13/bolha/actions/runs/43427853641),
+no commit `f2d9964`, validou o instalador com essas correções: 718 testes e
+24 cenários de instalação, atualização nativa e recuperação passaram.
+SHA-256 e SHA-512 aprovados. O runner mediu 78,54–81,03 MiB de memória
+residente, quadros p95 de 16 ms e cérebro p95 de 5,61–6,06 ms.
 
 A primeira execução do emulador encontrou o pacote `bolha` ausente: o Gradle
 não havia executado o produtor dos fontes compartilhados em um ambiente limpo.
@@ -43,10 +47,13 @@ voltar a aprender. O teste atualizado grava uma associação reconhecível no
 perfil descartável e tolera os pequenos ajustes dos primeiros ciclos sem
 aceitar uma rede zerada. A candidata ainda não é uma release estável publicada.
 
-O pipeline Windows verifica instalador, atualização, adiamento, recuperação,
-migração da versão nativa anterior e das versões Electron 0.1.0 e 0.2.1.
-O Android verifica a chave preservada, atualização de APK sem apagar os dados,
-central, rede neural, toque, sobreposição, rotação e reabertura do processo.
+O [workflow Android 43428971627](https://github.com/kuky13/bolha/actions/runs/43428971627),
+no commit `982ba9b`, passou no Android 15 x86_64. Confirmou a atualização
+do APK 0.4.10 com a mesma chave, memória e preferências preservadas; Central
+e painel neural; arrasto da mascote e do brinquedo sobre outro app; movimento
+do brinquedo em resposta à aceleração simulada; encerramento pelo botão
+desobstruído e reabertura com o perfil salvo. SHA-256 e assinatura conferidos.
+A rotação em paisagem não foi confirmada nessa imagem de emulador.
 
 ## Limites da evidência
 
