@@ -74,9 +74,9 @@ public final class MainActivity extends Activity implements Engine.Listener {
 
     @Override protected void onResume() {
         super.onResume();
-        if (waitingPermission && Settings.canDrawOverlays(this)) {
+        if (waitingPermission) {
             waitingPermission=false;
-            prepareOverlay();
+            if (Settings.canDrawOverlays(this)) prepareOverlay();
         }
         engine.listen(this);
         stage.post(() -> {
@@ -153,12 +153,16 @@ public final class MainActivity extends Activity implements Engine.Listener {
     }
 
     @Override public void frame(JSONObject state, String error) {
-        if (error != null) { status.setText(error); return; }
-        overlay.setText(FloatingBolha.active?"Parar de flutuar":"Flutuar");
+        String overlayLabel = FloatingBolha.active?"Parar de flutuar":"Flutuar";
+        if (!overlayLabel.contentEquals(overlay.getText())) overlay.setText(overlayLabel);
         stage.setVisibility(FloatingBolha.active?View.INVISIBLE:View.VISIBLE);
-        status.setText(FloatingBolha.active?"A Bolha está flutuando."
-                : String.format(java.util.Locale.forLanguageTag("pt-BR"),"Energia %.0f%%  ·  %d neurônios",
-                state.optDouble("energy",0)*100,state.optInt("neurons")));
+        String statusLabel;
+        if (error != null) statusLabel = error;
+        else if (FloatingBolha.active) statusLabel = "A Bolha está flutuando.";
+        else statusLabel = String.format(java.util.Locale.forLanguageTag("pt-BR"),
+                "Energia %.0f%%  ·  %d neurônios",state.optDouble("energy",0)*100,state.optInt("neurons"));
+        if (!statusLabel.contentEquals(status.getText())) status.setText(statusLabel);
+        if (error != null) return;
         if (!FloatingBolha.active) Haptics.frame(this,state);
         stage.invalidate();
     }

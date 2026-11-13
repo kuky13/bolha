@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -48,10 +48,17 @@ jobs:
           grep -q "^native-code: .*'arm64-v8a'.*'x86_64'" "$RUNNER_TEMP/bolha-apk.txt"
       - name: Habilitar aceleração do emulador descartável
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-bolha-kvm.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          test -r /dev/kvm && test -w /dev/kvm
+          if [[ ! -c /dev/kvm ]]; then
+            if grep -qw vmx /proc/cpuinfo; then sudo modprobe kvm_intel || true; fi
+            if grep -qw svm /proc/cpuinfo; then sudo modprobe kvm_amd || true; fi
+            sudo udevadm settle --timeout=10 || true
+          fi
+          if [[ -c /dev/kvm ]]; then
+            sudo chmod a+rw /dev/kvm
+            "$ANDROID_HOME/emulator/emulator" -accel-check || true
+          else
+            echo '::warning::KVM indisponível; o emulador usará aceleração de CPU por software.'
+          fi
       - name: Exercitar interface, sobreposição e preferências no Android 15
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
@@ -60,6 +67,8 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
+          emulator-boot-timeout: 480
+          disable-linux-hw-accel: auto
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: python android/tests/smoke.py android/app/build/outputs/apk/debug/app-debug.apk validation/android
       - name: Preparar o APK validado e seu checksum

@@ -138,10 +138,10 @@ public final class FloatingBolha extends Service implements Engine.Listener {
 
     @Override public void onDestroy() {
         active=false;
-        if (engine!=null) engine.remove(this);
         if (petAdded) windows.removeView(pet);
         if (toyAdded) windows.removeView(toy);
         if (messageAdded) windows.removeView(message);
+        if (engine!=null) engine.remove(this);
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }

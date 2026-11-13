@@ -31,6 +31,7 @@ def sharedAssets = tasks.register('sharedAssets', Sync) {
     into layout.buildDirectory.dir('generated/bolha-assets')
     from(new File(projectRoot, 'assets/bolha/content')) { into 'content' }
     from(projectRoot) { include 'LICENSE', 'NOTICE.md' }
-    from(new File(projectRoot, 'licenses')) { into 'licenses' }
+    from(new File(projectRoot, 'licenses/BOLHA-ASSETS.md')) { into 'licenses' }
+    from(new File(rootProject.projectDir, 'licenses')) { into 'licenses/android' }
 }
 tasks.named('preBuild').configure { dependsOn sharedAssets }

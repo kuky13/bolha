@@ -189,5 +189,18 @@ final class Stage extends View {
         copy.recycle();
     }
 
+    @Override protected void onDetachedFromWindow() {
+        if (held != null) {
+            JSONObject state = engine.state();
+            boolean toy = held.equals("toy");
+            engine.action("drag-end","cancel-"+held,n(state,toy?"toyX":"x",0),
+                    n(state,toy?"toyY":"y",0),0,0);
+            velocity.recycle();
+            velocity = null;
+            held = null;
+        }
+        super.onDetachedFromWindow();
+    }
+
     @Override public boolean performClick() { super.performClick(); return true; }
 }
