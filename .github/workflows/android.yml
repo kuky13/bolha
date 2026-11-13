@@ -70,7 +70,7 @@ jobs:
           previous="$RUNNER_TEMP/bolha-previous-android"
           mkdir -p "$previous"
           gh release download v0.4.10 --repo kuky13/bolha --pattern Bolha-0.4.10-Android.apk --pattern ANDROID-SHA256SUMS.txt --dir "$previous"
-          (cd "$previous" && sha256sum --check ANDROID-SHA256SUMS.txt)
+          (cd "$previous" && awk '$2 == "Bolha-0.4.10-Android.apk"' ANDROID-SHA256SUMS.txt > previous-apk.sha256 && test -s previous-apk.sha256 && sha256sum --check previous-apk.sha256)
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous/Bolha-0.4.10-Android.apk" > "$RUNNER_TEMP/bolha-previous-cert.txt"
           grep -q '10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-previous-cert.txt"
       - name: Habilitar aceleração do emulador descartável
