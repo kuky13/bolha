@@ -130,8 +130,9 @@ class PetWindow(QWidget):
         self.motion.update(self.game,now,self.press[1] if self.press else None)
         target=self.motion.pose['gaze'] or self.game.state.gaze
         elapsed=max(0.,now-self.gaze_tick)
-        eye_ease=1-math.exp(-22*elapsed)
-        ear_ease=1-math.exp(-12*elapsed)
+        running=self.motion.pose['effect']=='perseguindo'
+        eye_ease=1. if running else 1-math.exp(-22*elapsed)
+        ear_ease=1. if running else 1-math.exp(-12*elapsed)
         self.visual_gaze=tuple(current+(goal-current)*eye_ease for current,goal in zip(self.visual_gaze,target))
         self.visual_ear_gaze=tuple(current+(goal-current)*ear_ease for current,goal in zip(self.visual_ear_gaze,target))
         self.gaze_tick=now

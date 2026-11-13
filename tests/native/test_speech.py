@@ -10,6 +10,20 @@ from bolha.speech import Dialogue, LINES, SpeechWindow, bubble_path
 CONTENT = Path(__file__).resolve().parents[2]/'assets/bolha/content'
 
 
+def test_note_and_speech_do_not_compete_for_screen(qt_application, tmp_path):
+    game = Game(tmp_path, CONTENT)
+    window = SpeechWindow(game)
+    window.present('Olha só!', now=100.)
+    window.sync(101.)
+    assert window.isVisible()
+    note = game.mischief._make('bilhete', 'feliz', False)
+    game.mischief._add(note)
+    window.sync(101.1)
+    assert not window.isVisible()
+    assert not window.until
+    window.close()
+
+
 def test_conteudo_tem_categorias_distintas_e_ampla_variedade():
     assert {'ambiente', 'casual', 'pensamento', 'bravo', 'carinho', 'brincando'} <= LINES.keys()
     lines = [line for category in LINES.values() for line in category]

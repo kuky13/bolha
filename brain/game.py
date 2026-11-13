@@ -395,6 +395,7 @@ class Game:
             body = target.body if target and hasattr(target, 'body') else self.body
             if target and not hasattr(target, 'body'):
                 self.scene_dragging = kind != 'drag-end'
+                target.dragging = self.scene_dragging
                 target.place(event['x'], event['y'])
                 return
             moved = math.hypot(event['x']-body.x, event['y']-body.y) >= 3.
@@ -1182,6 +1183,7 @@ class Game:
     def tick(self, dt, now=None):
         now = time.monotonic() if now is None else now
         dt = min(.05, max(0.,dt))
+        self.mischief_ctl.expire_notes(now)
         if not self.panicked and not self.hidden: self.read_context(now)
         frozen = self.panicked or self.hidden or not self.available_areas()
         if frozen:

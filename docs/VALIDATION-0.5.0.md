@@ -27,7 +27,8 @@ O [workflow Windows 43413057303](https://github.com/kuky13/bolha/actions/runs/43
 terminou com sucesso: suíte, assistente de pasta, reinstalação, atualização,
 recuperação, métricas e migrações da versão nativa anterior e das versões
 Electron 0.1.0 e 0.2.1. O aplicativo Windows foi compilado no commit `67aa708`;
-as correções posteriores até esta revisão afetam somente o Android e este relatório.
+esta execução cobre a candidata antes das correções de corrida e bilhetes.
+Os pacotes finais precisam incluir essas correções.
 
 A primeira execução do emulador encontrou o pacote `bolha` ausente: o Gradle
 não havia executado o produtor dos fontes compartilhados em um ambiente limpo.
@@ -36,8 +37,11 @@ sucesso. Uma nova guarda verifica os oito módulos necessários e as bibliotecas
 ELF antes de iniciar o emulador. Os 88 ELF ARM64, incluindo CPython e NumPy,
 atendem ao alinhamento de 16 KiB. Cinco casos sintéticos da guarda passaram.
 
-O novo teste do emulador continua pendente. A candidata ainda não é uma release
-estável publicada.
+O APK recompilado abriu e migrou a preferência de vibração. A verificação
+inicial da memória comparava todos os pesos por igualdade depois de a rede
+voltar a aprender. O teste atualizado grava uma associação reconhecível no
+perfil descartável e tolera os pequenos ajustes dos primeiros ciclos sem
+aceitar uma rede zerada. A candidata ainda não é uma release estável publicada.
 
 O pipeline Windows verifica instalador, atualização, adiamento, recuperação,
 migração da versão nativa anterior e das versões Electron 0.1.0 e 0.2.1.

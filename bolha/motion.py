@@ -343,7 +343,8 @@ class ExpressionMotion:
         elif (game.pingpong is None and body.grounded and body.upright() and abs(body.vx)>35.
               and mode in ('observando','contente','curioso','feliz','entediado','atento','neutro')):
             mode='correndo'
-        running = mode in ('correndo','brinquedo_perseguindo') and body.grounded and abs(body.vx)>35.
+        running = (mode in ('correndo','brinquedo_perseguindo') and body.grounded
+                   and body.upright() and abs(body.vx)>35.)
         if running:
             strength=_unit(abs(body.vx)/360.)
             elapsed=self.run_phase
@@ -380,10 +381,12 @@ class ExpressionMotion:
         if running:
             direction=math.copysign(1.,body.vx)
             heading=0. if direction>0 else 180.
-            self.pose['angle_offset']*=direction
-            local_angle=math.radians(heading-body.angle-self.pose['angle_offset'])
+            # Physical roll can contain full turns or lean against the next stride.
+            visual_angle = self.pose['angle_offset']*direction
+            self.pose['angle_offset'] = visual_angle - ((body.angle+180.)%360.-180.)
+            local_angle=math.radians(heading-visual_angle)
             self.pose['gaze']=(math.cos(local_angle)*.86,math.sin(local_angle)*.86)
-            self.pose['effect_angle']=heading-body.angle-self.pose['angle_offset']
+            self.pose['effect_angle'] = heading-visual_angle
         if mode == 'pop_return':
             inward = reaction['inward']
             glance = .47+.22*math.sin(elapsed*5.)*math.exp(-elapsed)

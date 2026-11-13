@@ -305,9 +305,15 @@ def tick(dt):
         else:
             preview = None
     goal = pose.get('gaze') or game.state.gaze
-    last_gaze = tuple(value+(target-value)*(1.-math.exp(-22.*dt)) for value,target in zip(last_gaze,goal))
-    last_ear_gaze = tuple(value+(target-value)*(1.-math.exp(-12.*dt)) for value,target in zip(last_ear_gaze,goal))
-    if preferences['speechEnabled']:
+    if pose['effect'] == 'perseguindo':
+        last_gaze = last_ear_gaze = goal
+    else:
+        last_gaze = tuple(value+(target-value)*(1.-math.exp(-22.*dt)) for value,target in zip(last_gaze,goal))
+        last_ear_gaze = tuple(value+(target-value)*(1.-math.exp(-12.*dt)) for value,target in zip(last_ear_gaze,goal))
+    note_visible = game.mischief.has_note()
+    if note_visible:
+        say_until = 0.
+    if preferences['speechEnabled'] and not note_visible:
         line = dialogue.update(game, now)
         if line:
             say_text, say_thought = line

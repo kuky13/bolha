@@ -35,7 +35,12 @@ final class ObjectRenderer {
         switch (object.optString("kind")) {
             case "notebook": notebook(canvas,rect,object.optBoolean("working"),phase); break;
             case "meme": media.draw(canvas,object,rect,view); break;
-            case "note": bubble(canvas,rect,object.optString("text"),true); break;
+            case "note":
+                int layer=canvas.saveLayerAlpha(rect,Math.round(255*Math.max(0,Math.min(1,n(object,"opacity",1)))));
+                bubble(canvas,rect,object.optString("text"),true,object.optBoolean("tailTop"),
+                       rect.left+rect.width()*n(object,"anchor",.5f));
+                canvas.restoreToCount(layer);
+                break;
             case "sign": bubble(canvas,rect,object.optString("text"),false); break;
             case "corner":
                 fill("#272130"); canvas.drawRoundRect(rect,10,10,paint);

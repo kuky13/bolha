@@ -78,7 +78,7 @@ class SpeechWindow(QWidget):
     def sync(self, now=None):
         now = time.monotonic() if now is None else now
         game = self.game
-        if not game.pet_visible(now) or game.panel or now < game.quiet_until:
+        if not game.pet_visible(now) or game.panel or now < game.quiet_until or game.mischief.has_note():
             self.until = 0.
             self.hide()
             self.dialogue.previous = None

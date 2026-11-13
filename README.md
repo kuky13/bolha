@@ -51,6 +51,8 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
   moldura, some após 15 segundos de exibição e mostra a origem no botão direito.
 - Tamanhos separados para a personagem, o brinquedo, o notebook, as reações,
   os bilhetes, os cartazes, o cantinho e os efeitos.
+- Bilhetes curtos aparecem perto da Bolha, um por vez, e somem sozinhos em
+  5 a 8 segundos. Enquanto um bilhete está na tela, as falas aguardam.
 - Painel com os 470 neurônios, filtros, conexões reais do grupo selecionado,
   decisões recentes, humor, necessidades e associações aprendidas.
 - Rotina com esquecimento gradual, objetivos persistentes e aprendizado por

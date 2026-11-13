@@ -246,6 +246,19 @@ def test_corrida_espelha_olhar_inclinacao_e_rastros_sem_mover_o_corpo(tmp_path):
     assert ExpressionMotion(100.).update(game,100.04)['effect'] is None
 
 
+@pytest.mark.parametrize('velocity,roll', [(-280., 384.), (280., -384.)])
+def test_corrida_compensa_rolagem_oposta_e_voltas_completas(tmp_path, velocity, roll):
+    game=game_at_rest(tmp_path)
+    game.body.angle=roll
+    game.body.vx=velocity
+    pose=ExpressionMotion(100.).update(game,100.04)
+    lean=(roll+pose['angle_offset']+180.)%360.-180.
+    assert lean*velocity>0.
+    assert (roll+pose['angle_offset']+pose['effect_angle'])%360. == pytest.approx(
+        180. if velocity<0 else 0.)
+    assert pose['gaze'][0]*velocity>0.
+
+
 def test_rebatida_do_brinquedo_livre_usa_a_direcao_do_rebote(tmp_path):
     game=game_at_rest(tmp_path)
     game.body.angle=-20.

@@ -336,7 +336,9 @@ def test_preferencia_online_reactions_desligada_impede_requisicoes_e_limpa_memes
     assert not note.closed and note in game.mischief.things
     perms = dict(config.DEFAULT_PERMISSIONS, travessuras=True, memes=False, online_reactions=False, bilhetes=True)
     options = game.mischief.available('feliz', perms)
-    assert 'meme' not in options and 'bilhete' in options
+    assert 'meme' not in options and 'bilhete' not in options
+    game.mischief_ctl.expire_notes(note.expires_at)
+    assert 'bilhete' in game.mischief.available('feliz', perms)
     assert game.mischief._make('meme', 'feliz', False) is None
     scene.close()
 

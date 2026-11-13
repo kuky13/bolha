@@ -269,8 +269,13 @@ def saved_memory(path, since):
 
 def preserved_memory(path, before):
     after = saved_memory(path, before['saved_at'])
-    if (after is not None and after.get('seed') == before['seed']
-            and after.get('learned') == before['learned']):
+    if after is None or after.get('seed') != before['seed']:
+        return None
+    # A few neural ticks can adjust the weights before the next save.
+    weights = after.get('learned', {})
+    if all(channel in weights and all(target in weights[channel]
+            and abs(weights[channel][target] - value) < .004
+            for target, value in row.items()) for channel, row in before['learned'].items()):
         return after
     return None
 
@@ -352,10 +357,16 @@ def migrate_previous(apk, output):
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
     before = wait_for('memória gravada pelo APK anterior', lambda: saved_memory(MEMORY_PATH, 0))
     assert before['seed'] == 1313 and before.get('learned'), before
-    (output / 'memoria-versao-anterior.json').write_text(json.dumps(before, ensure_ascii=False,
-        indent=2)+'\n', encoding='utf-8')
     adb('shell', 'am', 'force-stop', PACKAGE)
     assert not adb('shell', 'pidof', PACKAGE, check=False).strip()
+    # Seed one nonzero learned association in the disposable profile. A reset
+    # to a fresh brain must fail even if the old session learned very little.
+    before['learned']['CARESS']['PLAYFUL'] = .035
+    payload = json.dumps(before, ensure_ascii=False, indent=2)+'\n'
+    subprocess.run(['adb','shell','-T','run-as',PACKAGE,'tee',MEMORY_PATH],
+                   input=payload.encode(), stdout=subprocess.DEVNULL, check=True, timeout=30)
+    assert private_json(MEMORY_PATH)['learned']['CARESS']['PLAYFUL'] == .035
+    (output / 'memoria-versao-anterior.json').write_text(payload, encoding='utf-8')
     return before
 
 
