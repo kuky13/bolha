@@ -16,6 +16,10 @@ on:
         description: 'Testar também Electron 0.1.0 e 0.2.1 (Windows descartável)'
         type: boolean
         default: true
+      validate_previous:
+        description: 'Validar atualização da versão estável anterior sem publicar'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -86,7 +90,7 @@ jobs:
         run: |
           python scripts/test_windows_native.py --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --target-installer "validation/update-feed/Bolha-Setup-$($env:BOLHA_NEXT_VERSION)-x64.exe" --output validation/windows-native
       - name: Atualizar a versão estável anterior pelo instalador novo
-        if: github.ref_type == 'tag' || inputs.publish_release
+        if: ${{ !inputs.installer_ui_only && (github.ref_type == 'tag' || inputs.publish_release || inputs.validate_previous) }}
         timeout-minutes: 5
         shell: pwsh
         run: |

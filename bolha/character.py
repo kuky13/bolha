@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
-"""Desenho aprovado da Bolha nativa: somente olhos e orelhas.
+"""Desenho da Bolha nativa com olhos, orelhas e boca expressiva.
 
 O corpo e o rosto usam o mesmo centro, rotação e deformação. A expressão
 permanece recortada ao interior da esfera em todos os quadros.
@@ -8,6 +8,7 @@ permanece recortada ao interior da esfera em todos os quadros.
 import math
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
+from .facial_motion import WINK_DURATION, wink_state, mouth_state
 
 RADIUS = 49.0
 FACE_RADIUS = 43.0
@@ -238,11 +239,73 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     p.restore()
 
 
+def _mouth(p, emotion, opening=None, curve=None, chew=0., tongue=0.,
+           cursor_inside=False, cursor_spit=0.):
+    defaults = mouth_state(emotion)
+    opening = _clamp(defaults['mouth_open'] if opening is None else opening, 0., 1.)
+    curve = _clamp(defaults['mouth_curve'] if curve is None else curve, -1., 1.)
+    chew, tongue = _clamp(chew, 0., 1.), _clamp(tongue, 0., 1.)
+    p.save()
+    clip = QPainterPath()
+    clip.addEllipse(QPointF(0., 0.), FACE_RADIUS, FACE_RADIUS)
+    p.setClipPath(clip, Qt.IntersectClip)
+    width = 7.5 + 10. * opening
+    height = 2.5 + 12. * opening
+    y = 18. + chew * 1.5
+    if opening > .055:
+        mouth = QPainterPath()
+        mouth.moveTo(-width, y - 1.5)
+        mouth.quadTo(0., y - height * .7, width, y - 1.5)
+        mouth.quadTo(width * .8, y + height, 0., y + height)
+        mouth.quadTo(-width * .8, y + height, -width, y - 1.5)
+        p.setPen(_pen(width=1.75))
+        p.setBrush(QColor('#2f1026'))
+        p.drawPath(mouth)
+        if curve > .4:
+            p.save()
+            p.setClipPath(mouth, Qt.IntersectClip)
+            p.setPen(Qt.NoPen)
+            p.setBrush(_color('#f9b3bd', .9))
+            p.drawEllipse(QPointF(0., y + height), width * .55, max(2., height * .38))
+            p.restore()
+    else:
+        mouth = QPainterPath(QPointF(-width, y))
+        mouth.quadTo(0., y + 7. * curve, width, y)
+        p.setPen(_pen(width=2.))
+        p.setBrush(Qt.NoBrush)
+        p.drawPath(mouth)
+    if chew > 0:
+        p.setPen(_pen(width=1.6, alpha=.7))
+        for side in (-1., 1.):
+            cheek = QPainterPath(QPointF(side * 25., 10.))
+            cheek.quadTo(side * (28. + chew * 4.), 17., side * 25., 22.)
+            p.drawPath(cheek)
+    if tongue > 0:
+        p.setPen(_pen('#e9a0af', width=1.2))
+        p.setBrush(QColor('#d58fa4'))
+        p.drawRoundedRect(QRectF(-3., y + 3., 6., 3. + 8. * tongue), 2.5, 2.5)
+    if cursor_inside or cursor_spit > 0:
+        p.save()
+        p.translate(0. if cursor_inside else 25. * _clamp(cursor_spit, 0., 1.), y - 2.)
+        p.rotate(-12. if cursor_inside else -35.)
+        arrow = QPainterPath(QPointF(-3., -5.))
+        for x, offset_y in ((-3., 4.), (0., 2.), (2., 6.), (4., 5.), (2., 1.), (5., 0.)):
+            arrow.lineTo(x, offset_y)
+        arrow.closeSubpath()
+        p.setPen(_pen('#2b2236', width=1.1))
+        p.setBrush(QColor('#fff4db'))
+        p.drawPath(arrow)
+        p.restore()
+    p.restore()
+
+
 def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
                    blink=0.0, gaze=(0.0, 0.0), squash=0.0,
                    ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, body_opacity=1.0,
-                   blink_left=None, blink_right=None, anger=None, ear_gaze=None):
-    """Pinta Bolha somente com olhos e orelhas: nunca desenha boca.
+                   blink_left=None, blink_right=None, anger=None, ear_gaze=None,
+                   mouth_enabled=True, mouth_open=None, mouth_curve=None, mouth_chew=0.,
+                   tongue=0., cursor_inside=False, cursor_spit=0.):
+    """Pinta a expressão inteira com a mesma transformação do corpo.
 
     ``blink``: 0 aberto, 1 fechado; ``eye_open``: abertura 0..1.3;
     ``ear_tilt``: graus espelhados; ``ear_raise``: elevação canônica.
@@ -263,6 +326,9 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
     _features(painter, emotion, _clamp(blink, 0, 1), gaze,
               _clamp(ear_tilt, -35, 35), _clamp(ear_raise, -5, 5), _clamp(eye_open, 0, 1.3),
               blink_left,blink_right,anger,detail=max(1.,min(1.3,.7/max(.05,scale))),ear_gaze=ear_gaze)
+    if mouth_enabled or cursor_inside or cursor_spit > 0:
+        _mouth(painter, emotion, mouth_open, mouth_curve, mouth_chew, tongue,
+               cursor_inside, cursor_spit)
     painter.restore()
 
 
@@ -450,22 +516,3 @@ def draw_reaction_marks(painter, cx, cy, scale=1.0, phase=0.0, kind='carinho', s
         for side in (-1,1):
             painter.drawLine(QPointF(x+2.,side*(height+1.)),QPointF(x+5.,side*(height+4.)))
     painter.restore()
-
-
-
-
-WINK_DURATION = 1.12
-
-def wink_state(progress):
-    """Dois gestos rápidos com120ms totalmente fechados e final aberto."""
-    progress=_clamp(progress,0,1);t=progress*WINK_DURATION
-    def pulse(start):
-        local=t-start
-        if local<0 or local>=.34:return 0.
-        if local<.10:return .5-.5*math.cos(math.pi*local/.10)
-        if local<.22:return 1.
-        return .5+.5*math.cos(math.pi*(local-.22)/.12)
-    left,right=pulse(.03),pulse(.43)
-    envelope=math.sin(math.pi*progress)**2
-    return dict(blink_left=left,blink_right=right,ear_tilt=10*math.sin(progress*math.tau)*envelope,
-                ear_raise=1.8*envelope,tilt=5*math.sin(progress*math.tau)*envelope)

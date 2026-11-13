@@ -14,8 +14,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QSize, Qt
-from PySide6.QtGui import QImage, QImageReader, QMovie
 
 USER_AGENT = 'Bolha (https://github.com/kuky13/bolha)'
 REACTIONGIFS_API = 'https://www.reactiongifs.com/wp-json/wp/v2/posts'
@@ -306,6 +304,8 @@ def validate_media_signature(data, content_type=''):
 class InMemoryMedia:
     """Mantém QByteArray/QBuffer/QMovie/QImage exclusivamente em RAM e libera no close()."""
     def __init__(self, payload: ReactionPayload, target_size=220):
+        from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QSize, Qt
+        from PySide6.QtGui import QImage, QImageReader, QMovie
         kind = validate_media_signature(payload.data, payload.content_type)
         self.candidate = payload.candidate
         self.byte_size = len(payload.data)
@@ -398,6 +398,7 @@ class InMemoryMedia:
 
     def set_target_size(self, target_size):
         """Redimensiona mídia em memória ao mudar escala, sem buscar novamente."""
+        from PySide6.QtCore import QSize, Qt
         bound=max(64,min(320,int(target_size)))
         if bound==self._bound:return
         self._bound=bound

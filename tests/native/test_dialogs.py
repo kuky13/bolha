@@ -464,3 +464,19 @@ def test_painel_mostra_ultima_decisao_sem_fingir_que_esta_ativa(app):
     assert 'Última decisão registrada: explorar' in dialog.decision.text()
     assert 'Agora: explorar' not in dialog.decision.text()
     dialog.close()
+
+
+def test_painel_explica_escolha_real_da_brincadeira_com_ponteiro(app):
+    controller = ControllerStub()
+    controller.game.decision_snapshot = lambda: {'current': dict(
+        action='cursor_prank_intent', target='approach', intensity=.8, duration=8.,
+        source='cursor_prank_policy', factors=dict(idleSeconds=137., angryAttempt=False)),
+        'history': []}
+    dialog = NeuralDialog(controller)
+    dialog.show()
+    dialog.refresh()
+    assert 'Agora: brincar com o ponteiro' in dialog.decision.text()
+    assert 'Alvo: se aproximar' in dialog.decision.text()
+    assert 'rede e memória da brincadeira' in dialog.decision.text()
+    assert 'ponteiro em repouso · inatividade 137 s' in dialog.decision.text()
+    dialog.close()

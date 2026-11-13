@@ -84,7 +84,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
     (resource/'bolha-version.json').write_text(json.dumps({'version':version}),encoding='utf-8')
     collect_licenses(resource/'licenses')
     shutil.copy2(ROOT/'packaging/THIRD-PARTY-NOTICES.txt',resource/'THIRD-PARTY-NOTICES.txt')
-    # Geometria Qt aprovada sem boca; o ícone antigo nunca entra no pacote.
+    # O pacote usa a mesma geometria vetorial das expressões atuais.
     icon(resource/'icons')
     args=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--windowed','--onedir','--name','Bolha',
           '--distpath',str(work/'dist'),'--workpath',str(work/'pyinstaller'),'--specpath',str(work),
