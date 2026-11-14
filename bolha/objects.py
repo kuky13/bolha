@@ -21,67 +21,70 @@ def notebook_transform(rect):
     return QTransform().translate(x,y).scale(scale,scale)
 
 
+_NOTEBOOK_LID=QRectF(21,7,90,65)
+_NOTEBOOK_HINGE=QRectF(12,68,108,10)
+
+
 def _notebook_base():
-    path=QPainterPath(QPointF(17,49))
-    path.lineTo(93,49);path.lineTo(108,61)
-    path.quadTo(109,66,104,66);path.lineTo(6,66)
-    path.quadTo(1,66,2,61);path.closeSubpath()
+    path=QPainterPath(QPointF(18,72))
+    path.lineTo(114,72);path.quadTo(119,72,121,76)
+    path.lineTo(130,85);path.quadTo(131,91,125,91);path.lineTo(7,91)
+    path.quadTo(1,91,2,85);path.lineTo(11,76);path.quadTo(14,72,18,72)
+    path.closeSubpath()
     return path
 
 
-def notebook_shape(rect,working=False):
+def notebook_shape(rect):
     path=QPainterPath();path.setFillRule(Qt.WindingFill)
-    half_pen=1.25 if working else .6
-    path.addRoundedRect(QRectF(16,10,78,43).adjusted(-half_pen,-half_pen,half_pen,half_pen),6+half_pen,6+half_pen)
+    path.addRoundedRect(_NOTEBOOK_LID.adjusted(-.55,-.55,.55,.55),9.55,9.55)
+    path.addRoundedRect(_NOTEBOOK_HINGE,4,4)
     base=_notebook_base()
-    edge=QPainterPathStroker();edge.setWidth(.8)
+    edge=QPainterPathStroker();edge.setWidth(1.)
     path.addPath(base.united(edge.createStroke(base)))
     return notebook_transform(rect).map(path)
 
 
 def paint_notebook(p,rect,working=False,phase=0.):
-    """Notebook de brinquedo, com tampa baixa e teclado em perspectiva."""
+    """Mini terminal grafite, com cursor e teclas ligados ao ritmo da Bolha."""
     phase=phase if math.isfinite(phase) else 0.
     key,tap,progress=typing_frame(phase) if working else (-1,0.,0)
     p.save();p.setTransform(notebook_transform(rect),True)
-    tampa=QRectF(16,10,78,43)
-    metal=QLinearGradient(tampa.topLeft(),tampa.bottomRight())
-    metal.setColorAt(0.,QColor('#817293'));metal.setColorAt(1.,QColor('#353043'))
-    p.setPen(QPen(QColor('#c6a8ee') if working else QColor('#91829e'),2.5 if working else 1.2))
-    p.setBrush(metal);p.drawRoundedRect(tampa,6,6)
-    screen=QRectF(21,16,68,29)
-    p.setPen(QPen(QColor('#171522'),1));p.setBrush(QColor('#1e1d2e'))
-    p.drawRoundedRect(screen,3,3)
+    shell=QLinearGradient(0,7,0,72)
+    shell.setColorAt(0,QColor('#493e60'));shell.setColorAt(1,QColor('#242031'))
+    p.setPen(QPen(QColor('#a494bd'),1.1));p.setBrush(shell)
+    p.drawRoundedRect(_NOTEBOOK_LID,9,9)
+    glass=QLinearGradient(0,14,0,63)
+    glass.setColorAt(0,QColor('#242034'));glass.setColorAt(1,QColor('#0b0e15'))
+    p.setPen(QPen(QColor('#51445e'),1));p.setBrush(glass)
+    p.drawRoundedRect(QRectF(27,14,78,49),6,6)
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#131520'))
+    p.drawRoundedRect(QRectF(34,21,64,33),4,4)
+    for x,color in ((34,'#db99ad'),(39,'#ffd16e'),(44,'#89d3bf')):
+        p.setBrush(QColor(color));p.drawEllipse(QPointF(x,19),1.2,1.2)
+    p.setPen(QPen(QColor('#ffd16e'),2,Qt.SolidLine,Qt.RoundCap,Qt.RoundJoin));p.setBrush(Qt.NoBrush)
+    prompt=QPainterPath(QPointF(43,32));prompt.lineTo(49,37);prompt.lineTo(43,42)
+    p.drawPath(prompt)
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#b98b64'))
+    for index in range(progress):
+        p.drawEllipse(QPointF(55+3.5*index,37),.8,.8)
+    if not working or key>=0 or int(phase*2)%2==0:
+        p.setPen(QPen(QColor('#ffd16e'),2,Qt.SolidLine,Qt.RoundCap))
+        x=54+3.5*progress
+        p.drawLine(QPointF(x,43),QPointF(x+9,43))
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#55425d'))
+    for x in (84,90):p.drawEllipse(QPointF(x,48),1,1)
+    p.setBrush(QColor('#24202e'));p.drawRoundedRect(_NOTEBOOK_HINGE,4,4)
+    base=QLinearGradient(0,72,0,91)
+    base.setColorAt(0,QColor('#665a79'));base.setColorAt(1,QColor('#2a2638'))
+    p.setPen(QPen(QColor('#9383ae'),1));p.setBrush(base);p.drawPath(_notebook_base())
     p.setPen(Qt.NoPen)
-    p.setBrush(QColor('#37304b'));p.drawRoundedRect(QRectF(22,17,66,5),2,2)
-    for x,color in ((26,'#d49cb9'),(30,'#ffd364'),(34,'#90d9c9')):
-        p.setBrush(QColor(color));p.drawEllipse(QPointF(x,19.5),.8,.8)
-    for row,(indent,length,color) in enumerate(((0,24,'#cbb6f2'),(5,29,'#91c8c7'),(5,19,'#cbb6f2'))):
-        p.setBrush(QColor(color));p.drawRoundedRect(QRectF(28+indent,26+row*4,length,1.6),.6,.6)
-    length=7+progress*3.5
-    p.setBrush(QColor(255,211,100,round(125+115*tap) if working else 85))
-    p.drawRoundedRect(QRectF(33,39,length,1.7),.7,.7)
-    if working and (key>=0 or int(phase*2)%2==0):
-        p.fillRect(QRectF(34+length,37.8,1,4.3),QColor('#fff0bb'))
-    p.setBrush(QColor('#181622'));p.drawEllipse(QPointF(55,13),.9,.9)
-    # A tecla iluminada acompanha o toque; o resto do notebook fica estável.
-    base=QLinearGradient(0,49,0,66)
-    base.setColorAt(0.,QColor('#68617f'));base.setColorAt(.76,QColor('#9389a9'))
-    base.setColorAt(1.,QColor('#49435b'))
-    p.setPen(QPen(QColor('#4f455f'),.8));p.setBrush(base);p.drawPath(_notebook_base())
-    p.setPen(QPen(QColor('#2a2435'),.5))
-    for row in range(2):
-        for col in range(8):
-            pressed=tap if row==key%2 and col==key else 0.
-            p.setBrush(QColor(round(74+178*pressed),round(65+138*pressed),round(90+20*pressed)))
-            p.drawRoundedRect(QRectF(24-row*3+col*(8.2+row*.8),51+row*4+.3*pressed,6.6+row*.4,2.6),.7,.7)
-    p.setBrush(QColor('#786e8a'));p.drawRoundedRect(QRectF(44,60,22,4),1,1)
-    p.setPen(Qt.NoPen);p.setBrush(QColor('#4b3e5e'))
-    p.drawEllipse(QPointF(20,62),4.5,2)
-    p.setBrush(QColor('#ffd364'))
-    for x in (18.6,21.4):p.drawEllipse(QPointF(x,61.8),.65,.65)
-    p.setBrush(QColor('#ffd364') if working else QColor('#625776'))
-    p.drawEllipse(QPointF(94,62),.85,.85)
+    for col in range(8):
+        pressed=tap if col==key else 0.
+        p.setBrush(QColor(round(50+205*pressed),round(43+164*pressed),round(64+57*pressed)))
+        p.drawRoundedRect(QRectF(24+11*col,76+.35*pressed,7.5,3.4),1,1)
+    p.setBrush(QColor('#81708b'));p.drawRoundedRect(QRectF(53,82.5,26,4),1,1)
+    p.setBrush(QColor('#ffd16e') if working else QColor('#8a7161'))
+    p.drawEllipse(QPointF(114,85),1.3,1.3)
     p.restore()
 
 

@@ -17,12 +17,12 @@ def render(width, height, working=False, phase=0.):
     return image
 
 
-@pytest.mark.parametrize('size',[(66,42),(110,70),(198,126),(170,70),(110,115)])
+@pytest.mark.parametrize('size',[(66,42),(132,96),(216,157),(170,70),(110,115)])
 @pytest.mark.parametrize('working',[False,True])
 def test_art_stays_within_hit_silhouette_at_all_scales(qt_application,size,working):
     width,height=size
     image=render(width,height,working)
-    path=notebook_shape(QRectF(0,0,width,height),working)
+    path=notebook_shape(QRectF(0,0,width,height))
     # Inclui somente a cobertura parcial de antialias ao redor do contorno.
     stroker=QPainterPathStroker();stroker.setWidth(2.)
     covered=path.united(stroker.createStroke(path))
@@ -37,16 +37,17 @@ def test_art_stays_within_hit_silhouette_at_all_scales(qt_application,size,worki
 
 
 def test_working_notebook_animates_only_screen_and_keys(qt_application):
-    idle=render(110,70,False,0.)
-    assert idle==render(110,70,False,.7)
-    a,b=render(110,70,True,.05),render(110,70,True,.15)
-    changes={(x,y) for y in range(70) for x in range(110) if a.pixel(x,y)!=b.pixel(x,y)}
-    screen={(x,y) for x,y in changes if 10<=x<=100 and 9<=y<=44}
-    keys={(x,y) for x,y in changes if 16<=x<=94 and 49<=y<=56}
-    assert screen and keys and changes==screen|keys
-    # O texto fica na tela quando a Bolha tira o dedo da tecla.
-    assert a.pixelColor(42,39)!=idle.pixelColor(42,39)
-    assert b.pixelColor(42,39)!=idle.pixelColor(42,39)
+    idle=render(132,96,False,0.)
+    assert idle==render(132,96,False,.7)
+    active,pause=render(132,96,True,.05),render(132,96,True,.15)
+    changes={(x,y) for y in range(96) for x in range(132) if active.pixel(x,y)!=pause.pixel(x,y)}
+    keys={(x,y) for x,y in changes if 23<=x<=112 and 75<=y<=81}
+    assert keys and changes==keys
+    # Os pontos ficam no terminal enquanto a Bolha solta a tecla.
+    assert active.pixelColor(55,37)==pause.pixelColor(55,37)
+    assert pause.pixelColor(55,37)!=idle.pixelColor(55,37)
+    blink=render(132,96,True,2.55)
+    assert blink.pixelColor(86,43)!=render(132,96,True,3.1).pixelColor(86,43)
 
 
 @pytest.mark.parametrize('x, side', [(-608, -1), (-230, 1)])

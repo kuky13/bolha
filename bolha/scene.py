@@ -57,7 +57,7 @@ class ObjectWindow(QWidget):
             radius=item.body.half_w+1
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
         else:
-            if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()),item.working)
+            if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()))
             elif item.kind=='note':
                 path=bubble_path(QRectF(self.rect()),True,self.width()*item.anchor,item.tail_top,compact=True)
             elif item.kind=='sign':path=bubble_path(QRectF(self.rect()))
