@@ -1191,7 +1191,7 @@ class Game:
 
     def _sync_desk_pose(self):
         self.state.at_desk = self.mesa.sentado
-        self.state.desk_top = self.mesa.caderno.screen_top() if self.mesa.sentado else None
+        self.state.desk_top = self.mesa.caderno.screen_top() if self.mesa.sentado and not self.mesa.lado else None
 
     def tick(self, dt, now=None):
         now = time.monotonic() if now is None else now
@@ -1273,7 +1273,8 @@ class Game:
         self._track_landing(now)
         if self.body.grounded:self.in_flight=False
         if self.mesa.sentado:
-            if self.mesa.pin(self.body,now):
+            caderno = self.mesa.caderno
+            if self.mesa.pin(self.body,now,self.bounds((caderno._cx,caderno._cy))):
                 self.mesa.levantar_arrancado(now)
                 self.protest_ctl.provoke(.1)
             self._sync_desk_pose()

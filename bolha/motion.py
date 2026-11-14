@@ -421,9 +421,11 @@ class ExpressionMotion:
             phase = now % TYPING_SECONDS
             breath = math.sin(now*2.8)
             proud = _mouth_pulse(phase - 2.35, 1., .35)
-            self.pose.update(angle_offset=180.-(body.angle+180.)%360.+side*4.5*tap,
-                             squash=.048*tap+.012*breath, gaze=(.24*side*tap,.4+.26*tap-.28*proud),
-                             ear_raise=-.65+1.4*tap+1.5*proud, ear_tilt=4.*side*tap,
+            facing = game.mesa.lado
+            self.pose.update(angle_offset=180.-(body.angle+180.)%360.+facing*(8.+2.*tap)+side*tap,
+                             squash=.029*tap+.012*breath,
+                             gaze=(facing*(.76-.16*proud)+.09*side*tap,.34+.26*tap-.3*proud),
+                             ear_raise=-.85+.65*tap+1.65*proud, ear_tilt=2.4*side*tap,
                              blink=_mouth_pulse(phase - 2.2,.18,.07),
                              mouth_curve=.52-.27*tap+.38*proud)
         if mode == 'pouso_de_lado' and landing_reaction.get('angle',0.) < 0.:

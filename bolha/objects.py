@@ -2,14 +2,13 @@
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Desenhos GPL do Pestinha, mille-okws e contribuidores.
 
-Notebook e bolinha extraídos de world/notebook.py:_paint_desenho e body/bolinha.py:paintEvent
-no commit ca03a48136d2f97b9b58bbc7ae4e307bb408048d. Sem sprites ou assets.
-A silhueta do notebook vem do Pestinha; os detalhes, materiais e animações
-da tela foram redesenhados para a Bolha. O amendoim é um desenho próprio.
+Notebook e bolinha adaptados de world/notebook.py e body/bolinha.py
+do Pestinha no commit ca03a48136d2f97b9b58bbc7ae4e307bb408048d.
+O notebook foi redesenhado para a Bolha. O amendoim é um desenho próprio.
 """
 import math
 from PySide6.QtCore import QPointF,QRectF,Qt
-from PySide6.QtGui import QColor,QLinearGradient,QRadialGradient,QPen,QPainterPath,QTransform
+from PySide6.QtGui import QColor,QLinearGradient,QRadialGradient,QPen,QPainterPath,QPainterPathStroker,QTransform
 from pestinha.scene import NOTEBOOK_W,NOTEBOOK_H
 from .desk import typing_frame
 BALL_RADIUS=18
@@ -22,87 +21,67 @@ def notebook_transform(rect):
     return QTransform().translate(x,y).scale(scale,scale)
 
 
+def _notebook_base():
+    path=QPainterPath(QPointF(17,49))
+    path.lineTo(93,49);path.lineTo(108,61)
+    path.quadTo(109,66,104,66);path.lineTo(6,66)
+    path.quadTo(1,66,2,61);path.closeSubpath()
+    return path
+
+
 def notebook_shape(rect,working=False):
     path=QPainterPath();path.setFillRule(Qt.WindingFill)
     half_pen=1.25 if working else .6
-    path.addRoundedRect(QRectF(4,3,NOTEBOOK_W-8,NOTEBOOK_H-14).adjusted(-half_pen,-half_pen,half_pen,half_pen),6+half_pen,6+half_pen)
-    path.addRoundedRect(QRectF(2,NOTEBOOK_H-13,NOTEBOOK_W-4,9).adjusted(-.5,-.5,.5,.5),3,3)
+    path.addRoundedRect(QRectF(16,10,78,43).adjusted(-half_pen,-half_pen,half_pen,half_pen),6+half_pen,6+half_pen)
+    base=_notebook_base()
+    edge=QPainterPathStroker();edge.setWidth(.8)
+    path.addPath(base.united(edge.createStroke(base)))
     return notebook_transform(rect).map(path)
 
 
 def paint_notebook(p,rect,working=False,phase=0.):
-    """Notebook derivado do Pestinha, com materiais e detalhes próprios da Bolha.
-
-    ``phase`` é tempo em segundos; tela e teclas respondem à digitação.
-    A silhueta e a escala continuam compartilhadas com a máscara de entrada.
-    """
-    phase=float(phase)
-    if not math.isfinite(phase):phase=0.
+    """Notebook de brinquedo, com tampa baixa e teclado em perspectiva."""
+    phase=phase if math.isfinite(phase) else 0.
     key,tap,progress=typing_frame(phase) if working else (-1,0.,0)
     p.save();p.setTransform(notebook_transform(rect),True)
-    tampa=QRectF(4,3,NOTEBOOK_W-8,NOTEBOOK_H-14)
+    tampa=QRectF(16,10,78,43)
     metal=QLinearGradient(tampa.topLeft(),tampa.bottomRight())
-    metal.setColorAt(0.,QColor('#77708e'));metal.setColorAt(.45,QColor('#49435d'))
-    metal.setColorAt(1.,QColor('#282637'))
+    metal.setColorAt(0.,QColor('#817293'));metal.setColorAt(1.,QColor('#353043'))
     p.setPen(QPen(QColor('#c6a8ee') if working else QColor('#91829e'),2.5 if working else 1.2))
     p.setBrush(metal);p.drawRoundedRect(tampa,6,6)
-    # A moldura escura mantém os detalhes legíveis mesmo na escala pequena.
-    screen=QRectF(10,9,90,35)
-    p.setPen(QPen(QColor('#16141d'),1.5));p.setBrush(QColor('#11131d'))
-    p.drawRoundedRect(screen,2,2)
-    p.save()
-    clip=QPainterPath();clip.addRoundedRect(screen,2,2);p.setClipPath(clip)
-    glass=QLinearGradient(screen.topLeft(),screen.bottomRight())
-    glass.setColorAt(0.,QColor('#272740'));glass.setColorAt(1.,QColor('#131622'))
-    p.fillRect(screen,glass)
-    p.fillRect(QRectF(11,10,88,5),QColor('#38304c'))
-    p.fillRect(QRectF(11,15,15,28),QColor('#242132'))
-    p.setPen(QPen(QColor('#746484'),.7));p.drawLine(QPointF(27,15),QPointF(27,43))
+    screen=QRectF(21,16,68,29)
+    p.setPen(QPen(QColor('#171522'),1));p.setBrush(QColor('#1e1d2e'))
+    p.drawRoundedRect(screen,3,3)
     p.setPen(Qt.NoPen)
-    for x,color in ((14,'#d49cb9'),(18,'#ffd364'),(22,'#90d9c9')):
-        p.setBrush(QColor(color));p.drawEllipse(QPointF(x,12.5),.85,.85)
-    for row,length in enumerate((8,6,9,5)):
-        p.setBrush(QColor('#b6a0d3') if row==0 else QColor('#665c7c'))
-        p.drawRoundedRect(QRectF(14,19+row*5,length,1.5),.6,.6)
-    for row,(indent,length,color) in enumerate(((0,29,'#cbb6f2'),(4,37,'#f2ca83'),
-                                               (4,23,'#91c8c7'),(8,29,'#cbb6f2'))):
-        p.setBrush(QColor(color));p.drawRoundedRect(QRectF(33+indent,18+row*4.8,length,1.5),.7,.7)
-    length=9+progress*3.6
-    p.setBrush(QColor(255,211,100,round(135+110*tap) if working else 85))
+    p.setBrush(QColor('#37304b'));p.drawRoundedRect(QRectF(22,17,66,5),2,2)
+    for x,color in ((26,'#d49cb9'),(30,'#ffd364'),(34,'#90d9c9')):
+        p.setBrush(QColor(color));p.drawEllipse(QPointF(x,19.5),.8,.8)
+    for row,(indent,length,color) in enumerate(((0,24,'#cbb6f2'),(5,29,'#91c8c7'),(5,19,'#cbb6f2'))):
+        p.setBrush(QColor(color));p.drawRoundedRect(QRectF(28+indent,26+row*4,length,1.6),.6,.6)
+    length=7+progress*3.5
+    p.setBrush(QColor(255,211,100,round(125+115*tap) if working else 85))
     p.drawRoundedRect(QRectF(33,39,length,1.7),.7,.7)
     if working and (key>=0 or int(phase*2)%2==0):
-        p.fillRect(QRectF(34+length,37.5,1,4.4),QColor('#fff0bb'))
-    # Reflexo estreito e fixo, sem brilho atravessando a área inteira da tela.
-    sheen=QPainterPath(QPointF(10,9));sheen.lineTo(55,9);sheen.lineTo(27,44);sheen.lineTo(10,44);sheen.closeSubpath()
-    p.setBrush(QColor(224,217,255,10));p.drawPath(sheen);p.restore()
-    p.setPen(Qt.NoPen);p.setBrush(QColor('#11121a'));p.drawEllipse(QPointF(55,6.2),.9,.9)
-    p.setBrush(QColor('#a491bb'));p.drawEllipse(QPointF(55,6.),.3,.3)
-    # Dobradiças, teclas e pequenos riscos no apoio dão escala ao objeto.
-    p.setPen(QPen(QColor('#aaa0b8'),1.2))
-    for x in (18,80):p.drawLine(QPointF(x,47),QPointF(x+12,47))
-    p.setPen(QPen(QColor('#17151f'),.5))
+        p.fillRect(QRectF(34+length,37.8,1,4.3),QColor('#fff0bb'))
+    p.setBrush(QColor('#181622'));p.drawEllipse(QPointF(55,13),.9,.9)
+    # A tecla iluminada acompanha o toque; o resto do notebook fica estável.
+    base=QLinearGradient(0,49,0,66)
+    base.setColorAt(0.,QColor('#68617f'));base.setColorAt(.76,QColor('#9389a9'))
+    base.setColorAt(1.,QColor('#49435b'))
+    p.setPen(QPen(QColor('#4f455f'),.8));p.setBrush(base);p.drawPath(_notebook_base())
+    p.setPen(QPen(QColor('#2a2435'),.5))
     for row in range(2):
-        for col in range(11):
-            pressed=tap if key>=0 and row==key%2 and col==1+key else 0.
-            p.setBrush(QColor(round(117+135*pressed),round(108+95*pressed),round(138-28*pressed)))
-            p.drawRoundedRect(QRectF(16+col*7.2,50+row*3.4+.45*pressed,5.6,2.2),.6,.6)
-    base=QRectF(2,NOTEBOOK_H-13,NOTEBOOK_W-4,9)
-    silver=QLinearGradient(base.topLeft(),base.bottomLeft())
-    silver.setColorAt(0.,QColor('#b6afc5'));silver.setColorAt(.5,QColor('#827d92'))
-    silver.setColorAt(1.,QColor('#4d4a5c'))
-    p.setPen(QPen(QColor('#464151'),1));p.setBrush(silver);p.drawRoundedRect(base,3,3)
-    p.setPen(QPen(QColor('#5a536b'),.6));p.setBrush(QColor('#a29aaf'))
-    p.drawRoundedRect(QRectF(42,59,26,3.5),1,1)
-    p.setPen(QPen(QColor('#d8cfdf'),.5))
-    for x,y,length in ((10,60,5),(91,62,3)):
-        p.drawLine(QPointF(x,y),QPointF(x+length,y-.6))
-    p.setPen(Qt.NoPen);p.setBrush(QColor('#473957'))
-    p.drawEllipse(QPointF(23,61.5),5.4,2.6)
-    p.setBrush(QColor('#f6cd82'))
-    for x in (21.5,24.5):p.drawEllipse(QPointF(x,61.3),.65,.7)
-    p.setPen(Qt.NoPen)
-    p.setBrush(QColor('#ffd364') if working else QColor('#695f7e'))
-    p.drawEllipse(QPointF(98,61.5),1,1)
+        for col in range(8):
+            pressed=tap if row==key%2 and col==key else 0.
+            p.setBrush(QColor(round(74+178*pressed),round(65+138*pressed),round(90+20*pressed)))
+            p.drawRoundedRect(QRectF(24-row*3+col*(8.2+row*.8),51+row*4+.3*pressed,6.6+row*.4,2.6),.7,.7)
+    p.setBrush(QColor('#786e8a'));p.drawRoundedRect(QRectF(44,60,22,4),1,1)
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#4b3e5e'))
+    p.drawEllipse(QPointF(20,62),4.5,2)
+    p.setBrush(QColor('#ffd364'))
+    for x in (18.6,21.4):p.drawEllipse(QPointF(x,61.8),.65,.65)
+    p.setBrush(QColor('#ffd364') if working else QColor('#625776'))
+    p.drawEllipse(QPointF(94,62),.85,.85)
     p.restore()
 
 

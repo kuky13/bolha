@@ -124,7 +124,8 @@ def test_notebook_keys_follow_desk_pose_and_stop_when_stored(mobile, monkeypatch
     mobile.game.last_think = 80.
     mobile.game.mesa.tick(72., {}, 20., True, mobile.game.play)
     active = json.loads(mobile.tick(.016))
-    assert active['deskTop'] == mobile.game.mesa.caderno.screen_top()
+    assert active['deskTop'] is None
+    assert abs(active['x'] - active['notebook']['x']) > active['radius']
     assert active['poseMode'] == 'digitando'
     assert active['notebook']['typingKey'] == 0
     assert active['notebook']['typingTap'] > .95

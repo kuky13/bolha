@@ -31,9 +31,9 @@ def test_notebook_detalhado_com_tela_teclas_base_e_estado_de_trabalho(qt_applica
     # A tela tem painel, linhas de atividade e contraste com a moldura.
     assert len({idle.pixelColor(x,30).name() for x in range(12,98)})>4
     assert idle.pixelColor(55,20).lightness()<idle.pixelColor(55,61).lightness()
-    assert working.pixelColor(98,61)!=idle.pixelColor(98,61)
-    assert working.pixelColor(4,30).name()=='#c6a8ee'
-    assert idle.pixelColor(4,30)!=working.pixelColor(4,30)
+    assert working.pixelColor(94,62)!=idle.pixelColor(94,62)
+    assert working.pixelColor(16,30).name()=='#c6a8ee'
+    assert idle.pixelColor(16,30)!=working.pixelColor(16,30)
 
 @pytest.mark.parametrize('paper',[False,True])
 def test_bola_completa_mesmo_periodo_e_desenho_muda_quando_gira(qt_application,paper):
