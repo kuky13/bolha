@@ -15,19 +15,19 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.5.1 acrescenta embaixadinhas com contagem e melhora a exibição de GIFs.
+A 0.5.2 traz o Mini terminal: notebook grafite, teclas que acendem e cursor que pisca enquanto a Bolha digita.
 A série 0.5 aproxima as expressões e as atividades do Android da versão para PC,
 com central de configurações, painel neural e movimento opcional ao chacoalhar.
 No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
 vem desligada. Também é possível abrir pelo código com `python main.py`, como no Pestinha.
-Veja a [validação da versão](docs/VALIDATION-0.5.1.md) e a
+Veja as [notas da versão](docs/RELEASE.md) e a
 [revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
 *Expressões da 0.5.0 renderizadas pelo Qt em Linux. A validação em Windows é
 separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
-[GPL-3.0-or-later](licenses/BOLHA-ASSETS.md). Notebook e bolinha usam os desenhos
-Qt de Pestinha, de mille-okws e contribuidores, sob
+[GPL-3.0-or-later](licenses/BOLHA-ASSETS.md). O Mini terminal foi redesenhado a partir do notebook do Pestinha.
+A bolinha adapta o desenho de mille-okws e contribuidores, sob
 [GPL-3.0-or-later](NOTICE.md).*
 
 
