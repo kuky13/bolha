@@ -10,7 +10,8 @@ da tela foram redesenhados para a Bolha. O amendoim é um desenho próprio.
 import math
 from PySide6.QtCore import QPointF,QRectF,Qt
 from PySide6.QtGui import QColor,QLinearGradient,QRadialGradient,QPen,QPainterPath,QTransform
-NOTEBOOK_W,NOTEBOOK_H=110,70
+from pestinha.scene import NOTEBOOK_W,NOTEBOOK_H
+from .desk import typing_frame
 BALL_RADIUS=18
 
 
@@ -32,16 +33,17 @@ def notebook_shape(rect,working=False):
 def paint_notebook(p,rect,working=False,phase=0.):
     """Notebook derivado do Pestinha, com materiais e detalhes próprios da Bolha.
 
-    ``phase`` é tempo em segundos; somente a tela em uso muda entre quadros.
+    ``phase`` é tempo em segundos; tela e teclas respondem à digitação.
     A silhueta e a escala continuam compartilhadas com a máscara de entrada.
     """
     phase=float(phase)
     if not math.isfinite(phase):phase=0.
+    key,tap,progress=typing_frame(phase) if working else (-1,0.,0)
     p.save();p.setTransform(notebook_transform(rect),True)
     tampa=QRectF(4,3,NOTEBOOK_W-8,NOTEBOOK_H-14)
     metal=QLinearGradient(tampa.topLeft(),tampa.bottomRight())
-    metal.setColorAt(0.,QColor('#625c77'));metal.setColorAt(.45,QColor('#393644'))
-    metal.setColorAt(1.,QColor('#25242d'))
+    metal.setColorAt(0.,QColor('#77708e'));metal.setColorAt(.45,QColor('#49435d'))
+    metal.setColorAt(1.,QColor('#282637'))
     p.setPen(QPen(QColor('#c6a8ee') if working else QColor('#91829e'),2.5 if working else 1.2))
     p.setBrush(metal);p.drawRoundedRect(tampa,6,6)
     # A moldura escura mantém os detalhes legíveis mesmo na escala pequena.
@@ -51,24 +53,25 @@ def paint_notebook(p,rect,working=False,phase=0.):
     p.save()
     clip=QPainterPath();clip.addRoundedRect(screen,2,2);p.setClipPath(clip)
     glass=QLinearGradient(screen.topLeft(),screen.bottomRight())
-    glass.setColorAt(0.,QColor('#29283b'));glass.setColorAt(1.,QColor('#151823'))
+    glass.setColorAt(0.,QColor('#272740'));glass.setColorAt(1.,QColor('#131622'))
     p.fillRect(screen,glass)
-    p.fillRect(QRectF(11,10,15,33),QColor('#242132'))
-    p.setPen(QPen(QColor('#746484'),.7));p.drawLine(QPointF(27,10),QPointF(27,43))
+    p.fillRect(QRectF(11,10,88,5),QColor('#38304c'))
+    p.fillRect(QRectF(11,15,15,28),QColor('#242132'))
+    p.setPen(QPen(QColor('#746484'),.7));p.drawLine(QPointF(27,15),QPointF(27,43))
     p.setPen(Qt.NoPen)
+    for x,color in ((14,'#d49cb9'),(18,'#ffd364'),(22,'#90d9c9')):
+        p.setBrush(QColor(color));p.drawEllipse(QPointF(x,12.5),.85,.85)
     for row,length in enumerate((8,6,9,5)):
         p.setBrush(QColor('#b6a0d3') if row==0 else QColor('#665c7c'))
-        p.drawRoundedRect(QRectF(14,14+row*6,length,1.5),.6,.6)
-    for row,(indent,length,color) in enumerate(((0,27,'#bca6e5'),(4,37,'#e6c779'),
-                                               (4,22,'#8baab0'),(8,31,'#bca6e5'),
-                                               (4,18,'#8baab0'))):
-        p.setBrush(QColor(color));p.drawRoundedRect(QRectF(33+indent,14+row*5,length,1.6),.7,.7)
-    if working:
-        pulse=.5+.5*math.sin(phase*2.)
-        p.setBrush(QColor(255,211,100,round(115+100*pulse)))
-        p.drawRoundedRect(QRectF(33,39,7+20*pulse,1.8),.7,.7)
-        if int(phase*2)%2==0:
-            p.fillRect(QRectF(57,33,1,4),QColor('#fff0bb'))
+        p.drawRoundedRect(QRectF(14,19+row*5,length,1.5),.6,.6)
+    for row,(indent,length,color) in enumerate(((0,29,'#cbb6f2'),(4,37,'#f2ca83'),
+                                               (4,23,'#91c8c7'),(8,29,'#cbb6f2'))):
+        p.setBrush(QColor(color));p.drawRoundedRect(QRectF(33+indent,18+row*4.8,length,1.5),.7,.7)
+    length=9+progress*3.6
+    p.setBrush(QColor(255,211,100,round(135+110*tap) if working else 85))
+    p.drawRoundedRect(QRectF(33,39,length,1.7),.7,.7)
+    if working and (key>=0 or int(phase*2)%2==0):
+        p.fillRect(QRectF(34+length,37.5,1,4.4),QColor('#fff0bb'))
     # Reflexo estreito e fixo, sem brilho atravessando a área inteira da tela.
     sheen=QPainterPath(QPointF(10,9));sheen.lineTo(55,9);sheen.lineTo(27,44);sheen.lineTo(10,44);sheen.closeSubpath()
     p.setBrush(QColor(224,217,255,10));p.drawPath(sheen);p.restore()
@@ -77,10 +80,12 @@ def paint_notebook(p,rect,working=False,phase=0.):
     # Dobradiças, teclas e pequenos riscos no apoio dão escala ao objeto.
     p.setPen(QPen(QColor('#aaa0b8'),1.2))
     for x in (18,80):p.drawLine(QPointF(x,47),QPointF(x+12,47))
-    p.setPen(QPen(QColor('#17151f'),.5));p.setBrush(QColor('#766f85'))
+    p.setPen(QPen(QColor('#17151f'),.5))
     for row in range(2):
         for col in range(11):
-            p.drawRoundedRect(QRectF(16+col*7.2,50+row*3.4,5.6,2.2),.6,.6)
+            pressed=tap if key>=0 and row==key%2 and col==1+key else 0.
+            p.setBrush(QColor(round(117+135*pressed),round(108+95*pressed),round(138-28*pressed)))
+            p.drawRoundedRect(QRectF(16+col*7.2,50+row*3.4+.45*pressed,5.6,2.2),.6,.6)
     base=QRectF(2,NOTEBOOK_H-13,NOTEBOOK_W-4,9)
     silver=QLinearGradient(base.topLeft(),base.bottomLeft())
     silver.setColorAt(0.,QColor('#b6afc5'));silver.setColorAt(.5,QColor('#827d92'))
@@ -89,8 +94,12 @@ def paint_notebook(p,rect,working=False,phase=0.):
     p.setPen(QPen(QColor('#5a536b'),.6));p.setBrush(QColor('#a29aaf'))
     p.drawRoundedRect(QRectF(42,59,26,3.5),1,1)
     p.setPen(QPen(QColor('#d8cfdf'),.5))
-    for x,y,length in ((10,60,5),(91,62,3),(15,63,3)):
+    for x,y,length in ((10,60,5),(91,62,3)):
         p.drawLine(QPointF(x,y),QPointF(x+length,y-.6))
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#473957'))
+    p.drawEllipse(QPointF(23,61.5),5.4,2.6)
+    p.setBrush(QColor('#f6cd82'))
+    for x in (21.5,24.5):p.drawEllipse(QPointF(x,61.3),.65,.7)
     p.setPen(Qt.NoPen)
     p.setBrush(QColor('#ffd364') if working else QColor('#695f7e'))
     p.drawEllipse(QPointF(98,61.5),1,1)

@@ -46,7 +46,7 @@ Qt de Pestinha, de mille-okws e contribuidores, sob
 - Espreguiçada, espirro, soluço, cochilo, piscadela e movimentos de orelhas
   ocasionais. As manias cedem às interações, ao sono e aos painéis.
 - Amendoim como brinquedo padrão, bolinha original opcional nas configurações,
-  notebook de brincadeira, fogos, cartazes, protestos e castigo.
+  notebook de brincadeira com digitação animada, fogos, cartazes, protestos e castigo.
 - Reações online de memes e GIFs (ReactionGIFs e fallback Nekos.best) carregadas
   apenas em memória conforme o que a Bolha quer expressar, além de bilhetes: no
   máximo uma travessura a cada cinco minutos, até três objetos na tela; tudo

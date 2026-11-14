@@ -13,6 +13,7 @@ from game import Game
 from pestinha.sense.senses import detect_activity
 from bolha import VERSION
 from bolha.dialogue import Dialogue, speech_duration
+from bolha.desk import typing_frame
 from bolha.migration import atomic_json, read_json
 from bolha.motion import ExpressionMotion, animation_pose, QUIRK_SECONDS
 from bolha.preferences import defaults, sanitize, number
@@ -210,8 +211,7 @@ def motion(ax, ay, shake=False):
     intensity = min(1., math.hypot(ax, ay) / 22.)
     if game.mesa.sentado and not game.body.held:
         game.mesa.levantar_arrancado(now)
-        game.state.at_desk = False
-        game.state.desk_top = None
+        game._sync_desk_pose()
     for body in (game.body, game.ball.body):
         if body.held:
             continue
@@ -344,6 +344,7 @@ def tick(dt):
     _update_reactions(now, dt)
     data = game.snapshot()
     _neural_snapshot(data)
+    notebook = None
     for item in data['objects']:
         item['emotion'] = getattr(game.objects[item['id']], 'emotion', 'observando')
         item['mediaReady'] = item['id'] in media_cache
@@ -351,6 +352,11 @@ def tick(dt):
             payload, _, kind = media_cache[item['id']]
             item.update(mediaType=kind, sourceUrl=payload.candidate.source_url,
                         attribution=payload.candidate.attribution, provider=payload.candidate.provider)
+        if item['kind']=='notebook':
+            notebook = item
+            if item['working']:
+                item['typingKey'],item['typingTap'],item['typingProgress'] = typing_frame(now)
+                item['caret'] = int(now*2)%2==0
     pet, toy = game.body, game.ball.body
     reaction = game.play_reaction
     impact = reaction.get('impact_point', (toy.x, toy.y))
@@ -361,7 +367,7 @@ def tick(dt):
         asleep=game.sleep.asleep, caressing=game.state.feliz_fechado(now),
         toyX=toy.x, toyY=toy.y, toyRadius=toy.half_w, toyAngle=math.degrees(game.ball.roll_angle),
         toyVisible=game.ball.isVisible() and game.visible(), toyAppearance=game.ball.appearance,
-        notebook=game.mesa.caderno.snapshot() if game.mesa.caderno.isVisible() else None,
+        notebook=notebook,
         impactX=impact[0], impactY=impact[1],
         impact=reaction.get('started', 0.) if reaction.get('kind') == 'brinquedo_rebatida' else 0.,
         text=count[0] if count else say_text if preferences['speechEnabled'] and now < say_until and not game.panel else '',

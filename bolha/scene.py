@@ -100,7 +100,7 @@ class ObjectWindow(QWidget):
             getattr(item,'appearance',None),
             getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'attribution',None),
             frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible,data.get('opacity'),
-            int(time.monotonic()*10) if visible and item.kind=='notebook' and item.working else None)
+            int(time.monotonic()*30) if visible and item.kind=='notebook' and item.working else None)
         if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
             self._paint_key=key;self.update()
     def enterEvent(self,event):

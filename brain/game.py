@@ -235,7 +235,7 @@ class Game:
                            max(area[1]+item.height()/2, min(area[3]-item.height()/2, item._cy)))
         if self.mesa.sentado:
             self.mesa.ancora = (self.mesa.caderno.x(), self.mesa.caderno.y())
-            self.state.desk_top = self.mesa.caderno.y()
+            self._sync_desk_pose()
         self.mischief.interval = self.prefs.get('mischiefInterval', 300)
         self.mischief.max_objects = self.prefs.get('maxObjects', 3)
         self.mischief.online_reactions = self.prefs.get('onlineReactions', True)
@@ -517,7 +517,9 @@ class Game:
                     refusal_reason=None if allowed else 'low_energy_or_unwilling_mood_or_cooldown',
                     factors=dict(emotion=self.state.emotion,energy=self.drives.energy,neural={'CHEER':self.rates.get('CHEER',0.)}))
             self.intelligence.history.append(dict(self.intelligence.current_decision))
-        elif kind == 'notebook': self.mesa.alternar_notebook()
+        elif kind == 'notebook':
+            self.mesa.alternar_notebook()
+            self._sync_desk_pose()
         elif kind == 'corner': self.castigo.toggle(self.bounds())
         elif kind == 'ball':
             self.ball_stored = not self.ball_stored
@@ -537,8 +539,7 @@ class Game:
             self.drives.touched('drag')
             if self.mesa.sentado:
                 self.mesa.levantar_arrancado(now)
-                self.mesa.caderno.set_working(False)
-                self.state.at_desk=False;self.state.desk_top=None
+                self._sync_desk_pose()
         self.body.held=True;self.state.pressing=True;self.senses.set_dragging(True)
         self.body.grounded=False;self.body.platform=None
         self.body.vx=self.body.vy=self.body.omega=0.
@@ -1178,8 +1179,7 @@ class Game:
         self.behavior.canto = self.rates.get('CANTO',0) > 5 and self.sad.stage > 0
         can_sit = self.body.grounded and not self.body.held and not self.sleep.asleep and not self.castigo.dentro and self.castigo.fuga is None
         self.mesa.tick(now,self.brain.pool_rates(),self.rates['SENTAR'],can_sit,self.play)
-        self.state.at_desk = self.mesa.sentado
-        self.state.desk_top = self.mesa.caderno.y() if self.mesa.sentado else None
+        self._sync_desk_pose()
         self.behavior.play_pull = pull(self.brain.pool_rates())
         self.play.rates = self.rates
         self.play.energy = self.drives.energy
@@ -1188,6 +1188,10 @@ class Game:
         self.sleep.tick(now,self.body,self.in_flight,self.protest.stage,self.behavior.mission)
         if self.sleep.asleep: self.state.emotion = 'dormindo'; self.behavior.on_emotion('dormindo',now)
         self.adapt(now)
+
+    def _sync_desk_pose(self):
+        self.state.at_desk = self.mesa.sentado
+        self.state.desk_top = self.mesa.caderno.screen_top() if self.mesa.sentado else None
 
     def tick(self, dt, now=None):
         now = time.monotonic() if now is None else now
@@ -1268,7 +1272,11 @@ class Game:
             self.body.step(dt,area,platforms,areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
         self._track_landing(now)
         if self.body.grounded:self.in_flight=False
-        if self.mesa.sentado and self.mesa.pin(self.body,now): self.mesa.levantar_arrancado(now); self.protest_ctl.provoke(.1)
+        if self.mesa.sentado:
+            if self.mesa.pin(self.body,now):
+                self.mesa.levantar_arrancado(now)
+                self.protest_ctl.provoke(.1)
+            self._sync_desk_pose()
         if not self.ball_stored:
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
             if self.play.juggling():

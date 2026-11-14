@@ -152,7 +152,7 @@ class MesaController:
             return "arrancado"
         _ex, ey = body.extents()
         body.x = self.caderno.x() + self.caderno.width() / 2
-        body.y = self.caderno.y() + (2 * FRACAO_ESCONDIDA_NOTEBOOK - 1) * ey   # o centro desce até a tampa esconder a fração
+        body.y = self.caderno.screen_top() + (2 * FRACAO_ESCONDIDA_NOTEBOOK - 1) * ey
         body.vx = body.vy = 0.0
         body.grounded = True
         if now - self.ultimo_topo >= INTERVALO_TOPO:       # o pet não pode ficar por cima do notebook
@@ -165,6 +165,7 @@ class MesaController:
         self.decisao.at_desk = False
         self.decisao.left_at = now
         self.ancora = None
+        self.caderno.set_working(False)
 
     # ---------------- janela ----------------
 

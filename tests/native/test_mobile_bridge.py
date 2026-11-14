@@ -116,3 +116,25 @@ def test_all_expression_previews_are_serializable_and_do_not_change_emotion(mobi
         assert frame['poseMode'] == name
         assert frame['emotion'] == initial
         assert 'mouth_enabled' in frame['pose']
+
+
+def test_notebook_keys_follow_desk_pose_and_stop_when_stored(mobile, monkeypatch):
+    now = 72.05
+    monkeypatch.setattr(mobile.time, 'monotonic', lambda: now)
+    mobile.game.last_think = 80.
+    mobile.game.mesa.tick(72., {}, 20., True, mobile.game.play)
+    active = json.loads(mobile.tick(.016))
+    assert active['deskTop'] == mobile.game.mesa.caderno.screen_top()
+    assert active['poseMode'] == 'digitando'
+    assert active['notebook']['typingKey'] == 0
+    assert active['notebook']['typingTap'] > .95
+
+    now = 74.8
+    pause = json.loads(mobile.tick(.016))
+    assert pause['notebook']['typingKey'] == -1
+    assert pause['notebook']['typingProgress'] == 8
+    mobile.control(dict(type='notebook'))
+    stored = json.loads(mobile.tick(.016))
+    assert stored['deskTop'] is None
+    assert stored['notebook'] is None
+    assert not mobile.game.mesa.caderno.working

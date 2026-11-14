@@ -207,11 +207,18 @@ class PlaquinhaCanto(FloatingThing):
         self.move(left + 12, bottom - 154)
 
 
+NOTEBOOK_W, NOTEBOOK_H = 110, 70
+
+
 class Notebook(FloatingThing):
     def __init__(self, app):
         super().__init__('notebook', 190, 115)
         left, _top, right, bottom = app.bounds()
         self.move((left + right) / 2 - 95, bottom - 120)
+
+    def screen_top(self):
+        scale = min(self.width()/NOTEBOOK_W, self.height()/NOTEBOOK_H)
+        return self._cy + (3.-NOTEBOOK_H/2)*scale
 
 
 class Fireworks(Item):
