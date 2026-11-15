@@ -12,7 +12,7 @@ from bolha.scene import NativeScene,ObjectWindow
 
 CONTENT=Path(__file__).resolve().parents[2]/'assets/bolha/content'
 
-def notebook(working=False,width=110,height=70):
+def notebook(working=False,width=132,height=96):
     image=QImage(width,height,QImage.Format_ARGB32_Premultiplied);image.fill(0)
     painter=QPainter(image);painter.setRenderHint(QPainter.Antialiasing)
     paint_notebook(painter,QRectF(0,0,width,height),working);painter.end()
@@ -28,12 +28,12 @@ def ball(angle=0,paper=False):
 
 def test_notebook_detalhado_com_tela_teclas_base_e_estado_de_trabalho(qt_application):
     idle=notebook();working=notebook(True)
-    # A tela tem painel, linhas de atividade e contraste com a moldura.
-    assert len({idle.pixelColor(x,30).name() for x in range(12,98)})>4
-    assert idle.pixelColor(55,20).lightness()<idle.pixelColor(55,61).lightness()
-    assert working.pixelColor(98,61)!=idle.pixelColor(98,61)
-    assert working.pixelColor(4,30).name()=='#c6a8ee'
-    assert idle.pixelColor(4,30)!=working.pixelColor(4,30)
+    # O símbolo do terminal deve continuar legível com a tampa escura.
+    assert idle.pixelColor(49,37).lightness()>idle.pixelColor(60,38).lightness()
+    assert idle.pixelColor(55,25).lightness()<idle.pixelColor(55,83).lightness()
+    assert working.pixelColor(114,85)!=idle.pixelColor(114,85)
+    assert idle.pixelColor(21,40)==working.pixelColor(21,40)
+
 
 @pytest.mark.parametrize('paper',[False,True])
 def test_bola_completa_mesmo_periodo_e_desenho_muda_quando_gira(qt_application,paper):

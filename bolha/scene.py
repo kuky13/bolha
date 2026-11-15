@@ -57,7 +57,7 @@ class ObjectWindow(QWidget):
             radius=item.body.half_w+1
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
         else:
-            if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()),item.working)
+            if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()))
             elif item.kind=='note':
                 path=bubble_path(QRectF(self.rect()),True,self.width()*item.anchor,item.tail_top,compact=True)
             elif item.kind=='sign':path=bubble_path(QRectF(self.rect()))
@@ -100,7 +100,7 @@ class ObjectWindow(QWidget):
             getattr(item,'appearance',None),
             getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'attribution',None),
             frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible,data.get('opacity'),
-            int(time.monotonic()*10) if visible and item.kind=='notebook' and item.working else None)
+            int(time.monotonic()*30) if visible and item.kind=='notebook' and item.working else None)
         if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
             self._paint_key=key;self.update()
     def enterEvent(self,event):

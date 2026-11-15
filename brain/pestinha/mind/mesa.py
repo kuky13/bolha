@@ -74,6 +74,7 @@ class MesaController:
         self.caderno = Notebook(app)            # sempre na tela junto com o pet, arrastável
         self.debug = debug
         self.ancora = None                      # onde o notebook estava quando ele sentou
+        self.lado = 0
         self.ultimo_topo = -1e9                 # quando o notebook foi trazido para frente pela última vez
         self.pedido_ate = 0.0                   # até quando um pedido para trabalhar ainda vale
         self.em_pedido = False                  # um pedido está em aberto (ainda não sentou nem recusou)
@@ -132,6 +133,7 @@ class MesaController:
         self.caderno.set_working(self.sentado)
         if mudanca and mudanca[1]:
             self.ancora = (self.caderno.x(), self.caderno.y())
+            self.lado = 0
             self.caderno.raise_()                # o notebook fica na frente: ele aparece atrás dele
         if mudanca and mudanca[1] is False:
             self.ancora = None
@@ -142,17 +144,30 @@ class MesaController:
                 f"distração {distraction_level(rates):.2f})")
         return mudanca
 
-    def pin(self, body, now):
-        """Fixa o pet atrás do notebook. Devolve "arrancado" se o notebook foi levado longe demais."""
+    def pin(self, body, now, area):
+        """Posiciona o pet junto ao notebook ou indica que ele foi levado longe demais."""
         if not self.sentado or self.ancora is None:
             return None
         dx = self.caderno.x() - self.ancora[0]
         dy = self.caderno.y() - self.ancora[1]
         if (dx * dx + dy * dy) ** 0.5 > ALCANCE_NOTEBOOK:
             return "arrancado"
-        _ex, ey = body.extents()
-        body.x = self.caderno.x() + self.caderno.width() / 2
-        body.y = self.caderno.y() + (2 * FRACAO_ESCONDIDA_NOTEBOOK - 1) * ey   # o centro desce até a tampa esconder a fração
+        ex, ey = body.extents()
+        left, top, right, bottom = area
+        center = self.caderno.x() + self.caderno.width() / 2
+        reach = self.caderno.width() / 2 + .94*ex
+        before, after = center-reach, center+reach
+        candidates = {side:x for side,x in ((1,before),(-1,after)) if left+ex<=x<=right-ex}
+        if self.lado not in candidates:
+            self.lado = min(candidates,key=lambda side:abs(candidates[side]-body.x),default=0)
+        if self.lado:
+            body.x = candidates[self.lado]
+            body.y = clamp(self.caderno.base_y()-ey,top+ey,bottom-ey)
+        else:
+            # Em telas estreitas, ela ainda pode sentar atrás do notebook.
+            body.x = center
+            body.y = self.caderno.screen_top() + (2 * FRACAO_ESCONDIDA_NOTEBOOK - 1) * ey
+        body.omega = 0.
         body.vx = body.vy = 0.0
         body.grounded = True
         if now - self.ultimo_topo >= INTERVALO_TOPO:       # o pet não pode ficar por cima do notebook
@@ -165,6 +180,7 @@ class MesaController:
         self.decisao.at_desk = False
         self.decisao.left_at = now
         self.ancora = None
+        self.caderno.set_working(False)
 
     # ---------------- janela ----------------
 

@@ -3,6 +3,7 @@
 """Expressões visuais no relógio já existente; nunca modifica o corpo físico."""
 import math
 from .facial_motion import WINK_DURATION, wink_state, mouth_state
+from .desk import TYPING_SECONDS, typing_frame
 
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
@@ -220,6 +221,8 @@ def animation_pose(mode, seconds, strength=1.):
         pose.update(emotion='assustado', eye_open=1.25, ear_raise=3 * shock,
                     ear_tilt=-12 * shock, squash=-.22 * shock,
                     angle_offset=10 * math.sin(t * 16) * shock)
+    elif mode == 'digitando':
+        pose.update(emotion='contente', gaze=(.16,.52), mouth_curve=.56)
     elif mode == 'fingir_trabalho':
         caught = _ease((t - .45) / .3)
         pose.update(emotion='entediado' if t < .45 else 'assustado' if t < .8 else 'atento',
@@ -363,6 +366,7 @@ class ExpressionMotion:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since
         elif state.feliz_fechado(now):mode = 'caress';strength = .5 + .5 * tones['CHEER']
+        elif state.at_desk:mode = 'digitando'
         elif returning and now<reaction['until']:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif now < landing_reaction.get('until',0):
@@ -411,9 +415,19 @@ class ExpressionMotion:
             self.pose.update(emotion='bravo', anger=max(.72, tones['ANGRY']),
                              eye_open=min(.8,self.pose['eye_open']),
                              ear_raise=min(-1.8,self.pose['ear_raise']), mouth_curve=-.55)
-        if state.at_desk and not held and not game.sleep.asleep:
-            # Balanço de digitação do Pestinha (0d1ac98), aplicado só ao desenho.
-            self.pose['angle_offset'] += 1.8 * math.sin(now * math.tau * 2.4)
+        if mode=='digitando':
+            key, tap, _ = typing_frame(now)
+            side = (-1 if key<4 else 1) if key>=0 else 0
+            phase = now % TYPING_SECONDS
+            breath = math.sin(now*2.8)
+            proud = _mouth_pulse(phase - 2.35, 1., .35)
+            facing = game.mesa.lado
+            self.pose.update(angle_offset=180.-(body.angle+180.)%360.+facing*(8.+2.*tap)+side*tap,
+                             squash=.029*tap+.012*breath,
+                             gaze=(facing*(.76-.16*proud)+.09*side*tap,.34+.26*tap-.3*proud),
+                             ear_raise=-.85+.65*tap+1.65*proud, ear_tilt=2.4*side*tap,
+                             blink=_mouth_pulse(phase - 2.2,.18,.07),
+                             mouth_curve=.52-.27*tap+.38*proud)
         if mode == 'pouso_de_lado' and landing_reaction.get('angle',0.) < 0.:
             self.pose['angle_offset'] *= -1.
         if mode == 'deitada':

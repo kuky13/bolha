@@ -106,7 +106,7 @@ EUFORIA_MAXIMA = 1.5
 # Mesa (notebook)
 # ---------------------------------------------------------------------------
 FOCO_MAXIMO_HZ = 6.0           # taxa da população FOCUS que vale foco 1,0
-FRACAO_ESCONDIDA_NOTEBOOK = 0.45  # fração da altura do pet escondida atrás da tampa do notebook
+FRACAO_ESCONDIDA_NOTEBOOK = 0.24  # deixa os olhos e o sorriso visíveis sobre a tampa
 ALCANCE_NOTEBOOK = 300          # px: arrastar o notebook além disso faz o pet levantar e reagir
 INSATISFACAO_NOTEBOOK = 0.35    # quanto a insatisfação sobe quando ele é arrancado da mesa (máximo 1,3)
 PEDIDO_VALIDADE_S = 60.0        # s em que um pedido para trabalhar ainda vale

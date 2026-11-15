@@ -33,7 +33,8 @@ final class ObjectRenderer {
         RectF rect = new RectF(x-w/2,y-h/2,x+w/2,y+h/2);
         canvas.save(); canvas.rotate(n(object,"angle",0),x,y);
         switch (object.optString("kind")) {
-            case "notebook": notebook(canvas,rect,object.optBoolean("working"),phase); break;
+            case "notebook": notebook(canvas,rect,object.optBoolean("working"),
+                object.optInt("typingKey",-1),n(object,"typingTap",0),object.optInt("typingProgress"),object.optBoolean("caret")); break;
             case "meme": media.draw(canvas,object,rect,view); break;
             case "note":
                 int layer=canvas.saveLayerAlpha(rect,Math.round(255*Math.max(0,Math.min(1,n(object,"opacity",1)))));
@@ -72,27 +73,46 @@ final class ObjectRenderer {
         canvas.restore();
     }
 
-    void notebook(Canvas canvas, RectF rect, boolean working, float phase) {
-        float scale=Math.min(rect.width()/110,rect.height()/70);
-        canvas.save(); canvas.translate(rect.centerX()-55*scale,rect.centerY()-35*scale); canvas.scale(scale,scale);
-        fill("#393644"); paint.setShader(new LinearGradient(4,3,106,59,new int[]{color("#625c77"),color("#393644"),color("#25242d")},new float[]{0,.45f,1},Shader.TileMode.CLAMP));
-        canvas.drawRoundRect(4,3,106,59,6,6,paint); stroke(working?"#c6a8ee":"#91829e",working?2.5f:1.2f); canvas.drawRoundRect(4,3,106,59,6,6,paint);
-        fill("#11131d"); canvas.drawRoundRect(10,9,100,44,2,2,paint); stroke("#16141d",1.5f); canvas.drawRoundRect(10,9,100,44,2,2,paint);
-        canvas.save(); canvas.clipRect(11,10,99,43);
-        fill("#29283b"); paint.setShader(new LinearGradient(10,9,100,44,color("#29283b"),color("#151823"),Shader.TileMode.CLAMP)); canvas.drawRect(10,9,100,44,paint);
-        fill("#242132"); canvas.drawRect(11,10,26,43,paint); stroke("#746484",.7f); canvas.drawLine(27,10,27,43,paint);
-        for (int row=0;row<4;row++) { fill(row==0?"#b6a0d3":"#665c7c"); canvas.drawRoundRect(14,14+row*6,22-row%3,15.5f+row*6,.6f,.6f,paint); }
-        int[] indents={0,4,4,8,4}, lengths={27,37,22,31,18}; String[] colors={"#bca6e5","#e6c779","#8baab0","#bca6e5","#8baab0"};
-        for (int row=0;row<5;row++) { fill(colors[row]); float left=33+indents[row]; canvas.drawRoundRect(left,14+row*5,left+lengths[row],15.6f+row*5,.7f,.7f,paint); }
-        if (working) { float pulse=.5f+.5f*(float)Math.sin(phase*2); fill("#ffd364"); paint.setAlpha(Math.round(115+100*pulse)); canvas.drawRoundRect(33,39,40+20*pulse,40.8f,.7f,.7f,paint); paint.setAlpha(255); if (((int)(phase*2))%2==0) canvas.drawRect(57,33,58,37,paint); }
-        fill("#e0d9ff"); paint.setAlpha(10); path.reset(); path.moveTo(10,9); path.lineTo(55,9); path.lineTo(27,44); path.lineTo(10,44); path.close(); canvas.drawPath(path,paint); paint.setAlpha(255); canvas.restore();
-        fill("#11121a"); canvas.drawCircle(55,6.2f,.9f,paint); fill("#a491bb"); canvas.drawCircle(55,6,.3f,paint);
-        stroke("#aaa0b8",1.2f); canvas.drawLine(18,47,30,47,paint); canvas.drawLine(80,47,92,47,paint);
-        for (int row=0;row<2;row++) for (int col=0;col<11;col++) { fill("#766f85"); float left=16+col*7.2f,top=50+row*3.4f; canvas.drawRoundRect(left,top,left+5.6f,top+2.2f,.6f,.6f,paint); }
-        fill("#827d92"); paint.setShader(new LinearGradient(2,57,2,66,new int[]{color("#b6afc5"),color("#827d92"),color("#4d4a5c")},new float[]{0,.5f,1},Shader.TileMode.CLAMP)); canvas.drawRoundRect(2,57,108,66,3,3,paint);
-        stroke("#464151",1); canvas.drawRoundRect(2,57,108,66,3,3,paint); fill("#a29aaf"); canvas.drawRoundRect(42,59,68,62.5f,1,1,paint);
-        stroke("#d8cfdf",.5f); canvas.drawLine(10,60,15,59.4f,paint); canvas.drawLine(91,62,94,61.4f,paint);
-        fill(working?"#ffd364":"#695f7e"); canvas.drawCircle(98,61.5f,1,paint); canvas.restore();
+    void notebook(Canvas canvas, RectF rect, boolean working, int key, float tap, int progress, boolean caret) {
+        float scale=Math.min(rect.width()/132,rect.height()/96);
+        canvas.save(); canvas.translate(rect.centerX()-66*scale,rect.centerY()-48*scale); canvas.scale(scale,scale);
+        fill("#493e60"); paint.setShader(new LinearGradient(0,7,0,72,color("#493e60"),color("#242031"),Shader.TileMode.CLAMP));
+        canvas.drawRoundRect(21,7,111,72,9,9,paint);
+        stroke("#a494bd",1.1f); canvas.drawRoundRect(21,7,111,72,9,9,paint);
+        fill("#242034"); paint.setShader(new LinearGradient(0,14,0,63,color("#242034"),color("#0b0e15"),Shader.TileMode.CLAMP));
+        canvas.drawRoundRect(27,14,105,63,6,6,paint);
+        stroke("#51445e",1); canvas.drawRoundRect(27,14,105,63,6,6,paint);
+        fill("#131520"); canvas.drawRoundRect(34,21,98,54,4,4,paint);
+        fill("#db99ad"); canvas.drawCircle(34,19,1.2f,paint);
+        fill("#ffd16e"); canvas.drawCircle(39,19,1.2f,paint);
+        fill("#89d3bf"); canvas.drawCircle(44,19,1.2f,paint);
+        path.reset(); path.moveTo(43,32); path.lineTo(49,37); path.lineTo(43,42);
+        stroke("#ffd16e",2); paint.setStrokeCap(Paint.Cap.ROUND); paint.setStrokeJoin(Paint.Join.ROUND);
+        canvas.drawPath(path,paint);
+        fill("#b98b64");
+        for (int i=0;i<progress;i++) canvas.drawCircle(55+3.5f*i,37,.8f,paint);
+        if (!working || key>=0 || caret) {
+            stroke("#ffd16e",2);
+            float cursor=54+3.5f*progress;
+            canvas.drawLine(cursor,43,cursor+9,43,paint);
+        }
+        paint.setStrokeCap(Paint.Cap.BUTT); paint.setStrokeJoin(Paint.Join.MITER);
+        fill("#55425d"); canvas.drawCircle(84,48,1,paint); canvas.drawCircle(90,48,1,paint);
+        fill("#24202e"); canvas.drawRoundRect(12,68,120,78,4,4,paint);
+        path.reset(); path.moveTo(18,72); path.lineTo(114,72); path.quadTo(119,72,121,76);
+        path.lineTo(130,85); path.quadTo(131,91,125,91); path.lineTo(7,91);
+        path.quadTo(1,91,2,85); path.lineTo(11,76); path.quadTo(14,72,18,72); path.close();
+        fill("#665a79"); paint.setShader(new LinearGradient(0,72,0,91,color("#665a79"),color("#2a2638"),Shader.TileMode.CLAMP));
+        canvas.drawPath(path,paint); stroke("#9383ae",1); canvas.drawPath(path,paint);
+        paint.setStyle(Paint.Style.FILL);
+        for (int col=0;col<8;col++) {
+            float pressed=col==key?tap:0;
+            paint.setColor(Color.rgb(Math.round(50+205*pressed),Math.round(43+164*pressed),Math.round(64+57*pressed)));
+            float left=24+11*col, top=76+.35f*pressed;
+            canvas.drawRoundRect(left,top,left+7.5f,top+3.4f,1,1,paint);
+        }
+        fill("#81708b"); canvas.drawRoundRect(53,82.5f,79,86.5f,1,1,paint);
+        fill(working?"#ffd16e":"#8a7161"); canvas.drawCircle(114,85,1.3f,paint); canvas.restore();
     }
 
     void bubble(Canvas canvas, RectF rect, String value, boolean thought) {
