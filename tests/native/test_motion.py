@@ -412,3 +412,27 @@ def test_janela_visual_com_geleia_preserva_centro_e_mascara_fisica(qt_applicatio
         assert resting.height()<mask.boundingRect().height()
         assert resting.bottom()==mask.boundingRect().bottom()
     finally:pet.close()
+
+
+@pytest.mark.parametrize('direction', [-1.,1.])
+def test_chasing_tracks_an_airborne_toy_and_springs_in_both_directions(tmp_path,direction):
+    game = game_at_rest(tmp_path)
+    body = game.body
+    body.vx = 300.*direction
+    game.ball.body.x = body.x+130.*direction
+    game.ball.body.y = body.y-100.
+    game.play_reaction = dict(kind='brinquedo_perseguindo',started=100.,until=102.,intensity=.9)
+    motion = ExpressionMotion(100.)
+    motion.run_phase = .125
+    spring = motion.update(game,100.)
+    assert spring['squash'] < -.06
+    motion.run_phase = .375
+    press = motion.update(game,100.)
+    assert press['squash'] > .08
+    for pose in (spring,press):
+        assert pose['eye_open']>=1. and pose['mouth_skew']==0.
+        gx,gy=pose['gaze']
+        angle=math.radians(body.angle+pose['angle_offset'])
+        assert (gx*math.cos(angle)-gy*math.sin(angle))*direction > .6
+        assert gx*math.sin(angle)+gy*math.cos(angle) < -.25
+        assert pose['angle_offset']*direction > 0.
