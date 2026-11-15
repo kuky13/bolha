@@ -8,7 +8,7 @@ from .desk import TYPING_SECONDS, typing_frame
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
 LANDING_POSES = ('pouso_em_pe', 'pouso_de_lado', 'pouso_invertido')
-FLOOR_POSES = (*LANDING_POSES, 'deitada', 'embaixadinha')
+FLOOR_POSES = (*LANDING_POSES, 'deitada', 'embaixadinha', 'brinquedo_perseguindo')
 
 
 def _unit(value):
@@ -128,7 +128,8 @@ def animation_pose(mode, seconds, strength=1.):
         crouch = _ease(t / .8)
         pose.update(emotion='atento', eye_open=1.15 - .4 * crouch,
                     ear_raise=-1.5 * crouch, ear_tilt=-6 * crouch,
-                    squash=.19 * crouch, angle_offset=4 * math.sin(t * 11) * crouch)
+                    squash=.19 * crouch, angle_offset=4 * math.sin(t * 11) * crouch,
+                    mouth_curve=.54+.24*crouch, mouth_width=1.12)
     elif mode == 'brinquedo_frustrado':
         # O abalo cresce com a intensidade, mas a esfera continua no mesmo centro.
         cooldown = 1. - _ease((t-2.05) / .75)
@@ -144,26 +145,68 @@ def animation_pose(mode, seconds, strength=1.):
     elif mode in ('correndo','brinquedo_perseguindo'):
         stride = t*math.tau*2.
         push = math.sin(stride)
-        pose.update(emotion='atento', eye_open=1.16,
+        playing = mode == 'brinquedo_perseguindo'
+        pose.update(emotion='contente' if playing else 'atento',
+                    eye_open=1.16+.10*push if playing else 1.16,
                     ear_raise=-1.4*strength+1.1*push,
                     ear_tilt=-9.-6.*strength-3.*math.cos(stride-.6),
                     squash=(.045*push-.035)*strength,
                     angle_offset=(9.+2.7*math.sin(stride-.3))*strength,
                     effect='perseguindo',effect_strength=.28+.4*strength)
+        if playing:
+            grin = _mouth_pulse(t%1.12,.52,.12)
+            press, spring = max(0.,-push)**1.3, max(0.,push)**1.3
+            ear_swing = math.sin(stride-.65)
+            pose.update(squash=(.11*press-.083*spring)*strength,
+                        ear_raise=.65+2.5*ear_swing*strength,
+                        ear_tilt=-5.-7.*ear_swing*strength,
+                        angle_offset=(7.5+3.8*math.sin(stride-.42))*strength,
+                        mouth_curve=.86+.12*grin, mouth_open=.44*grin, mouth_width=1.14)
+    elif mode == 'brinquedo_esperando':
+        spring = .5+.5*math.sin(t*6.)
+        pose.update(emotion='contente', eye_open=1.13+.10*spring,
+                    ear_raise=.5+1.5*spring, ear_tilt=-3.+3.*spring,
+                    squash=.025*spring, mouth_curve=.85, mouth_width=1.1,
+                    mouth_open=.18*_mouth_pulse(t,.55,.14))
     elif mode in ('pingpong_rebatida','brinquedo_rebatida'):
         impact = 1. - _ease(t/.09)
         stretch = _ease((t-.035)/.085)*(1.-_ease((t-.13)/.22))
-        pose.update(emotion='atento', eye_open=1.-.56*impact+.24*stretch,
-                    ear_raise=-3.2*impact+3.3*stretch, ear_tilt=12.*impact-11.*stretch,
+        grin = _ease((t-.035)/.12)
+        pose.update(emotion='atento' if t<.115 else 'contente',
+                    eye_open=1.-.56*impact+.24*stretch,
+                    ear_raise=-3.2*impact+3.3*stretch,
+                    ear_tilt=12.*impact-11.*stretch,
                     squash=(-.20*impact+.17*stretch)*strength,
                     angle_offset=(-5.5*impact+7.5*stretch)*strength,
-                    effect='rebatida', effect_strength=strength*(1.-_ease((t-.035)/.22)))
+                    effect='rebatida', effect_strength=strength*(1.-_ease((t-.035)/.22)),
+                    mouth_open=(.47+.17*strength)*_mouth_pulse(t,.38,.09),
+                    mouth_curve=.62+.38*grin, mouth_width=1.08+.11*grin,
+                    mouth_skew=.24*grin)
     elif mode == 'embaixadinha':
-        tap = _mouth_pulse(t,.29,.045)
-        pose.update(emotion='contente', eye_open=1.-.35*tap,
-                    squash=-.075*tap, ear_raise=2.8*tap,
-                    ear_tilt=-10.*tap, gaze=(0.,-.75), mouth_open=.54*tap,
-                    mouth_curve=.9, mouth_width=1.06)
+        tap = _mouth_pulse(t,.31,.045)
+        laugh = _mouth_pulse(t-.11,.26,.085)
+        pose.update(emotion='feliz' if .155<=t<.31 else 'contente',
+                    eye_open=1.04+.22*tap, squash=-.084*tap,
+                    ear_raise=3.4*tap, ear_tilt=-12.*tap,
+                    gaze=(0.,-.75), mouth_open=.66*tap+.13*laugh,
+                    mouth_curve=.88+.12*tap, mouth_width=1.14)
+    elif mode == 'ponto_bolha':
+        laugh = max(_mouth_pulse(t,.39,.085),.62*_mouth_pulse(t-.39,.33,.09))
+        lift = _mouth_pulse(t,.89,.22)
+        pose.update(emotion='feliz' if .08<t<.7 else 'contente',
+                    ear_raise=3.*lift, ear_tilt=-9.*lift+5.*math.sin(t*15)*laugh,
+                    squash=.07*math.sin(t*16)*lift, angle_offset=6.*math.sin(t*9)*lift,
+                    mouth_curve=.98, mouth_width=1.17, mouth_open=.71*laugh)
+    elif mode == 'brinquedo_escapou':
+        gasp = _mouth_pulse(t,.37,.06)
+        recovery = _mouth_pulse(t-.30,.78,.24)
+        smile = _ease((t-.22)/.30)
+        pose.update(emotion='assustado' if t<.29 else 'contente',
+                    eye_open=1.07+.23*gasp+.09*recovery,
+                    ear_raise=2.8*gasp+1.3*recovery,
+                    ear_tilt=-10.*gasp-4.*recovery, squash=-.065*gasp+.025*recovery,
+                    mouth_open=.6*gasp, mouth_curve=.1+.76*smile,
+                    mouth_width=.65+.47*smile)
     elif mode == 'pop':
         rupture = t-.13
         squeeze = _ease(t/.075)*(1.-_ease((t-.075)/.055))
@@ -292,14 +335,6 @@ def animation_pose(mode, seconds, strength=1.):
     elif mode in ('assustado', 'airborne', 'impact', 'brinquedo_susto'):
         pose['mouth_open'] = .43*_mouth_pulse(t,.32,.04)*strength
         pose['mouth_width'] = .68
-    elif mode in ('pingpong_rebatida','brinquedo_rebatida'):
-        pose['mouth_open'] = (.35+.16*strength)*_mouth_pulse(t,.38,.065)
-        pose['mouth_curve'] = .8
-        pose['mouth_width'] = 1.06
-    elif mode == 'brinquedo_perseguindo':
-        pose['mouth_curve'] = .76
-        # A largada muda o sorriso; na corrida, respiradas curtas seguem a passada.
-        pose['mouth_open'] = .27*_mouth_pulse(t%1.18,.28,.065)
     elif mode == 'doze':
         pose['mouth_open'] = .32*_mouth_pulse(t-.22,.56,.12)
         pose['mouth_width'] = .73
@@ -361,7 +396,10 @@ class ExpressionMotion:
         elif prank is not None and prank.active:
             mode='cursor_'+prank.phase;elapsed=now-prank.started;strength=prank.intensity
         elif game.play.count_text(now) is not None:
-            mode='embaixadinha';elapsed=now-game.play.juggle_at
+            if game.play.finishing_juggle(now) and game.play.juggle_count < game.play.juggle_target:
+                mode='brinquedo_escapou';elapsed=now-game.play.juggle_finished_at
+            else:
+                mode='embaixadinha';elapsed=now-game.play.juggle_at
         elif arriving:
             mode='pop_return';elapsed=now-reaction['started'];strength=_unit(reaction['intensity'])
         elif self.sleep_since is not None:mode = 'sleeping';elapsed = now - self.sleep_since
@@ -380,6 +418,8 @@ class ExpressionMotion:
         elif now < play_reaction.get('until',0):
             mode=play_reaction['kind'];elapsed=now-play_reaction['started'];strength=_unit(play_reaction['intensity'])
         elif game.festa.fogos.isVisible():mode = 'comemorando';strength = tones['CHEER']
+        elif game.pingpong is not None and not game.pingpong.finished and not game.pingpong_paused():
+            mode = 'brinquedo_esperando'
         elif mode == 'bravo':strength = .35 + .65 * tones['ANGRY']
         elif (body.grounded and 55.<=abs((body.angle+180.)%360.-180.)<=125.
               and mode in ('observando','contente','curioso','feliz','entediado','atento','neutro')):
@@ -394,7 +434,7 @@ class ExpressionMotion:
             elapsed=self.run_phase
         elif mode=='brinquedo_perseguindo':
             # A perseguição pode continuar enquanto ela espera o brinquedo chegar.
-            mode='atento'
+            mode='brinquedo_esperando'
         eligible = (game.visible() and body.grounded and not held and not game.hover and not game.panel
                     and mode in ('observando', 'contente', 'curioso', 'feliz', 'entediado'))
         if self.quirk is not None and (not eligible or now - self.quirk_since >= QUIRK_SECONDS[self.quirk]):
@@ -410,11 +450,34 @@ class ExpressionMotion:
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if mode in ('brinquedo_esperando','brinquedo_escapou','preparar_bote'):
+            toy = game.ball.body
+            angle = math.atan2(toy.y-body.y,toy.x-body.x)-math.radians(body.angle+self.pose['angle_offset'])
+            focus = .56 if mode == 'brinquedo_escapou' else .68
+            self.pose['gaze'] = focus*math.cos(angle), focus*math.sin(angle)
+        if mode == 'embaixadinha' and game.play.finishing_juggle(now):
+            proud = _mouth_pulse(now-game.play.juggle_finished_at-.3,.62,.14)
+            self.pose['mouth_open'] += .34*proud
+            self.pose['ear_raise'] += 1.6*proud
+            settle = _ease((now-game.play.juggle_finished_at-.25)/.7)
+            toy = game.ball.body
+            look_x = max(-.9,min(.9,(toy.x-body.x)/180.))
+            look_y = max(-.75,min(.5,(toy.y-body.y)/180.))
+            gaze_mix = _ease((now-game.play.juggle_finished_at)/.4)
+            self.pose['gaze'] = tuple(
+                (start+(look-start)*gaze_mix)*(1.-settle)+goal*settle
+                for start,look,goal in zip((0.,-.75),(look_x,look_y),state.gaze))
+            for key,value in mouth_state(state.emotion).items():
+                if key in ('mouth_curve','mouth_width'):
+                    self.pose[key] += (value-self.pose[key])*settle
         if (prank is not None and prank.angry_attempt
                 and mode in ('cursor_approach','cursor_pounce','cursor_swallow','cursor_chew')):
-            self.pose.update(emotion='bravo', anger=max(.72, tones['ANGRY']),
+            anger = max(.72, tones['ANGRY'])
+            self.pose.update(emotion='bravo', anger=anger,
                              eye_open=min(.8,self.pose['eye_open']),
                              ear_raise=min(-1.8,self.pose['ear_raise']), mouth_curve=-.55)
+            if mode in ('cursor_approach','cursor_pounce'):
+                self.pose.update(effect='bravo', effect_strength=.65*anger)
         if mode=='digitando':
             key, tap, _ = typing_frame(now)
             side = (-1 if key<4 else 1) if key>=0 else 0
@@ -439,7 +502,14 @@ class ExpressionMotion:
             visual_angle = self.pose['angle_offset']*direction
             self.pose['angle_offset'] = visual_angle - ((body.angle+180.)%360.-180.)
             local_angle=math.radians(heading-visual_angle)
-            self.pose['gaze']=(math.cos(local_angle)*.86,math.sin(local_angle)*.86)
+            focus=.86
+            if mode == 'brinquedo_perseguindo':
+                toy = game.ball.body
+                forward = (toy.x-body.x)*direction
+                pitch = max(-.45,min(.45,math.atan2(toy.y-body.y,max(80.,forward))))
+                local_angle = math.atan2(math.sin(pitch),direction*math.cos(pitch))-math.radians(visual_angle)
+                focus=.8
+            self.pose['gaze']=(math.cos(local_angle)*focus,math.sin(local_angle)*focus)
             self.pose['effect_angle'] = heading-visual_angle
         if mode == 'pop_return':
             inward = reaction['inward']

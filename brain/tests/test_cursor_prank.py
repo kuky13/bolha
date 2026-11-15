@@ -169,3 +169,33 @@ def test_panel_and_user_hold_cancel_and_persistence_preserves_seed(tmp_path, mon
     loaded = Game(tmp_path, CONTENT)
     assert loaded.brain.seed == 1313 and loaded.brain.N == 470
     assert not loaded.cursor_prank.hidden_cursor
+
+
+@pytest.mark.parametrize('trigger', ['released', 'toy_taken'])
+def test_angry_reaction_bites_without_an_idle_sensor_and_spits_on_its_own(tmp_path,monkeypatch,trigger):
+    game = prepared_game(tmp_path,monkeypatch,'watch')
+    game.configure(dict(senseIdle=False))
+    game.idle = None
+    prank = game.cursor_prank
+    prank.next_offer = 115.  # Uma recusa ociosa anterior não suprime uma reação de raiva.
+    if trigger == 'released':
+        game.state.tone.r['ANGRY'] = .9
+        game.held_since = 94.
+        game.interact(dict(type='hold-end'),now=100.)
+        game.body.grounded = True
+        assert game.release_reaction['kind'] == 'birra'
+    else:
+        game.play_reaction = dict(kind='brinquedo_frustrado', started=100., until=102.8,intensity=.8)
+    game.cursor = (840.,350.)
+    prank.update(game,.016,100.05)
+    assert prank.active and prank.angry_attempt
+    game.interact(dict(type='cursor',x=860.,y=350.),now=100.1)
+    assert prank.active
+    x,y = prank.mouth_position(game.body)
+    game.interact(dict(type='cursor',x=x,y=y),now=100.2)
+    assert prank.update(game,.016,100.2)
+    assert prank.hidden_cursor and prank.phase == 'swallow'
+    assert prank.update(game,.016,100.6) and prank.phase == 'chew'
+    assert not prank.update(game,.016,101.5)
+    assert prank.phase == 'spit' and not prank.hidden_cursor
+    assert game.memory.recent[-1]['resultado'] == 'cuspiu o ponteiro'

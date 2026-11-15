@@ -205,8 +205,9 @@ class Game:
             self.stop_pingpong()
         self.prefs.update(prefs)
         if not (self.prefs.get('cursorPrankEnabled', False)
-                and self.prefs.get('senseCursor', True) and self.prefs.get('senseIdle', True)
-                and self.prefs.get('adaptiveBehavior', True)):
+                and self.prefs.get('senseCursor', True)
+                and self.prefs.get('adaptiveBehavior', True)
+                and (self.prefs.get('senseIdle', True) or self.cursor_prank.angry_attempt)):
             self.cursor_prank.cancel(self, time.monotonic())
         if not self.prefs.get('popEnabled',True):
             self.strong_throws.clear()
@@ -280,19 +281,27 @@ class Game:
             self.senses.on_events(self.tracker.observe(active, self.activity))
             self.platforms = []
             previous_blocked=set(self.blocked)
-            self.blocked.clear()
             if self.prefs.get('senseWindows', True):
                 windows = []
                 platform_windows = []
-                for hwnd, (left, top, right, _bottom), maximized in native.janelas_visiveis(self.excluded):
+                foreground = native.win32gui.GetForegroundWindow()
+                game_rect = None
+                foreground_game = detect_activity(active, 0., self.prof['away_after']) == 'GAMING'
+                for hwnd, rect, maximized in native.janelas_visiveis(self.excluded):
                     style = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_STYLE)
                     extended = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_EXSTYLE)
-                    if extended & native.win32con.WS_EX_LAYERED:
-                        continue
-                    windows.append(((left, top, right, _bottom), maximized, bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))))
-                    platform_windows.append((hwnd, (left, top, right, _bottom), maximized))
+                    layered = extended & native.win32con.WS_EX_LAYERED
+                    if not layered:
+                        platform_windows.append((hwnd, rect, maximized))
+                    if (not layered) or hwnd == foreground:
+                        framed = bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))
+                        windows.append((rect, maximized, framed))
+                    if hwnd == foreground and foreground_game:
+                        game_rect = rect
                 self.platforms = visible_window_platforms(platform_windows, self.displays)
-                self.blocked = fullscreen_monitors(windows, self.displays)
+                self.blocked = fullscreen_monitors(windows, self.displays, game_rect=game_rect)
+            else:
+                self.blocked.clear()
             if self.available_areas():
                 if previous_blocked != self.blocked:
                     self.fit(self.body)
@@ -645,7 +654,7 @@ class Game:
             self.drives.stimulate('novelty',.3)
             self.drives.touched('poke',.2)
         if event in ('pet_hit','player_point','pet_point'):
-            kind = {'pet_hit':'pingpong_rebatida','player_point':'assustado','pet_point':'feliz'}[event]
+            kind = {'pet_hit':'pingpong_rebatida','player_point':'brinquedo_escapou','pet_point':'ponto_bolha'}[event]
             if match.finished and match.winner=='pet':
                 kind='comemorando'
             duration = .42 if event == 'pet_hit' else 1.15
@@ -1025,6 +1034,8 @@ class Game:
                 kind='brinquedo_rebatida';duration=.42
             else:
                 return
+        elif self.play.finishing_juggle(now):
+            return
         elif self.behavior.toy_action in ('chase','hop'):
             current = self.play_reaction
             if current.get('kind')=='brinquedo_perseguindo':
@@ -1254,8 +1265,9 @@ class Game:
                 or self.state.protest_stage or self.state.castigo or self.body.held or self.ball_stored
                 or self.cursor_prank.active or manual_play):
             self.play.stop_juggle()
-        if self.play.juggling():
-            self.body.vx = 0.
+        if self.play.juggling() or self.play.finishing_juggle(now):
+            if self.body.grounded:
+                self.body.vx = 0.
             self.behavior.toy_action = None
         else:
             self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
@@ -1279,10 +1291,12 @@ class Game:
                 self.protest_ctl.provoke(.1)
             self._sync_desk_pose()
         if not self.ball_stored:
+            closing_lob = (self.play.finishing_juggle(now) and self.play.juggle_count == self.play.juggle_target
+                           and not self.ball.body.grounded)
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
             if self.play.juggling():
                 self.play.follow_juggle(dt,now,self.body,self.ball,area,previous_toy[1])
-            elif not holding_cursor:
+            elif not (holding_cursor or closing_lob):
                 self._toy_contact(previous_pet,previous_toy,now)
         self._focus_gaze(now)
         if self.play.juggling():

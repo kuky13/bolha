@@ -2,14 +2,18 @@
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Detecção por monitor usando apenas retângulos e estilo de janela."""
 import math
-def fullscreen_monitors(windows, displays):
+def fullscreen_monitors(windows, displays, *, game_rect=None):
     blocked = set()
     for index, display in enumerate(displays):
         scale = display.get('scaleFactor', 1)
         nx, ny = display.get('nativeX', display['x']), display.get('nativeY', display['y'])
         mx, my = display.get('monitorX', display['x']), display.get('monitorY', display['y'])
-        full = (nx, ny, nx + display.get('monitorWidth', display['width'])*scale,
-                ny + display.get('monitorHeight', display['height'])*scale)
+        full = (nx, ny, nx + display.get('nativeWidth', display.get('monitorWidth', display['width'])*scale),
+                ny + display.get('nativeHeight', display.get('monitorHeight', display['height'])*scale))
+        if (game_rect is not None and full[0] < game_rect[2] and full[2] > game_rect[0]
+                and full[1] < game_rect[3] and full[3] > game_rect[1]):
+            blocked.add(index)
+            continue
         work = (nx + (display['x']-mx)*scale, ny + (display['y']-my)*scale,
                 nx + (display['x']-mx+display['width'])*scale,
                 ny + (display['y']-my+display['height'])*scale)

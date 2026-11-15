@@ -111,6 +111,13 @@ def test_missed_ball_keeps_the_last_number_until_it_fades(tmp_path,monkeypatch):
             break
     assert toy.grounded and not game.play.juggling()
     assert game.play.count_text(tick)==('1',1.)
+    motion = ExpressionMotion(tick)
+    surprise = motion.update(game,tick+.08)
+    amusement = motion.update(game,tick+.55)
+    assert motion.mode=='brinquedo_escapou'
+    assert surprise['mouth_open']>.45 and surprise['emotion']=='assustado'
+    assert amusement['emotion']=='contente' and amusement['eye_open']>1.
+    assert amusement['mouth_open']==0. and amusement['mouth_curve']>.7 and amusement['mouth_skew']==0.
     assert 0.<game.play.count_text(tick+1.17)[1]<.5
     assert game.play.count_text(tick+1.26) is None
 
@@ -128,3 +135,30 @@ def test_juggle_pose_stays_coherent_between_taps(tmp_path,monkeypatch):
     assert motion.mode=='embaixadinha'
     assert contact['emotion']==between_taps['emotion']=='contente'
     assert contact['mouth_open']>.4 and between_taps['mouth_open']==0.
+
+
+@pytest.mark.parametrize('target,edge', [(1,False),(3,False),(3,True)])
+def test_last_touch_lands_beside_the_bolha_without_an_extra_hit(tmp_path,monkeypatch,target,edge):
+    game = ready(tmp_path)
+    now = time.monotonic()
+    game.last_think = now+60.
+    if edge:
+        game.body.x = game.body.half_w
+        game.ball.body.x = game.body.x+75.
+    monkeypatch.setattr('pestinha.body.brincadeira.random.randint',lambda *_:target)
+    game.interact(dict(type='play',trick='juggle'),now=now)
+    landed = False
+    for frame in range(200):
+        tick = now+frame/60.
+        game.tick(1/60,tick)
+        if not game.play.finishing_juggle(tick):
+            continue
+        assert game.play.juggle_count==target
+        assert 'impact_point' not in game.play_reaction
+        assert game.body.grounded
+        toy = game.ball.body
+        if toy.grounded:
+            assert abs(toy.x-game.body.x)>game.body.half_w+toy.half_w
+            landed = True
+    assert landed
+    assert game.play.count_text(tick) is None

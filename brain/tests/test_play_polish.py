@@ -94,7 +94,7 @@ def test_impacto_real_acorda_a_bolha_sem_simular_tropeco(tmp_path,monkeypatch):
 
 
 @pytest.mark.parametrize('winner,previous_score,expected',[
-    ('player',0,'assustado'),('pet',0,'feliz'),('pet',4,'comemorando'),
+    ('player',0,'brinquedo_escapou'),('pet',0,'ponto_bolha'),('pet',4,'comemorando'),
 ])
 def test_ponto_real_na_partida_nao_simula_tropeco(tmp_path,monkeypatch,winner,previous_score,expected):
     game,clock=at_rest(tmp_path,monkeypatch)
@@ -115,6 +115,13 @@ def test_ponto_real_na_partida_nao_simula_tropeco(tmp_path,monkeypatch,winner,pr
     clock[0]+=.016
     game.tick(.016,clock[0])
     assert game.play_reaction['kind']==expected
+    if expected == 'ponto_bolha':
+        from bolha.motion import ExpressionMotion
+        motion = ExpressionMotion(clock[0])
+        delighted = motion.update(game,clock[0]+.14)
+        rested = motion.update(game,clock[0]+.77)
+        assert delighted['emotion']=='feliz' and delighted['mouth_open'] > .4
+        assert rested['mouth_open']==0. and rested['mouth_curve'] > .9
 
 
 @pytest.mark.parametrize('held',['pet','toy'])
