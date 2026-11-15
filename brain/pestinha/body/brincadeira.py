@@ -26,6 +26,7 @@ from ..ajustes import (
     INTERVALO_PAPEL as PAPER_EVERY,
 )
 
+JUGGLE_FINISH_SECONDS = 1.25
 DEFAULT_WEIGHTS = {"bola": 1.0, "arremesso": 0.6, "postit": 0.5}
 
 
@@ -72,27 +73,44 @@ class Play:
         self.juggle_target = self.juggle_count = 0
         self.juggle_finished_at = None
 
-    def juggle_touch(self, now, body, ball):
+    def juggle_touch(self, now, body, ball, area):
         toy = ball.body
         contact_y = body.y - body.half_h - toy.half_h - 8.
         speed = math.sqrt(2.*GRAVITY*(max(0.,toy.y-contact_y)+random.uniform(42.,62.)))
         flight = (speed+math.sqrt(max(0.,speed**2+2.*GRAVITY*(contact_y-toy.y))))/max(1.,GRAVITY)
         vx = max(-300.,min(300., (body.x-toy.x)/max(.18,flight)*1.12))
-        ball.kick(vx, -speed)
         self.juggle_count += 1
         self.juggle_at = now
         self.juggle_airtime = 0.
         if self.juggle_count == self.juggle_target:
             self.juggle_finished_at = now
             self.next_at = max(self.next_at, now+2.4)
+            left, _, right, bottom = area
+            reach = body.half_w+toy.half_w
+            lo, hi = left+toy.half_w, right-toy.half_w
+            # Prefere o lado em que o brinquedo já está, se houver espaço para cair.
+            if toy.x < body.x-10. and body.x-lo >= 1.55*reach:
+                side = -1
+            elif toy.x > body.x+10. and hi-body.x >= 1.55*reach:
+                side = 1
+            else:
+                side = -1 if body.x-lo > hi-body.x else 1
+            target = max(lo,min(hi,body.x+side*1.8*reach))
+            fall = max(0., bottom-toy.half_h-toy.y)
+            flight = (speed+math.sqrt(speed**2+2.*GRAVITY*fall))/GRAVITY
+            vx = max(-380.,min(380.,(target-toy.x)/max(.2,flight)))
+        ball.kick(vx, -speed)
 
-    def start_juggle(self, now, body, ball):
+    def finishing_juggle(self, now):
+        return self.juggle_finished_at is not None and 0. <= now-self.juggle_finished_at < JUGGLE_FINISH_SECONDS
+
+    def start_juggle(self, now, body, ball, area):
         self.stop_chase()
         self.juggle_target = random.randint(1,100)
         self.juggle_count = 0
         self.juggle_finished_at = None
         body.vx = 0.
-        self.juggle_touch(now,body,ball)
+        self.juggle_touch(now,body,ball,area)
 
     def follow_juggle(self, dt, now, body, ball, area, previous_y):
         toy = ball.body
@@ -109,14 +127,14 @@ class Play:
             return
         if (self.juggle_airtime>.19 and toy.vy>0. and previous_y <= contact_y <= toy.y
                 and abs(toy.x-body.x)<body.half_w*.8+toy.half_w):
-            self.juggle_touch(now,body,ball)
+            self.juggle_touch(now,body,ball,area)
 
     def count_text(self, now):
         if not self.juggle_count:
             return None
         if self.juggling():
             return str(self.juggle_count), 1.
-        remaining = 1.25-(now-self.juggle_finished_at)
+        remaining = JUGGLE_FINISH_SECONDS-(now-self.juggle_finished_at)
         if remaining <= 0.:
             return None
         return str(self.juggle_count), min(1.,remaining/.26)
@@ -222,7 +240,7 @@ class Play:
         pull (0..1): quanto a rede quer brincar agora (distração acima do foco). Zero, ele trabalha.
         """
         happy = emotion == "feliz"
-        if ball is None or not ball.isVisible() or now < self.next_at:
+        if ball is None or not ball.isVisible() or now < self.next_at or self.finishing_juggle(now):
             return None
         if ball.dragging or ball.body.held:
             return None
@@ -246,7 +264,7 @@ class Play:
                 return 'lift'
             if action == 'juggle':
                 if juggling_space:
-                    self.start_juggle(now,body,ball)
+                    self.start_juggle(now,body,ball,area)
                     return 'juggle'
                 return None
             if action == 'throw':
@@ -278,7 +296,7 @@ class Play:
             return "kick"
 
         if action == 'juggle':
-            self.start_juggle(now,body,ball)
+            self.start_juggle(now,body,ball,area)
             return 'juggle'
 
         if action == 'throw':

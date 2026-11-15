@@ -192,9 +192,9 @@ class SettingsDialog(QDialog):
     def _behavior_tab(self):
         layout = self._details('Comportamento e aprendizado', self._general_layout)
         self._check('cursorPrankEnabled', 'Brincar de comer o ponteiro', layout,
-                    'O cérebro pode tentar após 2 minutos sem interação ou com raiva intensa. '
-                    'Há pelo menos 5 minutos entre tentativas. Mexer ou clicar devolve o ponteiro. '
-                    'Exige as leituras de ponteiro e inatividade e o comportamento adaptativo.')
+                    'Com raiva forte, a Bolha persegue o ponteiro, mastiga e cospe. '
+                    'Na ociosidade, ela também pode tentar após 2 minutos se essa leitura estiver ligada. '
+                    'Mexer ou clicar devolve o ponteiro. Exige leitura do ponteiro e comportamento adaptativo.')
         self._check('popEnabled', 'Estourar após muitos arremessos fortes', layout,
                     'A contagem considera arremessos fortes numa janela de 1 minuto. A Bolha volta após 30 segundos.')
         pop_form = QFormLayout()

@@ -410,11 +410,26 @@ class ExpressionMotion:
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
         if mode != self.mode:self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if mode == 'embaixadinha' and game.play.finishing_juggle(now):
+            settle = _ease((now-game.play.juggle_finished_at-.25)/.7)
+            toy = game.ball.body
+            look_x = max(-.9,min(.9,(toy.x-body.x)/180.))
+            look_y = max(-.75,min(.5,(toy.y-body.y)/180.))
+            gaze_mix = _ease((now-game.play.juggle_finished_at)/.4)
+            self.pose['gaze'] = tuple(
+                (start+(look-start)*gaze_mix)*(1.-settle)+goal*settle
+                for start,look,goal in zip((0.,-.75),(look_x,look_y),state.gaze))
+            for key,value in mouth_state(state.emotion).items():
+                if key in ('mouth_curve','mouth_width'):
+                    self.pose[key] += (value-self.pose[key])*settle
         if (prank is not None and prank.angry_attempt
                 and mode in ('cursor_approach','cursor_pounce','cursor_swallow','cursor_chew')):
-            self.pose.update(emotion='bravo', anger=max(.72, tones['ANGRY']),
+            anger = max(.72, tones['ANGRY'])
+            self.pose.update(emotion='bravo', anger=anger,
                              eye_open=min(.8,self.pose['eye_open']),
                              ear_raise=min(-1.8,self.pose['ear_raise']), mouth_curve=-.55)
+            if mode in ('cursor_approach','cursor_pounce'):
+                self.pose.update(effect='bravo', effect_strength=.65*anger)
         if mode=='digitando':
             key, tap, _ = typing_frame(now)
             side = (-1 if key<4 else 1) if key>=0 else 0

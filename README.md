@@ -19,7 +19,8 @@ A 0.5.2 traz o Mini terminal: notebook grafite, teclas que acendem e cursor que 
 A série 0.5 aproxima as expressões e as atividades do Android da versão para PC,
 com central de configurações, painel neural e movimento opcional ao chacoalhar.
 No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
-vem desligada. Também é possível abrir pelo código com `python main.py`, como no Pestinha.
+vem desligada. Quando fica bem irritada, ela pode perseguir o cursor em movimento,
+mastigá-lo e cuspi-lo. Mexer ou clicar devolve o ponteiro na hora. Também é possível abrir pelo código com `python main.py`, como no Pestinha.
 Veja as [notas da versão](docs/RELEASE.md) e a
 [revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 

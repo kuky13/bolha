@@ -205,8 +205,9 @@ class Game:
             self.stop_pingpong()
         self.prefs.update(prefs)
         if not (self.prefs.get('cursorPrankEnabled', False)
-                and self.prefs.get('senseCursor', True) and self.prefs.get('senseIdle', True)
-                and self.prefs.get('adaptiveBehavior', True)):
+                and self.prefs.get('senseCursor', True)
+                and self.prefs.get('adaptiveBehavior', True)
+                and (self.prefs.get('senseIdle', True) or self.cursor_prank.angry_attempt)):
             self.cursor_prank.cancel(self, time.monotonic())
         if not self.prefs.get('popEnabled',True):
             self.strong_throws.clear()
@@ -1025,6 +1026,8 @@ class Game:
                 kind='brinquedo_rebatida';duration=.42
             else:
                 return
+        elif self.play.finishing_juggle(now):
+            return
         elif self.behavior.toy_action in ('chase','hop'):
             current = self.play_reaction
             if current.get('kind')=='brinquedo_perseguindo':
@@ -1254,8 +1257,9 @@ class Game:
                 or self.state.protest_stage or self.state.castigo or self.body.held or self.ball_stored
                 or self.cursor_prank.active or manual_play):
             self.play.stop_juggle()
-        if self.play.juggling():
-            self.body.vx = 0.
+        if self.play.juggling() or self.play.finishing_juggle(now):
+            if self.body.grounded:
+                self.body.vx = 0.
             self.behavior.toy_action = None
         else:
             self.behavior.tick(dt,now,self.cursor,area,self.prof,platforms,not resting,
@@ -1279,10 +1283,12 @@ class Game:
                 self.protest_ctl.provoke(.1)
             self._sync_desk_pose()
         if not self.ball_stored:
+            closing_lob = (self.play.finishing_juggle(now) and self.play.juggle_count == self.play.juggle_target
+                           and not self.ball.body.grounded)
             self.ball.step(dt,self.bounds((self.ball.body.x,self.ball.body.y)),areas,monitors,[d for i,d in enumerate(self.displays) if i not in self.blocked])
             if self.play.juggling():
                 self.play.follow_juggle(dt,now,self.body,self.ball,area,previous_toy[1])
-            elif not holding_cursor:
+            elif not (holding_cursor or closing_lob):
                 self._toy_contact(previous_pet,previous_toy,now)
         self._focus_gaze(now)
         if self.play.juggling():
