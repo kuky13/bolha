@@ -111,6 +111,12 @@ def test_missed_ball_keeps_the_last_number_until_it_fades(tmp_path,monkeypatch):
             break
     assert toy.grounded and not game.play.juggling()
     assert game.play.count_text(tick)==('1',1.)
+    motion = ExpressionMotion(tick)
+    surprise = motion.update(game,tick+.08)
+    amusement = motion.update(game,tick+.55)
+    assert motion.mode=='brinquedo_escapou'
+    assert surprise['mouth_open']>.45 and surprise['emotion']=='assustado'
+    assert amusement['mouth_open']==0. and amusement['mouth_curve']>.7
     assert 0.<game.play.count_text(tick+1.17)[1]<.5
     assert game.play.count_text(tick+1.26) is None
 

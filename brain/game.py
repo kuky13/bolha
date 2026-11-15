@@ -646,7 +646,7 @@ class Game:
             self.drives.stimulate('novelty',.3)
             self.drives.touched('poke',.2)
         if event in ('pet_hit','player_point','pet_point'):
-            kind = {'pet_hit':'pingpong_rebatida','player_point':'assustado','pet_point':'feliz'}[event]
+            kind = {'pet_hit':'pingpong_rebatida','player_point':'brinquedo_escapou','pet_point':'ponto_bolha'}[event]
             if match.finished and match.winner=='pet':
                 kind='comemorando'
             duration = .42 if event == 'pet_hit' else 1.15

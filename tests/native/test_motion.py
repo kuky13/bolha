@@ -215,10 +215,11 @@ def test_reacoes_a_perseguir_e_keep_away_sao_visuais_sem_alterar_a_fisica(tmp_pa
     game.play_reaction = dict(kind='brinquedo_perseguindo', started=101, until=103,
                               intensity=.8)
     waiting = motion.update(game,101.3)
-    assert waiting['emotion']=='atento' and waiting['effect'] is None
+    assert waiting['emotion']=='contente' and waiting['effect'] is None
+    assert waiting['mouth_curve']>.8
     game.body.vx=300.
     chase = motion.update(game, 101.4)
-    assert chase['emotion'] == 'atento' and chase['effect'] == 'perseguindo'
+    assert chase['emotion'] == 'contente' and chase['effect'] == 'perseguindo'
     assert chase['gaze'][0]>.7 and chase['effect_strength']>.5
     game.body.vx=0.
     game.play_reaction = dict(kind='comemorando', started=102, until=104, intensity=.9)
