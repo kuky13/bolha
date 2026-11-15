@@ -213,12 +213,18 @@ def test_recupera_camadas_da_bolha_sem_alterar_foco(monkeypatch):
         foreground = win32gui.GetForegroundWindow()
         before = win32gui.GetWindowRect(visual)
         widgets = [SimpleNamespace(isVisible=lambda:True,winId=lambda h=h:h) for h in (visual,target)]
-        for _ in range(2):  # Recupera também quando as duas camadas já eram "sempre visíveis".
-            win32gui.SetWindowPos(other,win32con.HWND_TOPMOST,0,0,0,0,flags)
+        def above(a,b):
+            while b := win32gui.GetWindow(b,win32con.GW_HWNDPREV):
+                if b == a:return True
+            return False
+
+        for placement in (win32con.HWND_TOPMOST, win32con.HWND_TOP):
+            win32gui.SetWindowPos(other,placement,0,0,0,0,flags)
+            assert above(other,visual)
             platform.keep_pet_above(*widgets)
-            order = []
-            win32gui.EnumWindows(lambda hwnd,_:order.append(hwnd) or True,None)
-            assert order.index(target) < order.index(visual) < order.index(other)
+            assert above(target,visual) and above(visual,other), placement
+            assert all(win32gui.GetWindowLong(hwnd,win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST
+                       for hwnd in (target,visual))
         assert win32gui.GetForegroundWindow() == foreground
         assert win32gui.GetWindowRect(visual) == before
     finally:

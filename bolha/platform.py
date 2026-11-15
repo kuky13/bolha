@@ -36,7 +36,11 @@ def keep_pet_above(visual, target):
     for window in (visual, target):
         if window.isVisible():
             try:
-                win32gui.SetWindowPos(int(window.winId()), win32con.HWND_TOPMOST, 0, 0, 0, 0, flags)
+                hwnd = int(window.winId())
+                style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+                # TOPMOST muda a faixa; TOP recupera a posição dentro dela.
+                above = win32con.HWND_TOP if style & win32con.WS_EX_TOPMOST else win32con.HWND_TOPMOST
+                win32gui.SetWindowPos(hwnd, above, 0, 0, 0, 0, flags)
             except pywintypes.error:
                 pass  # Uma janela recriada pelo Qt será reavaliada no próximo ciclo.
 
