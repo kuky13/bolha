@@ -92,7 +92,7 @@ class NativeApp:
         self.refresh_desktop()
         self.last_tick=time.monotonic()
         self.frame=QTimer();self.frame.setTimerType(Qt.PreciseTimer);self.frame.setInterval(16);self.frame.timeout.connect(self.tick);self.frame.start()
-        self.status_timer=QTimer();self.status_timer.setInterval(250);self.status_timer.timeout.connect(self.poll);self.status_timer.start()
+        self.status_timer=QTimer();self.status_timer.setInterval(250);self.status_timer.timeout.connect(self.poll);self.status_timer.timeout.connect(self._keep_pet_above);self.status_timer.start()
         self.profile_timer=QTimer();self.profile_timer.setInterval(30000);self.profile_timer.timeout.connect(self.save_preferences_async);self.profile_timer.start()
         from .updates import Updater
         self.updater=Updater(self.data_dir,VERSION,self.before_install,self.on_recover)
@@ -157,6 +157,11 @@ class NativeApp:
             self.game.stop_pingpong()
             self.sync_pingpong()
         else:self.last_tick=time.monotonic()
+    def _keep_pet_above(self):
+        if (not (self.quitting or self.updating or self.suspended or self.game.panel)
+                and self.game.pet_visible() and QApplication.activePopupWidget() is None
+                and not (self.update_dialog and self.update_dialog.isVisible())):
+            keep_pet_above(self.pet.visual,self.pet)
     def poll(self):
         test_profile=os.getenv('BOLHA_TEST_USER_DATA')
         if (os.getenv('BOLHA_TEST')=='1' and os.getenv('BOLHA_TEST_ALLOW_STOP')=='1' and test_profile
@@ -166,10 +171,6 @@ class NativeApp:
             except FileNotFoundError:pass
             except OSError as error:self.warn('Não foi possível remover o pedido de parada do teste: '+str(error))
             else:self.quit();return
-        if (not (self.quitting or self.updating or self.suspended or self.game.panel)
-                and self.game.pet_visible() and QApplication.activePopupWidget() is None
-                and not (self.update_dialog and self.update_dialog.isVisible())):
-            keep_pet_above(self.pet.visual,self.pet)
         while True:
             try:path,error=self.writer.errors.get_nowait()
             except queue.Empty:break
