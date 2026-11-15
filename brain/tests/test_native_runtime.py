@@ -192,14 +192,24 @@ def test_app_health_dialogo_reaberto_e_cursor_desligado(qapp,tmp_path,monkeypatc
 
 
 @pytest.mark.skipif(sys.platform != 'win32', reason='Precisa da ordem nativa de janelas do Windows.')
-def test_recupera_camadas_da_bolha_sem_alterar_foco(monkeypatch):
+def test_recupera_camadas_da_bolha_sem_alterar_foco():
+    import subprocess
+
+    # Isola o desktop de teste dos objetos e eventos Qt deixados por outros casos.
+    result = subprocess.run([sys.executable, '-c',
+        "import runpy,sys;runpy.run_path(sys.argv[1])['_check_windows_pet_layers']()",
+        str(Path(__file__).resolve())], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _check_windows_pet_layers():
     from types import SimpleNamespace
     import win32con
     import win32gui
     from bolha import platform
 
-    # A suíte Qt está offscreen; estas três janelas Win32 testam a pilha real.
-    monkeypatch.setattr(platform, 'QGuiApplication', SimpleNamespace(platformName=lambda:'windows'))
+    # Estas três janelas Win32 testam a pilha real sem exigir janelas Qt.
+    platform.QGuiApplication = SimpleNamespace(platformName=lambda:'windows')
     handles = []
     flags = win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
     try:
@@ -218,8 +228,9 @@ def test_recupera_camadas_da_bolha_sem_alterar_foco(monkeypatch):
                 if b == a:return True
             return False
 
-        win32gui.SetWindowPos(other,win32con.HWND_TOP,0,0,0,0,flags)
-        assert above(other,visual)
+        for hwnd in (visual, target):
+            win32gui.SetWindowPos(hwnd,win32con.HWND_BOTTOM,0,0,0,0,flags)
+        assert above(other,visual) and above(other,target)
         for _ in range(2):
             platform.keep_pet_above(*widgets)
             assert above(visual,other) and above(target,other)
