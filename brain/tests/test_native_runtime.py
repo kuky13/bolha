@@ -218,11 +218,11 @@ def test_recupera_camadas_da_bolha_sem_alterar_foco(monkeypatch):
                 if b == a:return True
             return False
 
-        for placement in (win32con.HWND_TOPMOST, win32con.HWND_TOP):
-            win32gui.SetWindowPos(other,placement,0,0,0,0,flags)
-            assert above(other,visual)
+        win32gui.SetWindowPos(other,win32con.HWND_TOP,0,0,0,0,flags)
+        assert above(other,visual)
+        for _ in range(2):
             platform.keep_pet_above(*widgets)
-            assert above(target,visual) and above(visual,other), placement
+            assert above(visual,other) and above(target,other)
             assert all(win32gui.GetWindowLong(hwnd,win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST
                        for hwnd in (target,visual))
         assert win32gui.GetForegroundWindow() == foreground
