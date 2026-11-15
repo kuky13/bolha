@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QApplication,QMenu,QSystemTrayIcon,QMessageBox,QDi
 from . import VERSION
 from .preferences import PreferencesStore
 from .persistence import PersistenceWriter
-from .platform import desktop_layout,PanicHotkey
+from .platform import desktop_layout,keep_pet_above,PanicHotkey
 from .pet import PetWindow
 from .pingpong_view import PingPongView
 from .scene import NativeScene
@@ -166,6 +166,10 @@ class NativeApp:
             except FileNotFoundError:pass
             except OSError as error:self.warn('Não foi possível remover o pedido de parada do teste: '+str(error))
             else:self.quit();return
+        if (not (self.quitting or self.updating or self.suspended or self.game.panel)
+                and self.game.pet_visible() and QApplication.activePopupWidget() is None
+                and not (self.update_dialog and self.update_dialog.isVisible())):
+            keep_pet_above(self.pet.visual,self.pet)
         while True:
             try:path,error=self.writer.errors.get_nowait()
             except queue.Empty:break

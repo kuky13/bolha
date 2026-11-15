@@ -189,3 +189,38 @@ def test_app_health_dialogo_reaberto_e_cursor_desligado(qapp,tmp_path,monkeypatc
     assert not controller.game.panel
     controller.show_settings();assert controller.game.panel
     controller.quit()
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='Precisa da ordem nativa de janelas do Windows.')
+def test_recupera_camadas_da_bolha_sem_alterar_foco(monkeypatch):
+    from types import SimpleNamespace
+    import win32con
+    import win32gui
+    from bolha import platform
+
+    # A suíte Qt está offscreen; estas três janelas Win32 testam a pilha real.
+    monkeypatch.setattr(platform, 'QGuiApplication', SimpleNamespace(platformName=lambda:'windows'))
+    handles = []
+    flags = win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
+    try:
+        for name in ('Bolha desenho (teste)', 'Bolha entrada (teste)', 'Janela externa (teste)'):
+            hwnd = win32gui.CreateWindowEx(win32con.WS_EX_TOOLWINDOW | win32con.WS_EX_NOACTIVATE,
+                                            'Static', name, win32con.WS_POPUP,
+                                            20,20,150,150,0,0,0,None)
+            handles.append(hwnd)
+            win32gui.ShowWindow(hwnd,win32con.SW_SHOWNOACTIVATE)
+        visual, target, other = handles
+        foreground = win32gui.GetForegroundWindow()
+        before = win32gui.GetWindowRect(visual)
+        widgets = [SimpleNamespace(isVisible=lambda:True,winId=lambda h=h:h) for h in (visual,target)]
+        for _ in range(2):  # Recupera também quando as duas camadas já eram "sempre visíveis".
+            win32gui.SetWindowPos(other,win32con.HWND_TOPMOST,0,0,0,0,flags)
+            platform.keep_pet_above(*widgets)
+            order = []
+            win32gui.EnumWindows(lambda hwnd,_:order.append(hwnd) or True,None)
+            assert order.index(target) < order.index(visual) < order.index(other)
+        assert win32gui.GetForegroundWindow() == foreground
+        assert win32gui.GetWindowRect(visual) == before
+    finally:
+        for hwnd in reversed(handles):
+            win32gui.DestroyWindow(hwnd)

@@ -25,6 +25,22 @@ def drag_pointer():
     return None
 
 
+def keep_pet_above(visual, target):
+    """Restaura as camadas visíveis sem mudar foco, tamanho ou posição."""
+    if sys.platform != 'win32' or QGuiApplication.platformName() != 'windows' or not visual.isVisible():
+        return
+    import pywintypes
+    import win32con
+    import win32gui
+    flags = win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
+    for window in (visual, target):
+        if window.isVisible():
+            try:
+                win32gui.SetWindowPos(int(window.winId()), win32con.HWND_TOPMOST, 0, 0, 0, 0, flags)
+            except pywintypes.error:
+                pass  # Uma janela recriada pelo Qt será reavaliada no próximo ciclo.
+
+
 def set_app_id():
     """Fixa a identidade de instalação; falha vira somente um aviso local."""
     if sys.platform!='win32':return None
