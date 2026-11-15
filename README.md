@@ -15,7 +15,7 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.5.2 traz o Mini terminal: notebook grafite, teclas que acendem e cursor que pisca enquanto a Bolha digita.
+A 0.5.3 corrige a última embaixadinha, deixa a Bolha mais expressiva nas brincadeiras e restaura a prioridade da janela no Windows.
 A série 0.5 aproxima as expressões e as atividades do Android da versão para PC,
 com central de configurações, painel neural e movimento opcional ao chacoalhar.
 No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
