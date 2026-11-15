@@ -134,7 +134,8 @@ def test_native_context_builds_cross_app_platforms_and_respects_sensor(tmp_path,
     native=SimpleNamespace(janelas_visiveis=lambda _:windows,
         win32con=SimpleNamespace(GWL_STYLE=-16,GWL_EXSTYLE=-20,WS_EX_LAYERED=0x80000,
                                  WS_CAPTION=0xc00000,WS_THICKFRAME=0x40000),
-        win32gui=SimpleNamespace(GetWindowLong=lambda _hwnd,kind:0xc00000 if kind==-16 else 0))
+        win32gui=SimpleNamespace(GetForegroundWindow=lambda:8,
+                                 GetWindowLong=lambda _hwnd,kind:0xc00000 if kind==-16 else 0))
     monkeypatch.setattr(pestinha.plataforma,'windows',native,raising=False)
     monkeypatch.setitem(sys.modules,'pestinha.plataforma.windows',native)
     with monkeypatch.context() as platform:
@@ -150,3 +151,39 @@ def test_native_context_builds_cross_app_platforms_and_respects_sensor(tmp_path,
         platform.setattr(sys,'platform','win32')
         game.read_context(101.)
     assert game.platforms==[] and game.native_error is None
+
+
+def test_context_hides_on_layered_fullscreen_and_recognized_windowed_game(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    from pathlib import Path
+    import pestinha.plataforma
+    from game import Game
+
+    game = Game(tmp_path, Path(__file__).resolve().parents[2]/'assets/bolha/content')
+    game.desktop(dict(areas=[display(),display(1920,width=1280,height=720,scale=1.5,id=1)]))
+    active = 'browser.exe'
+    windows = [(11,(1920,0,3840,1080),False)]
+    native = SimpleNamespace(
+        janelas_visiveis=lambda _:windows,
+        processo_ativo=lambda:active,
+        ocioso_segundos=lambda:10_000,
+        win32con=SimpleNamespace(GWL_STYLE=-16,GWL_EXSTYLE=-20,WS_EX_LAYERED=0x80000,
+                                 WS_CAPTION=0xc00000,WS_THICKFRAME=0x40000),
+        win32gui=SimpleNamespace(GetForegroundWindow=lambda:11,
+                                 GetWindowLong=lambda _hwnd,attr:0x80000 if attr==-20 else 0))
+    monkeypatch.setattr(pestinha.plataforma,'windows',native,raising=False)
+    monkeypatch.setitem(sys.modules,'pestinha.plataforma.windows',native)
+    with monkeypatch.context() as platform:
+        platform.setattr(sys,'platform','win32')
+        game.read_context(100.)
+        assert game.blocked == {1} and game.visible() and len(game.available_areas()) == 1
+        assert game.platforms == []  # Janelas em camadas não passam a virar plataformas.
+        windows[:] = [(11,(2000,50,3300,850),False)]
+        active = 'cs2.exe'
+        game.read_context(101.)
+        assert game.blocked == {1}  # Também vale para o jogo conhecido em janela, mesmo ocioso.
+        active = 'browser.exe'
+        game.read_context(102.)
+    assert game.native_error is None
+    assert game.blocked == set()

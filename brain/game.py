@@ -281,19 +281,27 @@ class Game:
             self.senses.on_events(self.tracker.observe(active, self.activity))
             self.platforms = []
             previous_blocked=set(self.blocked)
-            self.blocked.clear()
             if self.prefs.get('senseWindows', True):
                 windows = []
                 platform_windows = []
-                for hwnd, (left, top, right, _bottom), maximized in native.janelas_visiveis(self.excluded):
+                foreground = native.win32gui.GetForegroundWindow()
+                game_rect = None
+                foreground_game = detect_activity(active, 0., self.prof['away_after']) == 'GAMING'
+                for hwnd, rect, maximized in native.janelas_visiveis(self.excluded):
                     style = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_STYLE)
                     extended = native.win32gui.GetWindowLong(hwnd, native.win32con.GWL_EXSTYLE)
-                    if extended & native.win32con.WS_EX_LAYERED:
-                        continue
-                    windows.append(((left, top, right, _bottom), maximized, bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))))
-                    platform_windows.append((hwnd, (left, top, right, _bottom), maximized))
+                    layered = extended & native.win32con.WS_EX_LAYERED
+                    if not layered:
+                        platform_windows.append((hwnd, rect, maximized))
+                    if (not layered) or hwnd == foreground:
+                        framed = bool(style & (native.win32con.WS_CAPTION | native.win32con.WS_THICKFRAME))
+                        windows.append((rect, maximized, framed))
+                    if hwnd == foreground and foreground_game:
+                        game_rect = rect
                 self.platforms = visible_window_platforms(platform_windows, self.displays)
-                self.blocked = fullscreen_monitors(windows, self.displays)
+                self.blocked = fullscreen_monitors(windows, self.displays, game_rect=game_rect)
+            else:
+                self.blocked.clear()
             if self.available_areas():
                 if previous_blocked != self.blocked:
                     self.fit(self.body)
