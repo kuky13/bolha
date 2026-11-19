@@ -8,7 +8,7 @@ permanece recortada ao interior da esfera em todos os quadros.
 import math
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
-from .facial_motion import WINK_DURATION, wink_state, mouth_state
+from .facial_motion import WINK_DURATION, wink_state, mouth_state, feature_profile
 
 RADIUS = 49.0
 FACE_RADIUS = 43.0
@@ -131,7 +131,7 @@ def _body(p, anger=0.0):
 
 
 def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0,
-              blink_left=None, blink_right=None, anger=0.0, detail=1.0, ear_gaze=None):
+              blink_left=None, blink_right=None, anger=0.0, detail=1.0, ear_gaze=None, face_profile=None):
     """Desenha somente olhos e orelhas. A metade inferior do rosto fica vazia."""
     clip = QPainterPath()
     clip.addEllipse(QPointF(0, 0), FACE_RADIUS, FACE_RADIUS)
@@ -140,25 +140,7 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
     p.setBrush(Qt.NoBrush)
     p.setPen(_pen(width=2.5*detail))
     # O olhar desloca o par; as dimensões permanecem iguais, inclusive de perfil.
-    profiles = {
-        'observando': (5.2, 6.4, 0.0, 0.0, 0.0),
-        'contente':   (5.2, 6.0, 0.0, 2.0, .4),
-        'feliz':      (5.2, 6.4, 0.0, 6.0, 1.0),
-        'curioso':    (5.7, 7.2, -.4, -5.0, 1.7),
-        'bravo':      (5.8, 5.4, .2, -26.0, -2.2),
-        'triste':     (5.4, 6.1, 1.3, 28.0, -3.2),
-        'assustado':  (6.1, 9.8, -.3, -6.0, 2.8),
-        'dramatico':  (5.7, 7.4, -.1, -11.0, 1.4),
-        'dormindo':   (5.2, 6.4, 1.0, 21.0, -2.9),
-        'sonolento':  (5.4, 3.2, 1.0, 12.0, -1.4),
-        'timido':     (4.9, 4.8, 1.1, -11.0, -.5),
-        'atento':     (5.4, 7.4, -.7, 0.0, 2.2),
-        'entediado':  (5.7, 2.5, 1.1, 17.0, -2.1),
-        'travesso':   (5.6, 4.7, -.1, -7.0, .9),
-        'tonto':      (5.8, 6.2, .2, 19.0, -.9),
-        'comemorando':(6.4, 7.2, -.3, 7.0, 2.0),
-    }
-    rx, ry, eye_y, tilt, raise_units = profiles[emotion]
+    rx, ry, eye_y, tilt, raise_units, lid_level, lid_slope = face_profile or feature_profile(emotion, anger)
     rx *= 1 + .2*(detail-1)
     ry *= 1 + .2*(detail-1)
     tilt = _clamp(tilt + ear_tilt, -35, 35)
@@ -214,10 +196,10 @@ def _features(p, emotion, blink, gaze, ear_tilt=0.0, ear_raise=0.0, eye_open=1.0
             height = ry * (1 - closing_eye) * max(1.0, opening) + .7 * closing_eye
             eye = QPainterPath()
             eye.addEllipse(QPointF(x, y), width, height)
-            if emotion in ('bravo', 'triste', 'entediado', 'sonolento', 'travesso'):
+            if lid_level < 1. or lid_slope != 0.:
                 # As pálpebras fazem parte dos olhos, sem acrescentar boca ou sobrancelhas.
-                slope = side * ((-.43 - .14 * anger) if emotion == 'bravo' else .26 if emotion == 'triste' else 0)
-                lid_y = y - height * ((.14 - .12 * anger) if emotion == 'bravo' else .30 if emotion == 'triste' else .48)
+                slope = side * lid_slope
+                lid_y = y - height * lid_level
                 edge = width+1.
                 lid = QPainterPath(QPointF(x-edge,lid_y-slope*edge))
                 lid.lineTo(x+edge,lid_y+slope*edge)
@@ -302,7 +284,7 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
                    ear_tilt=0.0, ear_raise=0.0, eye_open=1.0, body_opacity=1.0,
                    blink_left=None, blink_right=None, anger=None, ear_gaze=None,
                    mouth_enabled=True, mouth_open=None, mouth_curve=None, mouth_chew=0.,
-                   tongue=0., cursor_inside=False, cursor_spit=0., mouth_width=1., mouth_skew=0.):
+                   tongue=0., cursor_inside=False, cursor_spit=0., mouth_width=1., mouth_skew=0., face_profile=None):
     """Pinta a expressão inteira com a mesma transformação do corpo.
 
     ``blink``: 0 aberto, 1 fechado; ``eye_open``: abertura 0..1.3;
@@ -323,7 +305,7 @@ def draw_character(painter, cx, cy, scale=1.0, angle=0.0, emotion='observando',
     painter.restore()
     _features(painter, emotion, _clamp(blink, 0, 1), gaze,
               _clamp(ear_tilt, -35, 35), _clamp(ear_raise, -5, 5), _clamp(eye_open, 0, 1.3),
-              blink_left,blink_right,anger,detail=max(1.,min(1.3,.7/max(.05,scale))),ear_gaze=ear_gaze)
+              blink_left,blink_right,anger,detail=max(1.,min(1.3,.7/max(.05,scale))),ear_gaze=ear_gaze,face_profile=face_profile)
     if mouth_enabled or cursor_inside or cursor_spit > 0:
         _mouth(painter, emotion, mouth_open, mouth_curve, mouth_chew, tongue,
                cursor_inside, cursor_spit, mouth_width, mouth_skew)

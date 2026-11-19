@@ -212,6 +212,7 @@ def test_reacoes_a_perseguir_e_keep_away_sao_visuais_sem_alterar_a_fisica(tmp_pa
     assert frustrated['ear_raise'] < -3 and frustrated['eye_open'] < .5
     cooling = animation_pose('brinquedo_frustrado', 2.7, .9)
     assert cooling['anger'] < .15 and cooling['effect_strength'] < .15
+    motion = ExpressionMotion(101.)  # Cada gesto isolado tem sua própria prévia.
     game.play_reaction = dict(kind='brinquedo_perseguindo', started=101, until=103,
                               intensity=.8)
     waiting = motion.update(game,101.3)
@@ -436,3 +437,61 @@ def test_chasing_tracks_an_airborne_toy_and_springs_in_both_directions(tmp_path,
         assert (gx*math.cos(angle)-gy*math.sin(angle))*direction > .6
         assert gx*math.sin(angle)+gy*math.cos(angle) < -.25
         assert pose['angle_offset']*direction > 0.
+
+
+@pytest.mark.parametrize('angle', [-90., 0., 180.])
+def test_segurar_soltar_em_voo_e_pousar_preserva_raiva_e_geometria(tmp_path, angle):
+    game = game_at_rest(tmp_path)
+    game.body.angle = angle
+    game.state.tone.r['ANGRY'] = .9
+    game.interact({'type': 'hold-start'}, now=100.)
+    motion = ExpressionMotion(100.)
+    for frame in range(301):
+        held = motion.update(game, 100.+frame/60.)
+    assert held['emotion'] == 'bravo' and held['anger'] >= .9
+    game.interact({'type': 'hold-end'}, now=105.)
+    game.body.vx, game.body.vy = 1200., -600.
+    game.body.grounded = False
+    flying = motion.update(game, 105.+1/60.)
+    assert motion.mode == 'airborne'
+    assert flying['emotion'] == 'bravo' and flying['anger'] >= .88
+    for key in ('eye_open', 'ear_raise', 'ear_tilt', 'mouth_curve'):
+        assert abs(flying[key]-held[key]) < .8, key
+    assert max(abs(a-b) for a, b in zip(flying['face_profile'], held['face_profile'])) < .4
+    game.landing_reaction = dict(kind='pouso_de_lado', started=105., until=105.9, intensity=.8, angle=90.)
+    game.body.grounded = True
+    landing = motion.update(game, 105.+2/60.)
+    assert motion.mode == 'pouso_de_lado'
+    assert landing['anger'] >= .88 and landing['emotion'] == 'bravo'
+    assert landing['eye_open'] == pytest.approx(flying['eye_open'], abs=.08)
+
+
+def test_raiva_continua_enquanto_cerebro_mantem_e_carinho_amacia_a_recuperacao(tmp_path):
+    game = game_at_rest(tmp_path)
+    game.state.emotion = 'bravo'
+    game.state.tone.r['ANGRY'] = .95
+    motion = ExpressionMotion(100.)
+    angry = motion.update(game, 100.)
+    game.state.emotion = 'observando'
+    assert motion.update(game, 160.)['anger'] >= .94
+    game.state.tone.r['ANGRY'] = 0.
+    before = motion.update(game, 160.01)
+    assert .9 < before['anger'] < angry['anger']
+    game.state.mark_caress(160.01)
+    softening = motion.update(game, 160.11)
+    assert 0. < softening['anger'] < before['anger']
+    assert softening['emotion'] == 'feliz'
+    assert softening['eye_open'] == pytest.approx(before['eye_open'], abs=.4)
+    assert motion.update(game, 165.)['anger'] < .01
+
+
+def test_mastigada_tem_apenas_duas_batidas_sutis_e_olhos_abertos():
+    from cursor_prank import CHEW_SECONDS
+    samples = [animation_pose('cursor_chew', CHEW_SECONDS*frame/80.) for frame in range(81)]
+    peaks = [index for index in range(1,80)
+             if samples[index]['mouth_chew'] > samples[index-1]['mouth_chew']
+             and samples[index]['mouth_chew'] > samples[index+1]['mouth_chew']]
+    assert peaks == [20, 60]
+    assert all(pose['emotion'] == 'atento' and pose['eye_open'] >= 1. for pose in samples)
+    assert all(pose['mouth_skew'] == 0. and pose['squash'] <= .022 for pose in samples)
+    assert animation_pose('cursor_chew', CHEW_SECONDS*3.)['mouth_chew'] < 1e-10

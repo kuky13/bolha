@@ -66,7 +66,7 @@ class PetVisual(QWidget):
                            ear_tilt=pose['ear_tilt'],ear_raise=pose['ear_raise'],
                            eye_open=pose['eye_open'],squash=squash,
                            body_opacity=game.prefs.get('opacity',1),
-                           anger=pose.get('anger',0.),
+                           anger=pose.get('anger',0.), face_profile=pose.get('face_profile'),
                            mouth_enabled=pose.get('mouth_enabled',True),
                            mouth_open=pose.get('mouth_open'), mouth_curve=pose.get('mouth_curve'),
                            mouth_chew=pose.get('mouth_chew',0.), tongue=pose.get('tongue',0.),

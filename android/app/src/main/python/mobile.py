@@ -47,6 +47,10 @@ say_until = say_started = 0.
 say_text = ''
 say_thought = False
 last_gaze = last_ear_gaze = (0., 0.)
+function_test = None
+function_test_saved = None
+test_status = ''
+function_test_request = 0
 
 
 def _mobile_preferences(patch, previous=None):
@@ -90,6 +94,7 @@ def start(data, content):
 
 def configure(value):
     global preferences
+    _stop_function_test()
     patch = json.loads(value) if isinstance(value, str) else value
     if not isinstance(patch, dict):
         raise ValueError('Preferências precisam ser um objeto.')
@@ -142,7 +147,11 @@ def action(kind, target='', x=0., y=0., vx=0., vy=0.):
     if kind == 'drag-end' and str(target).startswith('cancel-'):
         event['cancelled'] = True
     if kind == 'toy-style':
-        configure(dict(toyAppearance='ball' if game.ball.appearance == 'peanut' else 'peanut'))
+        patch = dict(toyAppearance='ball' if game.ball.appearance == 'peanut' else 'peanut')
+        if function_test is not None:
+            game.configure(patch)
+        else:
+            configure(patch)
         return
     if kind in ('lift', 'kick', 'juggle'):
         event.update(type='play', trick=kind)
@@ -155,11 +164,28 @@ def action(kind, target='', x=0., y=0., vx=0., vy=0.):
 
 
 def control(value):
-    global preview, selected_neuron, monitor_cache, last_error, reaction_status
+    global preview, selected_neuron, monitor_cache, last_error, reaction_status, function_test_request
     event = json.loads(value) if isinstance(value, str) else value
     if not isinstance(event, dict):
         raise ValueError('Comando precisa ser um objeto.')
     kind = event.get('type')
+    if kind == 'test-function':
+        request = event.get('requestId', 0)
+        function_test_request = request if type(request) is int else 0
+        return _start_function_test(event.get('key'))
+    if kind == 'next-function-test':
+        if function_test is not None:
+            try:
+                function_test.next_step()
+            except Exception:
+                _stop_function_test()
+                raise
+        return
+    if kind == 'stop-function-test':
+        _stop_function_test()
+        return
+    if kind == 'panel' and function_test is not None:
+        function_test.live_game.panel = bool(event.get('value'))
     if kind == 'suspend':
         game._cancel_holds(time.monotonic())
         game.play.stop_juggle()
@@ -193,8 +219,77 @@ def control(value):
         game.stop_pingpong()
         return
     if kind == 'reset-memory':
+        _stop_function_test()
         monitor_cache.clear()
     game.interact(event)
+
+
+def _start_function_test(key):
+    global function_test, function_test_saved, test_status
+    from bolha.activity_tests import ActivityTestSession, TESTS_BY_KEY
+    _stop_function_test()
+    if key not in TESTS_BY_KEY:
+        raise ValueError('Função de teste desconhecida.')
+    if key == 'cursor':
+        test_status = 'A brincadeira de comer o ponteiro só está disponível no computador.'
+        return
+    session = ActivityTestSession(game)
+    try:
+        test_status = session.run(key)
+        if session.current is None:
+            session.stop()
+            return
+        names = ('game', 'motion_clock', 'dialogue', 'fetcher', 'media_cache', 'media_requested',
+                 'monitor_cache', 'selected_neuron', 'preview', 'say_until', 'say_started',
+                 'say_text', 'say_thought', 'last_gaze', 'last_ear_gaze')
+        function_test_saved = {name: globals()[name] for name in names}
+        function_test_saved['paused_at'] = time.monotonic()
+        globals().update(game=session.game, motion_clock=ExpressionMotion(time.monotonic()),
+            dialogue=Dialogue(), fetcher=OnlineReactionFetcher(), media_cache={}, media_requested=set(),
+            monitor_cache={}, selected_neuron=None, preview=None, say_until=0., say_started=0.,
+            say_text='', say_thought=False, last_gaze=(0., 0.), last_ear_gaze=(0., 0.))
+        function_test = session
+    except Exception:
+        session.stop()
+        if function_test_saved is not None:
+            restored = dict(function_test_saved)
+            restored.pop('paused_at', None)
+            globals().update(restored)
+            function_test_saved = None
+        raise
+
+
+def _stop_function_test():
+    global function_test, function_test_saved, test_status
+    if function_test is None:
+        return
+    session, function_test = function_test, None
+    saved, function_test_saved = function_test_saved, None
+    try:
+        fetcher.stop()
+    finally:
+        try:
+            session.stop()
+        finally:
+            elapsed = time.monotonic()-saved.pop('paused_at')
+            globals().update(saved)
+            current_size = size
+            if current_size:
+                globals()['size'] = None
+                resize(*current_size)
+            game.castigo.deslocar(elapsed)
+            game.mesa.deslocar(elapsed)
+            game.memory.deslocar(elapsed)
+            game.intelligence.until += elapsed
+            game.last_think = game.last_save = time.monotonic()
+            test_status = 'Teste encerrado. A memória original foi preservada.'
+
+
+def _touch_instruction(text):
+    return (text.replace('o mouse', 'o dedo').replace('do mouse', 'do dedo')
+        .replace('o ponteiro', 'o toque').replace('Clique e mantenha pressionado', 'Toque e mantenha pressionado')
+        .replace('Solte o botão', 'Solte o dedo').replace('clique com o botão direito', 'mantenha pressionado')
+        .replace('área de trabalho', 'tela'))
 
 
 def motion(ax, ay, shake=False):
@@ -313,7 +408,11 @@ def tick(dt):
     global last_diagnostic, diagnostic
     now = time.monotonic()
     dt = max(0., min(.05, float(dt)))
-    game.tick(dt, now)
+    try:
+        game.tick(dt, now)
+    except Exception:
+        _stop_function_test()
+        raise
     pose = dict(motion_clock.update(game, now))
     pose['mouth_enabled'] = preferences.get('mouthEnabled', True)
     if preview:
@@ -370,11 +469,18 @@ def tick(dt):
         notebook=notebook,
         impactX=impact[0], impactY=impact[1],
         impact=reaction.get('started', 0.) if reaction.get('kind') == 'brinquedo_rebatida' else 0.,
-        text=count[0] if count else say_text if preferences['speechEnabled'] and now < say_until and not game.panel else '',
+        text=(count[0] if count else say_text if now < say_until and not game.panel else '') if preferences['speechEnabled'] else '',
         thought=False if count else say_thought, speechStarted=say_started,
         speechCounting=count is not None,
         speechAlpha=count[1] if count else max(0., min(1., (now-say_started)/.22, (say_until-now)/.3)),
         expressionNames=EXPRESSION_NAMES)
+    from bolha.activity_tests import ACTIVITY_TESTS
+    data['functionTests'] = [dict(key=item.key, title=item.title) for item in ACTIVITY_TESTS if item.key != 'cursor']
+    data['functionTest'] = (dict(key=function_test.current.key, title=function_test.current.title,
+        step=function_test.step+1, total=len(function_test.current.steps),
+        instruction=_touch_instruction(function_test.instruction), hasNext=function_test.has_next) if function_test else None)
+    data['testStatus'] = test_status
+    data['functionTestRequest'] = function_test_request
     if game.pingpong:
         match = game.pingpong
         data['pingpong'] = dict(area=match.area, cursor=game.cursor, paddleRadius=match.cursor_radius,

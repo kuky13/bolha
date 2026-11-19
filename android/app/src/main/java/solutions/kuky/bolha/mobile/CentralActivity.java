@@ -48,13 +48,16 @@ public final class CentralActivity extends Activity implements Engine.Listener {
     private TextView status,brainStatus,decisionStatus,selectedNeuron,usageStatus,motionStatus;
     private NeuralView neural;
     private Stage expressionPreview;
-    private Spinner toyAppearance,expression;
+    private Spinner toyAppearance,expression,functionTest;
     private JSONObject preferences=new JSONObject();
     private String lastPreferences="";
     private String[] expressionNames=new String[0];
     private int section;
     private long lastBrainText;
     private boolean loading,waitingUsage;
+    private boolean waitingFunctionTest;
+    private long functionTestRequest;
+    private String[] functionTestKeys=new String[0];
 
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -109,6 +112,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         super.onResume();
         FloatingBolha.foregroundUi(this,true);
         engine.listen(this);
+        JSONObject stopTest=new JSONObject();put(stopTest,"type","stop-function-test");engine.control(stopTest);
         command("panel",true);
         command("monitor",section==2);
         if (waitingUsage) {
@@ -138,7 +142,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         lastBrainText=0;
         toggles.clear();sliders.clear();values.clear();sliderRanges.clear();tracking.clear();
         neural=null;brainStatus=null;decisionStatus=null;selectedNeuron=null;
-        usageStatus=null;motionStatus=null;expressionPreview=null;toyAppearance=null;expression=null;
+        usageStatus=null;motionStatus=null;expressionPreview=null;toyAppearance=null;expression=null;functionTest=null;
         content.removeAllViews();
         for (int index=0;index<navigation.size();index++) {
             Button button=navigation.get(index);
@@ -176,6 +180,25 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         text.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         text.setPadding(0,dp(22),0,dp(8));
         content.addView(text);
+    }
+
+    private void details(String title,Runnable build) {
+        LinearLayout parent=content;
+        Button header=MobileUi.button(this,title+" ▸",() -> {});
+        LinearLayout body=MobileUi.column(this);
+        body.setPadding(dp(12),0,0,dp(8));
+        parent.addView(header,new LinearLayout.LayoutParams(-1,-2));
+        parent.addView(body,new LinearLayout.LayoutParams(-1,-2));
+        content=body;
+        try { build.run(); } finally { content=parent; }
+        body.setVisibility(View.GONE);
+        header.setOnClickListener(view -> {
+            boolean opened=body.getVisibility()!=View.VISIBLE;
+            body.setVisibility(opened?View.VISIBLE:View.GONE);
+            header.setText(title+(opened?" ▾":" ▸"));
+            header.setContentDescription(title+(opened?", aberto":", fechado"));
+        });
+        header.setContentDescription(title+", fechado");
     }
 
     private void toggle(String key,String label,String help) {
@@ -281,10 +304,25 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         toggle("hapticsEnabled","Vibração","Pulsos leves acompanham carinho, impacto e irritação.");
         divider("Travessuras");
         toggle("mischiefEnabled","Memes, bilhetes e travessuras","");
-        toggle("speechEnabled","Falas e pensamentos","Balões curtos acompanham as interações e as decisões da Bolha.");
         toggle("onlineReactions","Buscar memes e GIFs online","A pesquisa usa o humor da Bolha. As imagens ficam apenas na memória enquanto aparecem.");
         slider("mischiefInterval","Intervalo mínimo",1,30,5," min");
-        slider("maxObjects","Máximo de objetos",1,5,3,"");
+        slider("maxObjects","Máximo de memes e bilhetes",1,5,3,"");
+        details("Brincadeiras",() -> {
+            toggle("chaseEnabled","Correr atrás do brinquedo","");
+            toggle("juggleEnabled","Fazer embaixadinhas","");
+            toggle("pingpongEnabled","Jogar pingue-pongue","");
+            toggle("notebookEnabled","Usar o notebook","");
+        });
+        details("Expressões e companhia",() -> {
+            toggle("speechEnabled","Falas e pensamentos","Balões curtos acompanham as interações e as decisões da Bolha.");
+            toggle("notesEnabled","Trazer bilhetes","");
+            toggle("fireworksEnabled","Soltar fogos","");
+        });
+        details("Protestos e revolução",() -> {
+            toggle("protestsEnabled","Protestar e fazer greve","");
+            toggle("signsEnabled","Segurar cartazes","");
+            toggle("revolutionEnabled","Lançar brinquedos na revolução","Até seis brinquedos por vez, do tipo oposto ao brinquedo escolhido.");
+        });
         divider("Estouro");
         toggle("popEnabled","Estourar após muitos arremessos fortes","Ela some por um momento e volta tímida pelo canto da tela.");
         slider("popThrowLimit","Arremessos fortes por minuto",5,30,12,"");
@@ -327,6 +365,23 @@ public final class CentralActivity extends Activity implements Engine.Listener {
             }
             action("reaction-now");finish();
         });
+        divider("Testar funções reais");
+        description("Uma função por vez na Bolha flutuante. Uma cópia temporária protege a memória original. Funções e leituras desligadas continuam desligadas.");
+        JSONArray tests=engine.state().optJSONArray("functionTests");
+        if (tests!=null && tests.length()>0) {
+            String[] labels=new String[tests.length()];
+            functionTestKeys=new String[tests.length()];
+            for (int index=0;index<tests.length();index++) {
+                JSONObject test=tests.optJSONObject(index);
+                labels[index]=test==null?"":test.optString("title");
+                functionTestKeys[index]=test==null?"":test.optString("key");
+            }
+            functionTest=spinner(labels);
+            button("Executar na Bolha flutuante",this::startFunctionTest);
+        } else description("Aguardando o catálogo de funções do cérebro. Reabra esta seção após a inicialização.");
+        button("Parar teste e voltar à minha Bolha",() -> {
+            JSONObject command=new JSONObject();put(command,"type","stop-function-test");engine.control(command);
+        });
         divider("Testar expressões");
         description("Veja as poses e os efeitos sem criar uma nova experiência de aprendizado.");
         expressionPreview=new Stage(this,engine,"preview");
@@ -340,6 +395,21 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         for (int index=0;index<names.length();index++) expressionNames[index]=names.optString(index);
         expression=spinner(expressionNames);
         actionRow("Ver expressão","test-expression","Encerrar teste","end-expression");
+    }
+
+    private void startFunctionTest() {
+        if (!FloatingBolha.active) {
+            status.setText("Ative a Bolha flutuante na área App antes de testar.");
+            return;
+        }
+        if (functionTest==null || functionTest.getSelectedItemPosition()<0) return;
+        JSONObject command=new JSONObject();put(command,"type","test-function");
+        put(command,"key",functionTestKeys[functionTest.getSelectedItemPosition()]);
+        functionTestRequest=SystemClock.elapsedRealtime();
+        put(command,"requestId",functionTestRequest);
+        waitingFunctionTest=true;
+        engine.control(command);
+        status.setText("Preparando a cópia temporária da Bolha…");
     }
 
     private void privacy() {
@@ -463,6 +533,13 @@ public final class CentralActivity extends Activity implements Engine.Listener {
 
     @Override public void frame(JSONObject state,String error) {
         if (error!=null) { updateText(status,error);return; }
+        if (waitingFunctionTest && state.optLong("functionTestRequest",-1)==functionTestRequest) {
+            if (state.optJSONObject("functionTest")!=null) {
+                waitingFunctionTest=false;command("panel",false);finish();return;
+            }
+            String message=state.optString("testStatus");
+            if (!message.isEmpty()) { waitingFunctionTest=false;updateText(status,message); }
+        }
         JSONObject next=state.optJSONObject("preferences");
         if (next!=null && !next.toString().equals(lastPreferences)) {
             preferences=next;lastPreferences=next.toString();loadPreferences();

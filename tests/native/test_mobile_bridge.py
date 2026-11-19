@@ -38,6 +38,67 @@ def test_size_preferences_survive_rotation_and_restart(mobile, tmp_path):
     assert mobile.preferences['shakeEnabled']
 
 
+def test_real_function_test_preserves_mobile_memory_and_restores_game(mobile, tmp_path):
+    from pestinha import scene, store
+    mobile.save()
+    original = mobile.game
+    before = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    try:
+        mobile.control({'type': 'test-function', 'key': 'sleep'})
+        assert mobile.game is not original and mobile.game.sleep.asleep
+        frame = json.loads(mobile.tick(.016))
+        assert frame['functionTest']['key'] == 'sleep'
+        assert frame['functionTest']['step'] == 1
+        mobile.save()
+        mobile.control({'type': 'next-function-test'})
+        assert not mobile.game.sleep.asleep
+    finally:
+        mobile.control({'type': 'stop-function-test'})
+    assert mobile.game is original and scene._current is original
+    assert store._dispatcher is None
+    after = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    assert after == before
+    assert json.loads(mobile.tick(.016))['functionTest'] is None
+
+
+def test_mobile_test_refuses_disabled_network_without_enabling_it(mobile):
+    original = mobile.game
+    mobile.control({'type': 'test-function', 'key': 'gif'})
+    assert mobile.game is original and mobile.function_test is None
+    assert 'desligada' in mobile.test_status
+    assert not mobile.preferences['onlineReactions']
+
+
+def test_mobile_test_ack_panel_and_rotation_restore_real_game(mobile):
+    original = mobile.game
+    mobile.control({'type': 'panel', 'value': True})
+    mobile.control({'type': 'test-function', 'key': 'sleep', 'requestId': 1234})
+    assert json.loads(mobile.tick(.016))['functionTestRequest'] == 1234
+    mobile.control({'type': 'panel', 'value': False})
+    mobile.resize(700., 411., 2.625)
+    mobile.control({'type': 'stop-function-test'})
+    assert mobile.game is original and not original.panel
+    assert original.areas[0][2] == 700.
+    assert original.areas[0][3] == 411.
+
+
+def test_mobile_toy_menu_during_test_only_changes_disposable_copy(mobile, tmp_path):
+    mobile.configure({'toyAppearance': 'peanut'})
+    mobile.save()
+    original = mobile.game
+    before = {str(p):p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    try:
+        mobile.control({'type': 'test-function', 'key': 'toy'})
+        mobile.action('toy-style')
+        assert mobile.function_test is not None
+        assert mobile.game.ball.appearance == 'ball'
+        assert original.ball.appearance == mobile.preferences['toyAppearance'] == 'peanut'
+    finally:
+        mobile.control({'type': 'stop-function-test'})
+    assert mobile.game is original
+    assert {str(p):p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()} == before
+
+
 def test_shake_is_optional_and_never_releases_a_held_object(mobile):
     pet, toy = mobile.game.body, mobile.game.ball.body
     pet.vx = toy.vx = 0.

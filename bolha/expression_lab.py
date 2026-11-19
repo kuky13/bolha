@@ -35,7 +35,7 @@ class ExpressionPreview(QWidget):
                        blink_left=pose['blink_left'], blink_right=pose['blink_right'],
                        eye_open=pose['eye_open'], gaze=pose['gaze'] or (0., 0.),
                        squash=pose['squash'], ear_tilt=pose['ear_tilt'],
-                       ear_raise=pose['ear_raise'], anger=pose['anger'],
+                       ear_raise=pose['ear_raise'], anger=pose['anger'], face_profile=pose.get('face_profile'),
                        mouth_open=pose['mouth_open'], mouth_curve=pose['mouth_curve'],
                        mouth_chew=pose['mouth_chew'], tongue=pose['tongue'],
                        mouth_width=pose['mouth_width'], mouth_skew=pose['mouth_skew'],

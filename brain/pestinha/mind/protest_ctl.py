@@ -29,6 +29,7 @@ class ProtestController:
         self.drives = drives
         self.state = state          # PetState: protest_stage é espelhado aqui
         self.debug = debug
+        self.enabled = True
         self.visivel = True         # o cartaz novo nasce com a visibilidade da sessão
 
     @property
@@ -90,6 +91,9 @@ class ProtestController:
 
     def show(self, sign):
         """Mostra um cartaz novo, preso no pet."""
+        if not self.enabled:
+            sign.deleteLater()
+            return
         sign.clicked.connect(self.on_sign_clicked)
         self.protest.sign = sign
         self.carry(time.monotonic(), asleep=False)
@@ -106,6 +110,10 @@ class ProtestController:
     def carry(self, now, asleep):
         """O cartaz vai preso em cima dele; a bandeja, ao lado. Some ao dormir."""
         pr = self.protest
+        if not self.enabled:
+            self.drop_sign()
+            if pr.stage:pr.respawn_at = now
+            return
         if pr.sign is None and pr.stage and pr.respawn_at and now >= pr.respawn_at and not asleep:
             pr.respawn_at = None
             self.show(criar_cartaz(pr.escolher_cartaz()))
@@ -119,15 +127,40 @@ class ProtestController:
             self.drop_sign()
             pr.respawn_at = now
             return
-        body = self.body
-        _ex, ey = body.extents()
-        top = body.y - ey
-        if isinstance(sign, FlagThing):
-            sign.place(body.x + 30 - 10 + sign.width() / 2, top + 24 - sign.height() / 2)
-        else:
-            sign.tilt = 7.0 * math.sin(now * 6.0) if pr.stage == 2 else 0.0
-            sign.place(body.x, top + 8 - sign.height() / 2)
+        self.attach_sign(sign, now)
         sign.update()
+
+    def attach_sign(self, sign, now):
+        """Prende a haste ao corpo, mantendo placa e texto inteiros nos cantos."""
+        body = self.body
+        width, height = sign.desired_board_width, sign.desired_board_height
+        angle = body.angle + (4.*math.sin(now*6.) if self.protest.stage == 2 else 0.)
+        rad = math.radians(angle)
+        c, s = math.cos(rad), math.sin(rad)
+        ex, ey = abs(c)*width/2+abs(s)*height/2, abs(s)*width/2+abs(c)*height/2
+        bounds = sign.app.bounds((body.x, body.y))
+        left, top, right, bottom = bounds
+        factor=min(1.,max(1.,right-left-10.)/(2*ex),max(1.,bottom-top-10.)/(2*ey))
+        width*=factor;height*=factor;ex*=factor;ey*=factor
+        sign.board_width,sign.board_height=width,height
+        # A placa muda de lado quando falta espaço; a haste permanece presa ao corpo.
+        side = 1 if right-body.x >= body.x-left else -1
+        bx = body.x+side*(body.half_w+ex-7.)
+        by = body.y-body.half_h*.22
+        bx = max(left+ex+3., min(right-ex-3., bx))
+        by = max(top+ey+3., min(bottom-ey-3., by))
+        gx, gy = side*body.half_w*.65, body.half_h*.45
+        shaft_x, shaft_y = body.x+c*gx-s*gy, body.y+s*gx+c*gy
+        shaft_x=max(left+3.,min(right-3.,shaft_x))
+        shaft_y=max(top+3.,min(bottom-3.,shaft_y))
+        min_x, max_x = min(bx-ex,shaft_x)-3., max(bx+ex,shaft_x)+3.
+        min_y, max_y = min(by-ey,shaft_y)-3., max(by+ey,shaft_y)+3.
+        sign._w, sign._h = max_x-min_x, max_y-min_y
+        sign.board_x, sign.board_y = bx, by
+        sign.shaft_x, sign.shaft_y = shaft_x, shaft_y
+        sign.tilt = angle
+        sign.attached = sign.carried = True
+        sign.place((min_x+max_x)/2, (min_y+max_y)/2)
 
     def set_visible(self, visible, asleep):
         """Mostra ou esconde o cartaz junto com o pet (não aparece se ele estiver dormindo)."""

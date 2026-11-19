@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QAbstractItemView, QVBoxLayout, QWidget, QDoubleSpinBox, QToolButton,
 )
 from . import VERSION
-from .preferences import DEFAULTS, OBJECT_SCALE_TYPES
+from .preferences import DEFAULTS, OBJECT_SCALE_TYPES, ACTIVITY_SWITCHES
 
 
 def _label(text=''):
@@ -205,9 +205,9 @@ class SettingsDialog(QDialog):
                     'Consulta ReactionGIFs e Nekos.best apenas com termos genéricos de humor; mídia fica só em memória.')
         form = QFormLayout()
         self.interval = self._spin(1, 30, ' min', 'Intervalo mínimo entre travessuras')
-        self.object_limit = self._spin(1, 5, '', 'Máximo de objetos na tela')
+        self.object_limit = self._spin(1, 5, '', 'Máximo de memes e bilhetes na tela')
         form.addRow('Intervalo &mínimo:', self.interval)
-        form.addRow('Máximo de &objetos:', self.object_limit)
+        form.addRow('Máximo de &memes e bilhetes:', self.object_limit)
         layout.addLayout(form)
         self.checks['mischiefEnabled'].toggled.connect(self.interval.setEnabled)
         self.checks['mischiefEnabled'].toggled.connect(self.object_limit.setEnabled)
@@ -216,15 +216,46 @@ class SettingsDialog(QDialog):
         self._check('adaptiveBehavior', 'Usar objetivos e aprendizado adaptativo', layout)
         self._check('learnRoutine', 'Aprender hábitos por horário', layout)
         layout.addWidget(_label('O aprendizado fica neste computador. Desativar preserva a memória.'))
+        groups = {}
+        for title, key, label in ACTIVITY_SWITCHES:
+            if title not in groups:
+                groups[title] = self._details(title, self._general_layout)
+            self._check(key, label, groups[title],
+                        'Desativar interrompe esta atividade e preserva o humor e o aprendizado.')
         self._general_layout.addStretch()
 
     def _test_tab(self):
         from .expression_lab import ExpressionLab
+        from .activity_tests import ACTIVITY_TESTS
         layout = self._tab('Testar')
+        layout.addWidget(_label('Testar funções na área de trabalho'))
+        layout.addWidget(_label('Uma função por vez, com cópia temporária da memória. '
+                               'A Bolha original fica pausada até você parar o teste. '
+                               'Leituras e funções desligadas continuam desligadas.'))
+        self.activity_test = QComboBox()
+        self.activity_test.setAccessibleName('Função para testar na área de trabalho')
+        for item in ACTIVITY_TESTS:
+            self.activity_test.addItem(item.title, item.key)
+        layout.addWidget(self.activity_test)
+        self.start_test = _button('Executar na área de trabalho', self._start_activity_test)
+        layout.addWidget(self.start_test)
         self.lab = ExpressionLab()
         layout.addWidget(self.lab)
         layout.addWidget(_button('Ver o cérebro da minha Bolha', self.controller.show_neural))
         layout.addStretch()
+
+    def _start_activity_test(self):
+        callback = getattr(self.controller, 'start_activity_test', None)
+        if callback is None:
+            self._status('O teste de funções não está disponível neste controlador.', True)
+            return
+        try:
+            message = callback(self.activity_test.currentData())
+        except (OSError, ValueError, RuntimeError) as error:
+            self._status('Não consegui iniciar o teste: '+str(error), True)
+            return
+        if isinstance(message, str) and message:
+            self._status(message)
 
     def _privacy_tab(self):
         layout = self._tab('Privacidade')
@@ -890,3 +921,52 @@ class NeuralDialog(QDialog):
             self.timer.stop()
         elif self.isVisible():
             self.timer.start()
+
+
+class ActivityTestDialog(QDialog):
+    """Controle compacto; não entra na lista de painéis que pausa o jogo de teste."""
+    def __init__(self, session, on_stop):
+        super().__init__(None, Qt.Tool | Qt.WindowStaysOnTopHint)
+        self.session = session
+        self.on_stop = on_stop
+        self.stopped = False
+        self.setWindowTitle('Bolha · teste na área de trabalho')
+        self.setAccessibleName('Controle do teste de funções')
+        layout = QVBoxLayout(self)
+        self.title = _label(session.current.title if session.current else 'Teste de funções')
+        layout.addWidget(self.title)
+        self.step_label = _label()
+        self.step_label.setMinimumWidth(270)
+        self.step_label.setMaximumWidth(330)
+        layout.addWidget(self.step_label)
+        layout.addWidget(_label('Perfil temporário. A memória da sua Bolha fica preservada.'))
+        row = QHBoxLayout()
+        self.next_button = _button('Próximo passo', self.advance)
+        self.stop_button = _button('Parar e voltar', self.reject)
+        row.addWidget(self.next_button)
+        row.addWidget(self.stop_button)
+        layout.addLayout(row)
+        self.finished.connect(self._stop)
+        self.refresh()
+        self.adjustSize()
+
+    def refresh(self):
+        total = len(self.session.current.steps) if self.session.current else 0
+        self.step_label.setText(f'Passo {self.session.step+1} de {total}\n{self.session.instruction}')
+        self.next_button.setEnabled(self.session.has_next)
+
+    def advance(self):
+        try:
+            self.session.next_step()
+        except Exception as error:
+            self.step_label.setText('Teste interrompido: '+str(error))
+            self.next_button.setEnabled(False)
+            self._stop()
+        else:
+            self.refresh()
+
+    def _stop(self, *_):
+        if self.stopped:
+            return
+        self.stopped = True
+        self.on_stop()

@@ -108,7 +108,7 @@ class Item:
 def object_scale(item, avatar_size=136, object_scales=None, bounds=None):
     """Escala única por tipo, relativa ao avatar base de 136 px."""
     kind = getattr(item, 'kind', '')
-    if kind in ('ball','paper'): key='toy'
+    if kind in ('ball','paper','projectile'): key='toy'
     elif kind=='notebook': key='notebook'
     elif kind=='meme': key='reaction'
     elif kind=='note': key='note'
@@ -128,7 +128,7 @@ def object_scale(item, avatar_size=136, object_scales=None, bounds=None):
 
 
 def minimum_object_dimensions(kind):
-    if kind in ('ball','paper'):return (48.,48.)
+    if kind in ('ball','paper','projectile'):return (48.,48.)
     if kind in ('meme',):return (96.,72.)
     if kind=='note':return (124.,84.)
     if kind=='corner':return (96.,72.)
@@ -189,6 +189,22 @@ class SignThing(ObjectThing):
     def __init__(self, text, style='small', scale=1.0):
         super().__init__('sign', min(340, 190 * scale), min(210, 94 * scale), text)
         self.style = style
+        self.board_width, self.board_height = self._w, self._h
+        self.desired_board_width,self.desired_board_height=self._w,self._h
+        self.board_x = self.board_y = self.shaft_x = self.shaft_y = 0.
+        self.attached = False
+
+    def apply_scale(self, scale):
+        if self._applied_scale == max(.3,min(3.,float(scale))):return
+        super().apply_scale(scale)
+        self.board_width, self.board_height = self._w, self._h
+        self.desired_board_width,self.desired_board_height=self._w,self._h
+
+    def snapshot(self):
+        return dict(super().snapshot(), style=self.style, attached=self.attached,
+                    boardWidth=self.board_width, boardHeight=self.board_height,
+                    boardX=self.board_x, boardY=self.board_y,
+                    shaftX=self.shaft_x, shaftY=self.shaft_y)
 
 
 class FlagThing(SignThing):
@@ -237,9 +253,9 @@ class Fireworks(Item):
 
 
 class Ball(Item):
-    def __init__(self, x, y, kind='ball', sprite=None):
+    def __init__(self, x, y, kind='ball'):
         # Margem do desenho original, sem alterar o raio da física existente.
-        super().__init__('paper' if kind == 'papel' else 'ball', 42, 42)
+        super().__init__('paper' if kind == 'papel' else 'projectile' if kind == 'projectile' else 'ball', 42, 42)
         self.body = Body(x, y, 17, 17, circular=kind!='papel')
         self.roll_angle = 0.0  # fase visual original em radianos, não é outro corpo
         self.appearance = 'ball' if kind=='papel' else 'peanut'
@@ -256,5 +272,5 @@ class Ball(Item):
             self.body.step(dt, bounds, [], areas, monitors, displays)
         self.place()
     def snapshot(self):
-        data=super().snapshot();data['angle']=math.degrees(self.roll_angle);data['appearance']=self.appearance
+        data=super().snapshot();data['angle']=math.degrees(self.roll_angle);data['appearance']=self.appearance;data['radius']=self.body.half_w
         return data

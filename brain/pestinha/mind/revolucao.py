@@ -1,78 +1,117 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Adapted from Pestinha by @mille-okws and contributors; see NOTICE.md.
-"""
-REVOLUÇÃO - as bolinhas de papel que o pet atira no cursor quando está em revolução.
-
-Quem decide quando atira é o neurônio PAPEL da rede: a taxa de disparo dele é a
-frequência das bolinhas (sem rajadas nem pausas fixas). Cada bolinha bate em post-its e
-no cursor, e some depois de 10 s. Há no máximo 40 na tela.
-"""
+"""A política neural decide os lançamentos; limites mantêm a cena discreta."""
+import math
 
 from ..body.bolinha import Ball
 from ..ajustes import GANHO_PAPEL
 from ..body.toy import bounce_off, push_from_cursor
 
-MAXIMO_PAPEIS = 40
-VIDA_PAPEL = 10.0          # s
+MAXIMO_PAPEIS = 6
+VIDA_PAPEL = 5.0
+INTERVALO_MINIMO = .6
 
 
 class RevolucaoController:
-    """Revolução: na revolução, o pet atira bolinhas de papel no cursor."""
-    def __init__(self, play, debug, sprite=None):
-        """Guarda o gerador de trajetórias e a imagem da bolinha de papel."""
-        self.play = play                 # Play: monta a trajetória até o cursor
-        self.sprite = sprite             # foto da bolinha de papel (load_sprite) ou None
-        self.papeis = []                 # dicts {bola, nascimento, ultimo_empurrao}
+    def __init__(self, play, debug):
+        self.play = play
+        self.papeis = []
         self.debug = debug
         self.policy = None
         self.rates = {}
         self.energy = 1.
         self.contact = 0.
+        self.last_throw = -math.inf
 
-    def tick(self, now, dt, limites, cursor, vel_cursor, corpo, visivel, revoltado, obstaculos, papel_hz):
-        """Atira conforme o disparo do neurônio PAPEL e move as bolinhas que já estão no ar."""
-        fire = False
-        if revoltado and len(self.papeis) < MAXIMO_PAPEIS:
-            fire = self.policy.event('paper_throw', papel_hz, GANHO_PAPEL, dt, rates=self.rates,
-                    emotion='revolta', energy=self.energy, contact=self.contact) if self.policy else False
+    def tick(self, now, dt, limites, cursor, vel_cursor, corpo, visivel, revoltado,
+             obstaculos, papel_hz, *, toy_appearance='peanut', enabled=True,
+             sense_cursor=True, areas=None, monitors=None, displays=None):
+        if not (enabled and visivel and revoltado):
+            self.fechar()
+            return
+        areas = list([limites] if areas is None else areas)
+        if not areas:
+            self.fechar()
+            return
+        self._mover(now, dt, limites, cursor, vel_cursor, obstaculos,
+                    sense_cursor, areas, monitors, displays)
+        if len(self.papeis) >= MAXIMO_PAPEIS or now-self.last_throw < INTERVALO_MINIMO:
+            return
+        fire = self.policy.event('paper_throw', papel_hz, GANHO_PAPEL, dt,
+                                rates=self.rates, emotion='revolta', energy=self.energy,
+                                contact=self.contact) if self.policy else False
         if fire:
-            self._atirar(now, cursor, corpo, visivel)
-        self._mover(now, dt, limites, cursor, vel_cursor, obstaculos)
+            target = self._target(corpo, cursor, sense_cursor, areas)
+            self._atirar(now, target, corpo, toy_appearance, areas)
 
-    def _atirar(self, now, cursor, corpo, visivel):
-        """Cria uma bolinha de papel saindo do pet e a lança na direção do cursor."""
-        papel = Ball(corpo.x, corpo.y - 40, kind="papel", sprite=self.sprite)
-        self.play.throw_at(papel, cursor, 0.8, corpo.x, corpo.y - 40)
-        papel.setVisible(visivel)
-        self.papeis.append({"bola": papel, "nascimento": now, "ultimo_empurrao": -1e9})
+    def _target(self, body, cursor, sense_cursor, areas):
+        def contains(area, point):
+            return area[0] <= point[0] < area[2] and area[1] <= point[1] < area[3]
+        # Não mira num vão, numa tela bloqueada ou num sensor desligado.
+        if sense_cursor and any(contains(area, cursor) for area in areas):
+            area = next(area for area in areas if contains(area, cursor))
+            target = cursor
+        else:
+            area = next((area for area in areas if contains(area, (body.x, body.y))), areas[0])
+            left, top, right, bottom = area
+            side = -1 if body.x-left > right-body.x else 1
+            target = (body.x+side*min(240., (right-left)*.35), body.y-min(130.,(bottom-top)*.25))
+            options = {'left': (left+(right-left)*.2, top+(bottom-top)*.45),
+                       'up': ((left+right)/2, top+(bottom-top)*.2),
+                       'right': (right-(right-left)*.2, top+(bottom-top)*.45)}
+            if self.policy:
+                choice = self.policy.choose('revolution_target', list(options), rates=self.rates,
+                    emotion='revolta', energy=self.energy, contact=self.contact,
+                    weights={key:max(.1,math.dist((body.x,body.y),point)/300.) for key,point in options.items()})
+                target = options.get(choice, target)
+        left, top, right, bottom = area
+        margin = min(30., (right-left)/4, (bottom-top)/4)
+        return (max(left+margin, min(right-margin, target[0])),
+                max(top+margin, min(bottom-margin, target[1])))
 
-    def _mover(self, now, dt, limites, cursor, vel_cursor, obstaculos):
-        """Move as bolinhas de papel; as que acertam algo ou saem da tela são removidas."""
-        vivos = []
-        for papel in self.papeis:
-            bola = papel["bola"]
-            if now - papel["nascimento"] > VIDA_PAPEL:
-                bola.close()
-                bola.deleteLater()
+    def _atirar(self, now, target, body, toy_appearance, areas):
+        area = next((area for area in areas if area[0] <= body.x < area[2]
+                     and area[1] <= body.y < area[3]), areas[0])
+        radius = 17.
+        x = max(area[0]+radius, min(area[2]-radius, body.x))
+        y = max(area[1]+radius, min(area[3]-radius, body.y-body.half_h*.6))
+        ball = Ball(x, y, kind='projectile')
+        ball.appearance = 'ball' if toy_appearance == 'peanut' else 'peanut'
+        self.play.throw_at(ball, target, .8, x, y)
+        ball.show()
+        self.papeis.append({'bola':ball, 'nascimento':now, 'ultimo_empurrao':-math.inf})
+        self.last_throw = now
+
+    def _mover(self, now, dt, limites, cursor, vel_cursor, obstacles,
+               sense_cursor, areas, monitors, displays):
+        alive = []
+        for entry in self.papeis:
+            ball = entry['bola']
+            if now-entry['nascimento'] >= VIDA_PAPEL:
+                ball.deleteLater()
                 continue
-            bola.step(dt, limites)
-            bounce_off(bola, obstaculos)
-            papel["ultimo_empurrao"] = push_from_cursor(bola, cursor, vel_cursor, now, papel["ultimo_empurrao"])
-            vivos.append(papel)
-        self.papeis = vivos
+            area = next((area for area in areas if area[0] <= ball.body.x < area[2]
+                         and area[1] <= ball.body.y < area[3]), None)
+            if area is None:
+                # A tela foi desconectada/bloqueada: descarte o efeito, sem teleportá-lo.
+                ball.deleteLater()
+                continue
+            ball.step(dt, area, areas, monitors, displays)
+            bounce_off(ball, obstacles)
+            if sense_cursor:
+                entry['ultimo_empurrao'] = push_from_cursor(
+                    ball, cursor, vel_cursor, now, entry['ultimo_empurrao'])
+            alive.append(entry)
+        self.papeis = alive
 
     def janelas(self):
-        """Janelas das bolinhas de papel agora (para o app não as contar como janelas de outros programas)."""
-        return [p["bola"] for p in self.papeis]
+        return [entry['bola'] for entry in self.papeis]
 
     def esconder(self):
-        """Esconde as bolinhas de papel (sem apagar)."""
-        for papel in self.papeis:
-            papel["bola"].setVisible(False)
+        for entry in self.papeis:
+            entry['bola'].hide()
 
     def fechar(self):
-        """Fecha as janelas das bolinhas ao sair."""
-        for papel in self.papeis:
-            papel["bola"].close()
-            papel["bola"].deleteLater()
-        self.papeis = []
+        for entry in self.papeis:
+            entry['bola'].deleteLater()
+        self.papeis.clear()

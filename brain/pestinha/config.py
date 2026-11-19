@@ -3,8 +3,7 @@
 """
 CONFIG - caminhos, permissões da sessão, perfis de tempo e pets.
 
-Tudo o que o usuário escolhe na tela inicial mora em memory/permissions.json (ver paths.py)
-e é gravado a CADA mudança (se o programa cair, a escolha não se perde).
+Perfis e conteúdo herdados do Pestinha. As preferências da Bolha ficam em bolha/preferences.py.
 """
 
 import random
@@ -53,62 +52,6 @@ DEFAULT_PERMISSIONS = {
     "bolinha": True,           # a bolinha para ele brincar
     "fogos": True,             # fogo de artifício quando ele fica feliz de verdade (rede)
 }
-
-# (chave, rótulo, descrição) na ordem da tela inicial
-PERMISSION_GROUPS = [
-    ("Travessuras", [
-        ("travessuras", "Travessuras", "Interruptor geral: sem ele, nada de memes, fotos ou bilhetes."),
-        ("memes", "Trazer memes", "Imagens de pets/<pet>/memes/<emoção>/."),
-        ("fotos", "Trazer fotos", "Imagens de assets/comum/fotos/."),
-        ("bilhetes", "Deixar bilhetes", "Post-its com frases de pets/<pet>/recadinhos.txt."),
-    ]),
-    ("Interação", [
-        ("cutucar", "Cutucar", "Clicar nele é uma cutucada, e ele reage."),
-        ("carinho", "Carinho e aprendizado",
-         "Passar o mouse para lá e para cá em cima dele é carinho. Ele aprende a gostar "
-         "do que estava acontecendo quando ganhou carinho (e a desgostar de ser dispensado)."),
-        ("arrastar", "Arrastar e arremessar", "Segurar, girar com a rodinha e jogar longe."),
-        ("pousar_janelas", "Pousar em janelas", "Solto no ar, ele pode cair em cima da barra de título."),
-    ]),
-    ("Contexto", [
-        ("tela_cheia", "Aparecer em tela cheia (experimental)",
-         "Por padrão ele some em jogos, vídeos e apresentações."),
-    ]),
-    ("Rotina", [
-        ("rotina", "Registrar minha rotina",
-         "Grava 1 linha por minuto em timeline.csv, na pasta de dados: hora, categoria de atividade, "
-         "trocas de programa, ocioso. Nunca títulos, sites ou conteúdo. O pet ainda não usa esse histórico."),
-    ]),
-    ("Brincadeira", [
-        ("fogos", "Fogos de artifício", "Quando ele fica muito feliz, a alegria da rede pode soltar um fogo."),
-        ("bolinha", "Bolinha", "Uma bolinha para ele brincar. Se você levar para longe, ele reage (pode ficar triste, bravo ou ir atrás)."),
-    ]),
-    ("Teste", [
-        ("modo_teste", "Modo teste", "Tempos curtos: travessuras e emoções acontecem em segundos."),
-        ("mostrar_emocao", "Mostrar nome da emoção", "Texto pequeno embaixo dele (só no modo teste)."),
-    ]),
-]
-
-
-def permissoes_validas(novo):
-    """Mantém só as chaves conhecidas e com o mesmo tipo do padrão."""
-    return {k: v for k, v in novo.items()
-            if k in DEFAULT_PERMISSIONS and type(v) is type(DEFAULT_PERMISSIONS[k])}
-
-
-def load_permissions(paths):
-    """Lê as permissões salvas e completa as que faltam com o padrão (um arquivo antigo continua valendo)."""
-    perms = dict(DEFAULT_PERMISSIONS)
-    saved = read_json(paths.permissions, default=None)
-    if isinstance(saved, dict):
-        perms.update(permissoes_validas(saved))
-    return perms
-
-
-def save_permissions(paths, perms):
-    """Grava as permissões em memory/permissions.json."""
-    write_json(paths.permissions, perms, indent=1)
-
 
 # ============================================================
 # PERFIS DE TEMPO (segundos)
@@ -302,12 +245,6 @@ def meme_for(memes_dir, emotion):
         return random.choice(own)
     every = [img for e in EMOTIONS for img in list_images(memes_dir / e)]
     return random.choice(every) if every else None
-
-
-def random_photo(fotos_dir):
-    """Uma foto ao acaso da pasta de fotos, ou None se não houver."""
-    photos = list_images(fotos_dir)
-    return random.choice(photos) if photos else None
 
 
 class Notes:

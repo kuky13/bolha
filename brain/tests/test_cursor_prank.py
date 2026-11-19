@@ -111,19 +111,19 @@ def test_keyboard_activity_also_cancels_an_idle_approach(tmp_path, monkeypatch):
     assert not game.cursor_prank.active
 
 
-def test_capture_chews_until_mouse_moves_then_learns_neutral_escape(tmp_path, monkeypatch):
+def test_mouse_movement_interrupts_a_short_chew_and_learns_neutral_escape(tmp_path, monkeypatch):
     game = prepared_game(tmp_path, monkeypatch)
     game.cursor = (game.body.x, game.body.y + game.body.half_w * 18. / 49.)
     assert game.cursor_prank.update(game, .016, 100.)
     assert game.cursor_prank.phase == 'swallow' and game.cursor_prank.hidden_cursor
     assert game.cursor_prank.update(game, .016, 100.4)
     assert game.cursor_prank.phase == 'chew'
-    assert game.cursor_prank.update(game, .016, 10000.)
-    game.interact(dict(type='cursor', x=game.cursor[0] + 20., y=game.cursor[1]), now=10000.1)
+    assert game.cursor_prank.update(game, .016, 100.8)
+    game.interact(dict(type='cursor', x=game.cursor[0] + 20., y=game.cursor[1]), now=100.9)
     assert not game.cursor_prank.hidden_cursor
     assert game.cursor_prank.phase == 'spit'
     assert game.memory.recent[-1]['valencia'] == 0.
-    game.interact(dict(type='caress'), now=10001.)
+    game.interact(dict(type='caress'), now=101.)
     assert game.memory.recent[-1]['valencia'] == .8
     assert game.intelligence.history[-1]['source'] == 'cursor_prank_policy'
 
@@ -199,3 +199,31 @@ def test_angry_reaction_bites_without_an_idle_sensor_and_spits_on_its_own(tmp_pa
     assert not prank.update(game,.016,101.5)
     assert prank.phase == 'spit' and not prank.hidden_cursor
     assert game.memory.recent[-1]['resultado'] == 'cuspiu o ponteiro'
+
+
+@pytest.mark.parametrize('angry', [False, True])
+def test_two_chews_restore_the_pointer_without_waiting_for_the_user(tmp_path, monkeypatch, angry):
+    from cursor_prank import CHEW_SECONDS
+    game = prepared_game(tmp_path, monkeypatch)
+    prank = game.cursor_prank
+    prank.angry_attempt = angry
+    prank._enter('chew', 100.)
+    assert prank.update(game, .016, 100.+CHEW_SECONDS-.01)
+    assert prank.hidden_cursor
+    assert not prank.update(game, .016, 100.+CHEW_SECONDS+.01)
+    assert prank.phase == 'spit' and not prank.hidden_cursor
+    prank.update(game, .016, 102.2)
+    assert prank.phase == 'recover'
+    prank.update(game, .016, 103.3)
+    assert not prank.active and not prank.hidden_cursor
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+@pytest.mark.parametrize('controller', ['protest', 'sad'])
+def test_disabled_protests_do_not_block_cursor_prank_but_enabled_ones_do(tmp_path, monkeypatch, enabled, controller):
+    game = prepared_game(tmp_path, monkeypatch)
+    game.configure({'protestsEnabled': enabled})
+    getattr(game, controller).stage = 2
+    game.cursor_prank.update(game, .016, 100.)
+    assert game.cursor_prank.active is not enabled
+    assert not game.cursor_prank.hidden_cursor
