@@ -32,6 +32,7 @@ def _text_lines(text, width, font, device=None):
         if not line.isValid():
             break
         line.setLineWidth(max(1., width))
+        line.setLeadingIncluded(True)
         line.setPosition(QPointF(0., y))
         lines.append(line)
         y += line.height()

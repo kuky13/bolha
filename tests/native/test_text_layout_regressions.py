@@ -1,10 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
 from PySide6.QtCore import QRectF
-from PySide6.QtGui import QImage, QPainter, QColor
+from PySide6.QtGui import QImage, QPainter, QColor, QFont, QFontMetricsF
 import pytest
 from bolha.speech import measure_text_box, paint_box_text, _text_lines, bubble_font, SpeechWindow
 from game import Game
+
+
+@pytest.mark.parametrize('family', ['Segoe UI', 'Liberation Sans', 'DejaVu Sans'])
+def test_multiline_text_reserves_font_leading(qt_application, family):
+    font = QFont(family, 10)
+    layout, lines, height = _text_lines('Trabalhando muito ou só encarando a tela comigo?', 190., font)
+    assert len(lines) >= 2
+    assert all(line.leadingIncluded() for line in lines)
+    assert all(line.height() >= line.ascent()+line.descent()+max(0.,line.leading()) for line in lines)
+    assert height >= QFontMetricsF(font).height()*len(lines)
 
 
 @pytest.mark.parametrize('scale', [1., 1.25, 1.5, 2.])
