@@ -71,6 +71,8 @@ class Intelligence:
         self.cpu_seconds = 0.
         self.decisions = 0
         self.memory_strikes = 0
+        self.memory_ok = 0
+        self._budget_paused = False
         self.current_decision = None
         self.history = deque(maxlen=32)
         self.expression_until = 0.
@@ -79,14 +81,14 @@ class Intelligence:
     def feedback(self, value, now):
         self.last_interaction = now
         if self.episode is not None and any(ep is self.episode for ep in self.memory.open):
-            self.memory._resolve(self.episode, 'carinho' if value > 0 else 'pedido de sossego', value)
+            self.memory.resolve(self.episode, 'carinho' if value > 0 else 'pedido de sossego', value)
         self.episode = None
         if value < 0:
             self.goal, self.until, self.next_choice = 'watch', now+30, now+30
 
     def clear_goal(self):
         if self.episode is not None and any(ep is self.episode for ep in self.memory.open):
-            self.memory._resolve(self.episode, 'interrompido', 0.)
+            self.memory.resolve(self.episode, 'interrompido', 0.)
         self.episode = None
         self.goal = None
         self.until = 0.
@@ -186,11 +188,45 @@ class Intelligence:
         self.history.append(dict(self.current_decision))
         return action
 
+    def deslocar(self, segundos):
+        if segundos <= 0:
+            return
+        for attr in ('until', 'next_choice', 'next_sample', 'expression_until', 'next_blink', 'next_quirk', 'next_wink'):
+            val = getattr(self, attr)
+            if val > 0:
+                setattr(self, attr, val + segundos)
+        if self.last_interaction > -1e8:
+            self.last_interaction += segundos
+
+    def _goal_estimate(self, activity, emotion, ctx, action):
+        if action in self.memory.table.get(ctx, {}):
+            return self.memory.estimate(ctx, action)
+        suffix = f'|{activity}|{emotion}'
+        matches = [acts[action] for c, acts in self.memory.table.items() if c.endswith(suffix) and action in acts]
+        if matches:
+            total_n = sum(n for n, _ in matches)
+            if total_n > 0:
+                return sum(n * mean for n, mean in matches) / total_n
+        return self.memory.estimate(ctx, action)
+
     def budget(self, rss_mib, limit=100_000_000/1048576):
-        self.memory_strikes = self.memory_strikes+1 if rss_mib > limit else 0
-        if self.memory_strikes >= 3:
-            self.compatibility = 'Cérebro acima do orçamento: autonomia adicional em pausa.'
-            self.clear_goal()
+        if rss_mib > limit:
+            self.memory_strikes += 1
+            self.memory_ok = 0
+            if self.memory_strikes >= 3:
+                self._budget_paused = True
+                self.compatibility = 'Cérebro acima do orçamento: autonomia adicional em pausa.'
+                self.clear_goal()
+        else:
+            self.memory_strikes = 0
+            if self._budget_paused and rss_mib <= limit * 0.85:
+                self.memory_ok += 1
+                if self.memory_ok >= 3:
+                    self._budget_paused = False
+                    self.compatibility = ''
+                    self.memory_ok = 0
+            else:
+                self.memory_ok = 0
 
     def tick(self, now, wall, activity, emotion, rates, energy, lonely, allowed, asleep=False):
         started = time.process_time()
@@ -219,19 +255,24 @@ class Intelligence:
             ctx = f'{prefix}|{activity}|{emotion}'
             actions = ['goal:'+g for g in allowed if g in GOALS]
             if not actions: return None
-            action = self.memory.choose(ctx, actions, .12, {'goal:'+g:v for g,v in bias.items()})
+            ctx_table = self.memory.table.get(ctx, {})
+            choice_bias = {
+                'goal:'+g: bias[g] + (0. if ('goal:'+g) in ctx_table else self._goal_estimate(activity, emotion, ctx, 'goal:'+g) - self.memory.estimate(ctx, 'goal:'+g))
+                for g in allowed if g in GOALS
+            }
+            action = self.memory.choose(ctx, actions, .12, choice_bias)
             self.goal = action[5:]
             self.repeats = self.repeats+1 if self.last_goal == self.goal else 1
             self.last_goal = self.goal
             duration = self.rng.uniform(12, 32)
             self.until = now+duration
             self.next_choice = now+1
-            self.episode = self.memory.start(ctx, action)
+            self.episode = self.memory.start(ctx, action, goal=True)
             self.decisions += 1
             factors = dict(neural={key: float(rates.get(key,0.)) for key in ('WANDER','CHEER','SENTAR')},
                            emotion=emotion, drives=dict(energy=energy, contact=lonely),
                            memory=dict(context=ctx, action=action,
-                                       estimate=self.memory.estimate(ctx, action)),
+                                       estimate=self._goal_estimate(activity, emotion, ctx, action)),
                            habit=habit)
             self.current_decision = dict(action=self.goal, target=None, intensity=max(0., min(1., bias.get(self.goal, 0.))),
                                          duration=duration, source='lif+episodic_policy', factors=factors)

@@ -1301,8 +1301,8 @@ class Game:
         if self.paused_at is not None:
             elapsed = now - self.paused_at
             self.castigo.deslocar(elapsed); self.mesa.deslocar(elapsed)
-            self.memory.deslocar(elapsed)
-            self.intelligence.until += elapsed
+            self.memory.deslocar(elapsed); self.conditioning.deslocar(elapsed)
+            self.intelligence.deslocar(elapsed)
             self.paused_at = None; self.last_think = now
         if self.pop_started is not None:
             self.revolucao.fechar()

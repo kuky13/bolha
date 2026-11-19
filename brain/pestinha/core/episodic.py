@@ -136,10 +136,10 @@ class EpisodicMemory:
 
     # ---------------- episódios ----------------
 
-    def start(self, ctx, action, thing=None):
+    def start(self, ctx, action, thing=None, goal=False):
         """Começa um episódio: registra a ação e o contexto, esperando o resultado (aceitar, dispensar, fugir)."""
         if len(self.open) >= 12:
-            self._resolve(self.open[0], 'sem resposta', 0.0)
+            self.resolve(self.open[0], 'sem resposta', 0.0)
         self._contador += 1
         episode = {
             "id": f"{time.time_ns()}-{self._contador}",     # identidade estável (para revisar depois)
@@ -148,10 +148,12 @@ class EpisodicMemory:
             "acao": action,
             "inicio": time.monotonic(),
             "thing": thing,
+            "goal": bool(goal),
             "carinho": False,
         }
         self.open.append(episode)
-        self.ultima_acao = episode
+        if not goal:
+            self.ultima_acao = episode
         return episode
 
     def punir(self, now, janela):
@@ -165,7 +167,7 @@ class EpisodicMemory:
             return None
         self.ultima_acao = None
         if any(aberto is ep for aberto in self.open):
-            self._resolve(ep, "castigo logo depois", CASTIGO_VALENCIA)
+            self.resolve(ep, "castigo logo depois", CASTIGO_VALENCIA)
         else:
             self._revisar(ep["id"], "castigo logo depois", CASTIGO_VALENCIA)
         return ep["acao"]
@@ -188,12 +190,13 @@ class EpisodicMemory:
         for ep in list(self.open):
             if ep["thing"] is thing:
                 valence = dismiss_valence(elapsed, patience)
-                self._resolve(ep, f"dispensado em {elapsed:.1f} s", valence)
+                self.resolve(ep, f"dispensado em {elapsed:.1f} s", valence)
 
     def on_interaction(self):
         """Você deu atenção ao pet logo depois de uma ação dele: conta a favor."""
         for ep in self.open:
-            ep["carinho"] = True
+            if not ep.get("goal"):
+                ep["carinho"] = True
 
     def tick(self, now, keep_ok, window):
         """Ausência de resposta é neutra; carinho e dispensa são sinais explícitos."""
@@ -201,10 +204,13 @@ class EpisodicMemory:
             age = now - ep["inicio"]
             if ep["thing"] is not None:
                 if age >= keep_ok:
-                    self._resolve(ep, 'recebeu carinho' if ep['carinho'] else 'sem resposta', 0.6 if ep['carinho'] else 0.0)
+                    self.resolve(ep, 'recebeu carinho' if ep['carinho'] else 'sem resposta', 0.6 if ep['carinho'] else 0.0)
+            elif ep.get("goal"):
+                if age >= max(window, 60.0):
+                    self.resolve(ep, "nada aconteceu", 0.0)
             elif age >= window:
                 result = "você deu atenção depois" if ep["carinho"] else "nada aconteceu"
-                self._resolve(ep, result, 0.5 if ep["carinho"] else 0.0)
+                self.resolve(ep, result, 0.5 if ep["carinho"] else 0.0)
 
     def deslocar(self, segundos):
         """A pausa não conta: os episódios pendentes ganham o tempo parado de volta."""
@@ -225,9 +231,9 @@ class EpisodicMemory:
         """Objetos limpos pela bandeja: leve negativo (você quis a tela limpa)."""
         for ep in list(self.open):
             if ep["thing"] is not None:
-                self._resolve(ep, "limpo pela bandeja", -0.1)
+                self.resolve(ep, "limpo pela bandeja", -0.1)
 
-    def _resolve(self, ep, result, valence):
+    def resolve(self, ep, result, valence):
         """Fecha um episódio com o resultado final e grava no histórico e no aprendizado."""
         self.open.remove(ep)
         record = {
@@ -243,6 +249,8 @@ class EpisodicMemory:
         self._learn(record["contexto"], record["acao"], valence)
         self.dirty = True
         log(f"[memória] {record['contexto']} -> {record['acao']}: {result} ({valence:+.2f})")
+
+    _resolve = resolve
 
     def _learn(self, ctx, action, valence):
         """Atualiza as médias de uma ação no contexto e no geral (limitadas, para não travar em um valor antigo)."""
@@ -268,8 +276,11 @@ class EpisodicMemory:
                           totals.setdefault(ep["acao"], [0.0, 0.0])):
                 stats[0] += w
                 stats[1] += w * ep["valencia"]
-        self.table = {c: {a: [min(n, MAX_COUNT), s / n] for a, (n, s) in acts.items()} for c, acts in table.items()}
-        self.totals = {a: [min(n, MAX_COUNT), s / n] for a, (n, s) in totals.items()}
+        self.table = dict(list({
+            c: dict(list({a: [min(n, MAX_COUNT), s / n] for a, (n, s) in acts.items()}.items())[-MAX_ACTIONS:])
+            for c, acts in table.items()
+        }.items())[-MAX_CONTEXTS:])
+        self.totals = dict(list({a: [min(n, MAX_COUNT), s / n] for a, (n, s) in totals.items()}.items())[-MAX_ACTIONS:])
         self.dirty = True
         self.save()
         return self.preferences()
