@@ -5,7 +5,9 @@ do sistema de pet virtual criado por [mille-okws](https://github.com/mille-okws)
 e colaboradores. Adaptamos o cérebro, a física e a aplicação para a personagem
 Bolha. Contribuições da comunidade são bem-vindas.
 
-![A Bolha em repouso, piscando, recebendo carinho, levando um susto, bocejando, soluçando, dormindo e mastigando](docs/images/bolha-050-expressoes.png)
+![Bolha 0.5.4: texto inteiro na placa pequena, revolução com brinquedos, irritação ao segurar e mastigação curta](docs/images/bolha-054-expressoes.png)
+
+[Ver as novas animações](docs/previews/bolha-054-animacoes.gif)
 
 A Bolha passeia, pula e quica pela sua tela, brinca com um amendoim, senta no
 próprio notebook e aprende com suas interações.
@@ -15,7 +17,7 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.5.4 está em validação: corrige texto cortado nas placas e bilhetes, mantém a irritação ao soltar a Bolha e acrescenta controles individuais e testes das atividades. Veja o [relatório da revisão](docs/AUDITORIA-0.5.4.md). A versão publicada continua disponível no link de download acima.
+A 0.5.4 corrige texto cortado nas placas e bilhetes, mantém a irritação ao soltar a Bolha e acrescenta controles individuais e testes das atividades. Veja o [relatório da revisão](docs/AUDITORIA-0.5.4.md).
 A série 0.5 aproxima as expressões e as atividades do Android da versão para PC,
 com central de configurações, painel neural e movimento opcional ao chacoalhar.
 No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
@@ -24,7 +26,7 @@ mastigá-lo e cuspi-lo. Mexer ou clicar devolve o ponteiro na hora. Também é p
 Veja as [notas da versão](docs/RELEASE.md) e a
 [revisão das mudanças recentes do Pestinha](docs/PESTINHA-2026-11.md).
 
-*Expressões da 0.5.0 renderizadas pelo Qt em Linux. A validação em Windows é
+*Cenas dirigidas da 0.5.4 renderizadas pelo Qt em Linux. A validação em Windows é
 separada. A personagem Bolha
 é arte própria de André Ribeiro Lima (KukySolutions), sob
 [GPL-3.0-or-later](licenses/BOLHA-ASSETS.md). O Mini terminal foi redesenhado a partir do notebook do Pestinha.
