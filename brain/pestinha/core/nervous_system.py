@@ -382,14 +382,16 @@ class LIFBrain(Brain):
             cursor += n
             return pool
 
+        sensory_step = 0.88 / max(1, len(SENSORY_SPEC) - 1)
         for i, (name, (n, *_rest)) in enumerate(SENSORY_SPEC.items()):
-            add_pool(name, "sensory", n, "sens", (0.05, 0.06 + i * 0.0933))
+            add_pool(name, "sensory", n, "sens", (0.05, 0.06 + i * sensory_step))
 
         for name, kind, n, _tau, _b, _bt, center in INTER_SPEC:
             add_pool(name, "inter", n, kind, center)
 
+        motor_step = 0.88 / max(1, len(MOTOR_SPEC) - 1)
         for i, (name, n, *_rest) in enumerate(MOTOR_SPEC):
-            add_pool(name, "motor", n, "exc", (0.95, 0.10 + i * 0.16))
+            add_pool(name, "motor", n, "exc", (0.95, 0.06 + i * motor_step))
 
         self.N = cursor
         self.Ns = sum(p["n"] for p in self.pools if p["group"] == "sensory")
@@ -644,19 +646,20 @@ class LIFBrain(Brain):
         self._apply_learning()
 
     def _apply_learning(self):
-        """Recalcula as sinapses que aprendem, a partir do rastro (trace) de atividade recente."""
-        W = self.W_base.copy()
-        for i, c in enumerate(self.sensory_names):
-            a = self.pool(c)
-            for j, post in enumerate(self.plastic_posts):
-                if self.learned[i, j] == 0.0:
-                    continue
-                b = self.pool(post)
-                W[a["start"]:a["start"] + a["n"], b["start"]:b["start"] + b["n"]] += (
-                    self.learned[i, j] * self.plastic_masks[(c, post)]
-                )
-        self.W = W
-        self.W_lif = np.ascontiguousarray(W[:, self.Ns:])
+        """Atualiza apenas as sinapses plásticas em W e W_lif sem realocar a matriz inteira."""
+        Ns = self.Ns
+        for j, post in enumerate(self.plastic_posts):
+            b = self.pool(post)
+            b_sl = slice(b["start"], b["start"] + b["n"])
+            lif_sl = slice(b["start"] - Ns, b["start"] - Ns + b["n"])
+            for i, c in enumerate(self.sensory_names):
+                a = self.pool(c)
+                a_sl = slice(a["start"], a["start"] + a["n"])
+                delta = self.learned[i, j]
+                block = self.W_base[a_sl, b_sl] if delta == 0.0 else self.W_base[a_sl, b_sl] + delta * self.plastic_masks[(c, post)]
+                self.W[a_sl, b_sl] = block
+                if b["start"] >= Ns:
+                    self.W_lif[a_sl, lif_sl] = block
 
     def learned_summary(self, top=5):
         """As associações mais fortes que ele aprendeu: [(canal, alvo, peso)]."""
