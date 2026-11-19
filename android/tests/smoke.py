@@ -166,8 +166,19 @@ def set_slider(label, fraction):
     adb('shell', 'input', 'swipe', str(x), str((y1+y2)//2), str(x), str((y1+y2)//2), '180')
 
 
-def select_spinner(value):
-    tap(control('', kind='Spinner'))
+def select_spinner(value, *, selected=None):
+    if selected is None:
+        spinner = control('', kind='Spinner')
+    else:
+        control(selected, exact=True, kind='TextView')
+        # Select the owning Spinner by its current row, never by the order of
+        # unrelated selectors elsewhere in this scrollable section.
+        candidates = [node for node in hierarchy()
+                      if node.get('package') == PACKAGE and node.get('class', '').endswith('Spinner')
+                      and any(child.get('text') == selected for child in node.iter('node'))]
+        assert len(candidates) == 1, f'Seletor ambíguo ou ausente: {selected}'
+        spinner = candidates[0]
+    tap(spinner)
     # Native dropdown entries can have an Android resource ID while retaining
     # the owning application's package, so selectors do not depend on IDs.
     tap(control(value, exact=True, kind='TextView'))
@@ -451,7 +462,7 @@ def smoke(apk, output, previous_apk=None):
         tap(control('Mostrar / guardar brinquedo', exact=True, kind='Button'))
         tap(control('Mostrar / guardar brinquedo', exact=True, kind='Button'))
         control('Testar expressões')
-        select_spinner('bravo')
+        select_spinner('bravo', selected='observando')
         tap(control('Ver expressão', exact=True, kind='Button'))
         screenshot(output, 'expressao-brava.png')
         tap(control('Encerrar teste', exact=True, kind='Button'))
