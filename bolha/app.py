@@ -65,6 +65,8 @@ class NativeApp:
         self.started=time.monotonic();self.errors=[];self.quitting=False;self.updating=False;self.suspended=False
         self.frame_times=deque(maxlen=1800);self.think_times=deque(maxlen=600);self.first_paint=False;self.first_think=False;self.healthy=False
         self.dialogs=[];self.updater=None;self.connected_screens=set();self.update_dialog=None;self.reset_pending=False
+        self.activity_test = None
+        self.activity_test_dialog = None
         self._health(False)
         self.store=PreferencesStore(self.data_dir)
         content=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parents[1]))/'assets'/'bolha'/'content'
@@ -140,14 +142,19 @@ class NativeApp:
         now=time.monotonic();dt=now-self.last_tick;self.last_tick=now;self.frame_times.append(dt*1000)
         try:
             self.pet.poll_interaction();self.scene.poll_interactions()
-            if self.store.preferences.get('senseCursor',True):
+            if getattr(self.game, 'prefs', self.store.preferences).get('senseCursor',True):
                 point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()), now=now)
             else:self.game.cursor=(self.game.body.x,self.game.body.y)
             self.game.tick(dt,now);self.pet.sync();self.scene.sync()
             self.sync_pingpong()
             self.game.excluded.update(self.scene.ids())
         except Exception as error:
-            self.cancel_interactions();self.frame.stop();self.warn('A rotina foi pausada: '+str(error));log('[erro]',repr(error))
+            if getattr(self, 'activity_test', None) is not None:
+                self.stop_activity_test()
+                self.warn('Teste encerrado; o perfil original foi preservado: '+str(error))
+            else:
+                self.cancel_interactions();self.frame.stop();self.warn('A rotina foi pausada: '+str(error))
+            log('[erro]',repr(error))
     def cancel_interactions(self):
         self.pet.cancel_interaction();self.scene.cancel_interactions()
     def _application_state_changed(self,state):
@@ -269,6 +276,8 @@ class NativeApp:
         self.cancel_interactions()
         self.game.interact(dict(type='panel',value=True))
     def _show_dialog(self,cls):
+        if self.activity_test is not None:
+            self.stop_activity_test()
         self._panel_opened()
         for dialog in self.dialogs:
             if isinstance(dialog,cls):dialog.show();dialog.raise_();dialog.activateWindow();return
@@ -280,7 +289,84 @@ class NativeApp:
     def show_neural(self):
         from .dialogs import NeuralDialog
         self._show_dialog(NeuralDialog)
+    def start_activity_test(self, key):
+        from .activity_tests import ActivityTestSession
+        from .dialogs import ActivityTestDialog
+        from .motion import ExpressionMotion
+        if self.activity_test is not None:
+            self.stop_activity_test()
+        if self.reset_pending or self.updating:
+            return 'Aguarde a operação em andamento antes de testar.'
+        # Only drain already queued writes; starting a test never saves the live game.
+        if not self.writer.flush(timeout=0):
+            return 'Há uma gravação em andamento. Tente novamente em alguns segundos.'
+        session = None
+        try:
+            session = ActivityTestSession(self.game)
+            result = session.run(key)
+            if session.current is None:
+                session.stop()
+                return result
+            self.cancel_interactions()
+            self._live_game, self._live_scene = self.game, self.scene
+            self._test_started = time.monotonic()
+            self._test_dialogs = [dialog for dialog in self.dialogs if dialog.isVisible()]
+            for dialog in self._test_dialogs:
+                dialog.hide()
+            self.scene.speech.hide()
+            for window in self.scene.windows.values():
+                window.hide()
+            self.activity_test = session
+            self.game = session.game
+            self.pet.game, self.pet.body = self.game, self.game.body
+            self.pet.motion = ExpressionMotion(time.monotonic())
+            self.scene = NativeScene(self.game)
+            self.activity_test_dialog = ActivityTestDialog(session, self.stop_activity_test)
+            self.activity_test_dialog.show()
+            self.refresh_desktop()
+            self.last_tick = time.monotonic()
+            return ''
+        except Exception as error:
+            if self.activity_test is not None:
+                self.stop_activity_test()
+            elif session is not None:
+                session.stop()
+            return 'O teste foi cancelado e o perfil foi preservado: '+str(error)
+    def stop_activity_test(self):
+        from .motion import ExpressionMotion
+        session = self.activity_test
+        if session is None:
+            return
+        self.activity_test = None
+        dialog, self.activity_test_dialog = self.activity_test_dialog, None
+        try:
+            self.cancel_interactions()
+            self.scene.close()
+        finally:
+            try:
+                session.stop()
+            finally:
+                self.game, self.scene = self._live_game, self._live_scene
+                self.pet.game, self.pet.body = self.game, self.game.body
+                self.pet.motion = ExpressionMotion(time.monotonic())
+                elapsed = time.monotonic()-self._test_started
+                self.game.castigo.deslocar(elapsed)
+                self.game.mesa.deslocar(elapsed)
+                self.game.memory.deslocar(elapsed)
+                self.game.intelligence.until += elapsed
+                self.game.last_think = self.game.last_save = time.monotonic()
+                for window in self.scene.windows.values():
+                    window._reaction_tick = time.monotonic()
+                if dialog is not None:
+                    dialog.close()
+                for previous in self._test_dialogs:
+                    previous.show()
+                self.game.panel = any(d.isVisible() for d in self.dialogs)
+                self.refresh_desktop()
+                self.last_tick = time.monotonic()
     def save_preferences(self,patch):
+        if self.activity_test is not None:
+            self.stop_activity_test()
         result=self.store.save(patch);self.game.configure(result);self.pet.sync();self.scene.sync();return result
     def reset_appearance(self):
         result=self.store.reset_appearance();self.game.configure(result);return result
@@ -315,6 +401,7 @@ class NativeApp:
     def before_install(self):
         from concurrent.futures import Future
         import threading
+        self.stop_activity_test()
         self.game.stop_pingpong()
         self.sync_pingpong()
         self.game.save();self.writer.retry();future=Future()
@@ -356,6 +443,7 @@ class NativeApp:
         return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Reações online: '+json.dumps(self.reaction_status(),ensure_ascii=False),'Avisos: '+'; '.join(self.errors),'Log local (trecho):',local_log_excerpt(self.data_dir)))
     def quit(self):
         if self.quitting:return
+        self.stop_activity_test()
         self.quitting=True
         if os.getenv('BOLHA_TEST')=='1' and os.getenv('BOLHA_TEST_REPORT'):
             try:

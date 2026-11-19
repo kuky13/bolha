@@ -7,6 +7,18 @@ from pathlib import Path
 from .migration import atomic_json, prepare_data, read_json
 
 OBJECT_SCALE_TYPES = ('toy','notebook','reaction','note','sign','corner','effects')
+ACTIVITY_SWITCHES = (
+    ('Brincadeiras', 'chaseEnabled', 'Correr atrás do brinquedo'),
+    ('Brincadeiras', 'juggleEnabled', 'Fazer embaixadinhas'),
+    ('Brincadeiras', 'pingpongEnabled', 'Jogar pingue-pongue'),
+    ('Brincadeiras', 'notebookEnabled', 'Usar o notebook'),
+    ('Expressões e companhia', 'speechEnabled', 'Falas e pensamentos'),
+    ('Expressões e companhia', 'notesEnabled', 'Trazer bilhetes'),
+    ('Expressões e companhia', 'fireworksEnabled', 'Soltar fogos'),
+    ('Protestos e revolução', 'protestsEnabled', 'Protestar e fazer greve'),
+    ('Protestos e revolução', 'signsEnabled', 'Segurar cartazes'),
+    ('Protestos e revolução', 'revolutionEnabled', 'Lançar brinquedos na revolução'),
+)
 DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 mouthEnabled=True, cursorPrankEnabled=False,
                 objectScales={key:1. for key in OBJECT_SCALE_TYPES},
@@ -15,8 +27,9 @@ DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 popEnabled=True, popThrowLimit=12,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True)
+DEFAULTS.update({key: True for _, key, _ in ACTIVITY_SWITCHES})
 BOOLEAN_KEYS = ('roaming','mouthEnabled','cursorPrankEnabled','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
-                'adaptiveBehavior','learnRoutine','popEnabled')
+                'adaptiveBehavior','learnRoutine','popEnabled') + tuple(key for _, key, _ in ACTIVITY_SWITCHES)
 SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 
 

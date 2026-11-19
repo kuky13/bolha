@@ -2,8 +2,9 @@
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Expressões visuais no relógio já existente; nunca modifica o corpo físico."""
 import math
-from .facial_motion import WINK_DURATION, wink_state, mouth_state
+from .facial_motion import WINK_DURATION, wink_state, mouth_state, feature_profile
 from .desk import TYPING_SECONDS, typing_frame
+from cursor_prank import CHEW_SECONDS
 
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
@@ -45,15 +46,16 @@ def animation_pose(mode, seconds, strength=1.):
                     mouth_curve=.6)
     elif mode == 'cursor_swallow':
         progress = _unit(t / .32)
-        pose.update(emotion='travesso', eye_open=1.15-.3*progress, ear_raise=2.,
+        pose.update(emotion='atento', eye_open=1.1, ear_raise=2.,
                     squash=.11*math.sin(progress*math.pi), mouth_open=1.-_ease(progress),
                     mouth_curve=.6, cursor_inside=progress < .65)
     elif mode == 'cursor_chew':
-        chew = .5 + .5 * math.sin(t * math.tau * 2.7)
-        pose.update(emotion='travesso', eye_open=.7, ear_tilt=4.*math.sin(t*5.),
-                    squash=.045*math.sin(t*math.tau*2.7), mouth_open=0.,
-                    mouth_curve=.15+.28*chew, mouth_chew=chew, mouth_width=.84+.18*chew,
-                    mouth_skew=.22*math.sin(t*math.tau*2.7))
+        # Duas mastigadas pequenas; o mesmo prazo encerra o gesto no cérebro.
+        chew = math.sin(math.pi * 2. * _unit(t / CHEW_SECONDS)) ** 2
+        pose.update(emotion='atento', eye_open=1.08, ear_tilt=2.*chew,
+                    ear_raise=.7, squash=.022*chew, mouth_open=0.,
+                    mouth_curve=.12+.12*chew, mouth_chew=.48*chew,
+                    mouth_width=.92+.08*chew, mouth_skew=0.)
     elif mode == 'cursor_spit':
         progress = _unit(t / 1.35)
         pulse = math.sin(math.pi * _unit(t / .35)) if t < .35 else 0.
@@ -305,14 +307,6 @@ def animation_pose(mode, seconds, strength=1.):
         wink = wink_state(_unit(t / WINK_DURATION))
         pose.update(emotion='contente', **{key: value for key, value in wink.items() if key != 'tilt'})
         pose['angle_offset'] = wink['tilt']
-    elif mode == 'bravo':
-        pulse = .92 + .08 * math.sin(t * 17)
-        pose.update(eye_open=.56-.17*strength, ear_raise=-2.1-1.5*strength,
-                    ear_tilt=6. * strength + 3. * math.sin(t * 16) * strength,
-                    squash=.06 * math.sin(t * 12) * strength,
-                    angle_offset=2.5 * math.sin(t * 13) * strength,
-                    effect='bravo', effect_strength=strength,
-                    anger=_unit((.58 + .42 * strength) * pulse))
     elif mode == 'triste':
         pose.update(ear_raise=-1.2 + .35 * math.sin(t * 2), eye_open=.8,
                     gaze=(0., .8), squash=.045 * math.sin(t * 2), angle_offset=2. * math.sin(t * 1.5))
@@ -361,11 +355,14 @@ class ExpressionMotion:
         self.blink_until = 0.
         self.run_phase = 0.
         self.run_tick = now
+        self.irritation = None
         self.pose = animation_pose(self.mode, 0)
 
     def update(self, game, now, press_since=None):
         body, state = game.body, game.state
-        run_dt = max(0.,min(.05,now-self.run_tick))
+        expression_dt = max(0., now-self.run_tick)
+        previous_pose = self.pose
+        run_dt = min(.05, expression_dt)
         self.run_tick = now
         self.run_phase += abs(body.vx)*run_dt/max(24.,body.half_w)/3.4
         tones = state.tone.r
@@ -473,8 +470,9 @@ class ExpressionMotion:
         if (prank is not None and prank.angry_attempt
                 and mode in ('cursor_approach','cursor_pounce','cursor_swallow','cursor_chew')):
             anger = max(.72, tones['ANGRY'])
-            self.pose.update(emotion='bravo', anger=anger,
-                             eye_open=min(.8,self.pose['eye_open']),
+            chewing = mode in ('cursor_swallow', 'cursor_chew')
+            self.pose.update(emotion='atento' if chewing else 'bravo', anger=anger,
+                             eye_open=1.08 if chewing else min(.8,self.pose['eye_open']),
                              ear_raise=min(-1.8,self.pose['ear_raise']), mouth_curve=-.55)
             if mode in ('cursor_approach','cursor_pounce'):
                 self.pose.update(effect='bravo', effect_strength=.65*anger)
@@ -539,6 +537,45 @@ class ExpressionMotion:
                 self.pose['impact_angle'] = play_reaction['impact_angle']
                 self.pose['impact_phase'] = age
                 self.pose['impact_strength'] = play_reaction['intensity'] * (1.-_ease((age-.035)/.22))
+        self._ease_irritation(game, now, expression_dt, previous_pose)
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         self.pose['mouth_enabled'] = game.prefs.get('mouthEnabled', True)
         return self.pose
+
+
+    def _ease_irritation(self, game, now, dt, previous):
+        """Interpola o desenho; o tom neural continua decidindo o quanto está brava."""
+        pose = self.pose
+        previous_anger = self.irritation or 0.
+        calming = self.mode in ('caress', 'sleeping', 'pop', 'pop_return')
+        reactive = pose['anger'] > .03 or previous_anger > .03 or game.state.emotion == 'bravo'
+        neural = game.state.tone.r['ANGRY'] if reactive and not calming else 0.
+        reaction = getattr(game, 'release_reaction', {})
+        release = (reaction.get('intensity', 0.) if now < reaction.get('until', 0.)
+                   and reaction.get('kind') in ('bravo', 'birra') and not calming else 0.)
+        target = max(pose['anger'], neural, release)
+        first_frame = self.irritation is None
+        response = .16 if target > previous_anger else .32 if calming else .85
+        blend = 1. - math.exp(-dt / response)
+        self.irritation = target if first_frame else previous_anger + (target-previous_anger)*blend
+        pose['anger'] = self.irritation
+        chewing = self.mode in ('cursor_swallow', 'cursor_chew')
+        if self.irritation > .03 and not calming and not chewing:
+            weight = _ease((self.irritation-.08)/.62)
+            if weight > .2:
+                pose['emotion'] = 'bravo'
+            for key, angry in (('eye_open', .42), ('ear_raise', -3.8), ('mouth_curve', -.55)):
+                pose[key] += (min(pose[key], angry)-pose[key])*weight
+            pose['ear_tilt'] += (max(pose['ear_tilt'], 10.)-pose['ear_tilt'])*weight
+            if pose['effect'] in (None, 'bravo'):
+                pose['effect'] = 'bravo'
+                pose['effect_strength'] = max(pose['effect_strength'], .7*self.irritation)
+        pose['face_profile'] = feature_profile(pose['emotion'], self.irritation)
+        # A troca de modo físico não deve trocar os olhos/orelhas em um só quadro.
+        if not first_frame and max(previous_anger, self.irritation) > .03:
+            facial_blend = 1. - math.exp(-dt / .14)
+            for key in ('eye_open', 'ear_raise', 'ear_tilt', 'mouth_curve', 'mouth_width'):
+                pose[key] = previous[key] + (pose[key]-previous[key])*facial_blend
+            before = previous.get('face_profile', feature_profile(previous['emotion'], previous_anger))
+            pose['face_profile'] = tuple(start+(end-start)*facial_blend
+                                         for start, end in zip(before, pose['face_profile']))

@@ -171,6 +171,10 @@ final class BolhaRenderer {
     private void drawFace(Canvas canvas, JSONObject state, JSONObject pose, float scale) {
         String emotion = pose.optString("emotion", state.optString("emotion", "observando"));
         float[] profile = profile(emotion);
+        JSONArray faceProfile = pose.optJSONArray("face_profile");
+        if (faceProfile != null && faceProfile.length() == 7) {
+            for (int i = 0; i < 5; i++) profile[i] = (float)faceProfile.optDouble(i, profile[i]);
+        }
         float detail = clamp(.7f / Math.max(.05f, scale), 1, 1.3f);
         float rx = profile[0] * (1 + .2f * (detail - 1)), ry = profile[1] * (1 + .2f * (detail - 1));
         float tilt = clamp(profile[3] + number(pose, "ear_tilt", 0), -35, 35);
@@ -215,10 +219,17 @@ final class BolhaRenderer {
             } else {
                 float h = ry * (1 - eyeClosing) * Math.max(1, opening) + .7f * eyeClosing;
                 path.addOval(x - rx, y - h, x + rx, y + h, Path.Direction.CW);
-                if (emotion.equals("bravo") || emotion.equals("triste") || emotion.equals("entediado") || emotion.equals("sonolento") || emotion.equals("travesso")) {
-                    float anger = unit(number(pose, "anger", 0));
-                    float slope = side * (emotion.equals("bravo") ? -.43f - .14f * anger : emotion.equals("triste") ? .26f : 0);
-                    float lidY = y - h * (emotion.equals("bravo") ? .14f - .12f * anger : emotion.equals("triste") ? .30f : .48f);
+                float anger = unit(number(pose, "anger", 0));
+                float lidLevel = emotion.equals("bravo") ? .14f - .12f * anger : emotion.equals("triste") ? .30f
+                        : emotion.equals("entediado") || emotion.equals("sonolento") || emotion.equals("travesso") ? .48f : 1;
+                float lidSlope = emotion.equals("bravo") ? -.43f - .14f * anger : emotion.equals("triste") ? .26f : 0;
+                if (faceProfile != null && faceProfile.length() == 7) {
+                    lidLevel = (float)faceProfile.optDouble(5, lidLevel);
+                    lidSlope = (float)faceProfile.optDouble(6, lidSlope);
+                }
+                if (lidLevel < 1 || lidSlope != 0) {
+                    float slope = side * lidSlope;
+                    float lidY = y - h * lidLevel;
                     float edge = rx + 1;
                     Path lid = new Path(); lid.moveTo(x - edge, lidY - slope * edge); lid.lineTo(x + edge, lidY + slope * edge);
                     lid.lineTo(x + edge, y + h + 1); lid.lineTo(x - edge, y + h + 1); lid.close(); path.op(lid, Path.Op.INTERSECT);

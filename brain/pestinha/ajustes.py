@@ -72,7 +72,6 @@ INTERVALO_CURSOR = 0.25         # s: o cursor não chuta a bolinha de novo logo 
 ALCANCE_BRINCADEIRA = 240       # px: a bolinha precisa estar perto dele
 TEMPO_VOO_ARREMESSO = 0.7       # s de voo do arremesso até o cursor
 INTERVALO_BRINCADEIRA = (2.5, 5.0)   # s entre tentativas de brincar
-INTERVALO_PAPEL = 0.45          # s entre bolinhas de papel na revolução
 
 # ---------------------------------------------------------------------------
 # Protesto (raiva) e tristeza
@@ -178,7 +177,6 @@ _LIMITES = {
     "INTERVALO_CURSOR": (float, 0.0, 10.0),
     "ALCANCE_BRINCADEIRA": (int, 1, 5000),
     "TEMPO_VOO_ARREMESSO": (float, 0.05, 10.0),
-    "INTERVALO_PAPEL": (float, 0.05, 60.0),
     "HISTERESE": (float, 0.0, 1.0),
     "INSATISFACAO_MAXIMA": (float, 0.1, 10.0),
     "ALIVIO_CARINHO": (float, 0.0, 10.0),

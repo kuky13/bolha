@@ -5,7 +5,7 @@ import math
 import time
 
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPen, QTransform
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPen, QTransform, QTextLayout, QTextOption
 from PySide6.QtWidgets import QWidget
 from .pet import FLAGS
 
@@ -13,6 +13,62 @@ from .dialogue import Dialogue, LINES, THOUGHTS, SPEECH_INTERVAL, AMBIENT_MIN_IN
 
 COMPACT_TEXT_PADDING = (11, 8, 12)
 BUBBLE_TEXT_FLAGS = Qt.AlignCenter | Qt.TextWordWrap
+
+
+def bubble_font():
+    return QFont('Segoe UI', 10)
+
+
+def _text_lines(text, width, font, device=None):
+    # Measurement and painting must use the same wrapping, including long words.
+    layout = QTextLayout(str(text).replace('\n', '\u2028'), font, device)
+    option = QTextOption(Qt.AlignHCenter)
+    option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+    layout.setTextOption(option)
+    layout.beginLayout()
+    lines, y = [], 0.
+    while True:
+        line = layout.createLine()
+        if not line.isValid():
+            break
+        line.setLineWidth(max(1., width))
+        line.setPosition(QPointF(0., y))
+        lines.append(line)
+        y += line.height()
+    layout.endLayout()
+    return layout, lines, y
+
+
+def measure_text_box(text, width, compact=False, device=None, font=None, padding=None):
+    font = font or bubble_font()
+    pad_x, pad_y, tail = padding or (COMPACT_TEXT_PADDING if compact else (14, 10, 14))
+    layout, lines, height = _text_lines(text, width-2*pad_x, font, device)
+    return math.ceil(height+2*pad_y+tail+3), font
+
+
+def paint_box_text(painter, rect, text, *, font=None, now=None):
+    """Paginate oversized local text instead of cutting a line through its middle."""
+    font = font or bubble_font()
+    layout, lines, height = _text_lines(text, rect.width(), font, painter.device())
+    pages, page, used = [], [], 0.
+    for line in lines:
+        if page and used+line.height() > rect.height():
+            pages.append(page)
+            page, used = [], 0.
+        page.append(line)
+        used += line.height()
+    if page:
+        pages.append(page)
+    if not pages:
+        return
+    selected = pages[int((time.monotonic() if now is None else now)/4.5) % len(pages)]
+    visible_height = sum(line.height() for line in selected)
+    offset = max(0., (rect.height()-visible_height)/2.)-selected[0].y()
+    painter.save()
+    painter.setFont(font)
+    for line in selected:
+        line.draw(painter, QPointF(rect.left(), rect.top()+offset))
+    painter.restore()
 
 
 def bubble_path(rect, thought=False, anchor=None, tail_top=False, *, compact=False):
@@ -46,12 +102,10 @@ def paint_bubble(painter, rect, text, thought=False, anchor=None, opacity=1., ta
     painter.setBrush(QColor(37, 33, 47, 224 if compact else 255))
     painter.drawPath(bubble_path(rect, thought, anchor, tail_top, compact=compact))
     painter.setPen(QColor('#fff1c7'))
-    font = QFont('Segoe UI', 10)
-    painter.setFont(font)
     pad_x, pad_y, tail = COMPACT_TEXT_PADDING if compact else (14, 10, 14)
     text_rect = QRectF(rect).adjusted(pad_x, pad_y + (tail if tail_top else 0),
                                     -pad_x, -pad_y - (0 if tail_top else tail))
-    painter.drawText(text_rect, BUBBLE_TEXT_FLAGS, text)
+    paint_box_text(painter, text_rect, text)
     painter.restore()
 
 
@@ -79,7 +133,8 @@ class SpeechWindow(QWidget):
     def sync(self, now=None):
         now = time.monotonic() if now is None else now
         game = self.game
-        if not game.pet_visible(now) or game.panel or now < game.quiet_until or game.mischief.has_note():
+        if (not game.prefs.get('speechEnabled', True) or not game.pet_visible(now)
+                or game.panel or now < game.quiet_until or game.mischief.has_note()):
             self.until = 0.
             self.hide()
             self.dialogue.previous = None
@@ -103,18 +158,18 @@ class SpeechWindow(QWidget):
             self.hide()
             return
         left, top, right, bottom = game.bounds((game.body.x, game.body.y))
-        metrics = QFontMetricsF(QFont('Segoe UI', 10), self)
+        metrics = QFontMetricsF(bubble_font(), self)
         pad_x, pad_y, tail = COMPACT_TEXT_PADDING
         measured = metrics.horizontalAdvance('100' if count else self.text)
         width = min(212, int(right-left-16), max(46, math.ceil(measured)+2*pad_x+2))
         if width < 46:
             self.hide()
             return
-        text_bounds = metrics.boundingRect(QRectF(0., 0., width-2*pad_x, 0.), BUBBLE_TEXT_FLAGS, self.text)
-        height = math.ceil(text_bounds.height()) + 2*pad_y + tail + 3
-        if height > bottom-top-16:
+        height, _ = measure_text_box(self.text, width, compact=True, device=self)
+        if bottom-top-16 < metrics.height()+2*pad_y+tail+3:
             self.hide()
             return
+        height = min(height, int(bottom-top-16))
         self.resize(width, height)
         center_x = game.body.x
         if count:

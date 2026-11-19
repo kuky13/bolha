@@ -204,6 +204,48 @@ class Game:
         ):
             self.stop_pingpong()
         self.prefs.update(prefs)
+        self.protest_ctl.enabled = self.sad_ctl.enabled = (
+            self.prefs.get('protestsEnabled', True) and self.prefs.get('signsEnabled', True))
+        self.play.chase_enabled = self.prefs.get('chaseEnabled', True)
+        self.play.juggle_enabled = self.prefs.get('juggleEnabled', True)
+        if not self.play.chase_enabled:
+            self.play.stop_chase()
+            if self.behavior.adaptive_goal == 'play':
+                self.intelligence.clear_goal()
+                self.behavior.adaptive_goal = None
+        if not self.play.juggle_enabled:
+            self.play.stop_juggle()
+            if self.play.requested_action == 'juggle':
+                self.play.requested_action = None
+        if not self.prefs.get('pingpongEnabled', True):
+            self.stop_pingpong()
+        if not (self.prefs.get('protestsEnabled', True) and self.prefs.get('signsEnabled', True)):
+            self.protest_ctl.drop_sign()
+            self.sad_ctl.drop_sign()
+        for controller in (self.protest_ctl, self.sad_ctl):
+            if controller.stage and controller.protest.sign is None and controller.protest.respawn_at is None:
+                controller.protest.respawn_at = time.monotonic()
+        if not self.prefs.get('protestsEnabled', True):
+            self.state.protest_stage = 0
+            self.behavior.canto = False
+        if not (self.prefs.get('protestsEnabled', True) and self.prefs.get('revolutionEnabled', True)):
+            self.revolucao.fechar()
+        if not self.prefs.get('fireworksEnabled', True):
+            self.festa.requested = False
+            self.festa.euforia = 0.
+            self.festa.fogos.hide()
+        if not self.prefs.get('notesEnabled', True):
+            for thing in list(self.mischief.things):
+                if thing.kind == 'note':
+                    self.mischief_ctl.abort_thing(thing)
+        if not self.prefs.get('notebookEnabled', True):
+            self.mesa.decisao.at_desk = False
+            self.mesa.ancora = None
+            self.mesa.em_pedido = False
+            self.mesa.pedido_ate = 0.
+            self.mesa.caderno.set_working(False)
+            self.mesa.caderno.hide()
+            self._sync_desk_pose()
         if not (self.prefs.get('cursorPrankEnabled', False)
                 and self.prefs.get('senseCursor', True)
                 and self.prefs.get('adaptiveBehavior', True)
@@ -317,6 +359,14 @@ class Game:
     def interact(self, event, *, now=None):
         now = time.monotonic() if now is None else now
         kind = event.get('type')
+        switch = {'work': 'notebookEnabled', 'notebook': 'notebookEnabled',
+                  'celebrate': 'fireworksEnabled', 'pingpong': 'pingpongEnabled'}.get(kind)
+        if kind == 'play' and event.get('trick') == 'juggle':
+            switch = 'juggleEnabled'
+        if switch and not self.prefs.get(switch, True):
+            self.intelligence.current_decision = dict(action='request_refused', target=kind,
+                source='explicit_user_request', refusal_reason='activity_disabled', factors={'setting': switch})
+            return 'Esta atividade está desligada na Central da Bolha.'
         if (kind in ('hold-start','drag-start','sleep','quiet','hide','panic','ball','pingpong',
                      'work','notebook','corner') or (kind=='panel' and event.get('value'))):
             self.play.stop_juggle()
@@ -558,6 +608,8 @@ class Game:
         """Reserva os dois corpos existentes para uma partida e guarda a posição de passeio."""
         if self.pingpong is not None:
             return None
+        if not self.prefs.get('pingpongEnabled', True):
+            return 'O pingue-pongue está desligado na Central da Bolha.'
         if not self.visible():
             return 'Mostre a Bolha para começar uma partida.'
         if self.pop_started is not None or now<self.release_reaction.get('arrives',0.):
@@ -766,9 +818,28 @@ class Game:
             elif anger>.55 and elapsed>=4:kind='birra'
             elif motors.get('SETTLE',0)>.5 and anger<.4:kind='sacudir'
             else:kind='bravo'
-            self.release_reaction=dict(kind=kind,started=now,until=now+2+3*intensity,intensity=intensity)
+            self.release_reaction=dict(kind=kind,started=now,until=now+.4,intensity=intensity)
             self.conditioning.outcome(now)
         self.conditioning.set_cue('PRESS',False,now)
+
+    def _update_release_reaction(self, dt, now, caressing):
+        reaction = self.release_reaction
+        if reaction.get('kind') not in ('bravo', 'birra', 'sacudir', 'timido'):
+            return
+        tone = self.state.tone.r
+        target = max(0., min(1., .85*tone.get('ANGRY', 0.)+.15*tone.get('SAD', 0.)
+                            -.22*tone.get('SETTLE', 0.)))
+        previous = reaction['intensity']
+        anticipation = max(0., self.conditioning.V.get('PRESS', 0.))
+        rate = 3. if target > previous else .65/(1.+anticipation)
+        if caressing:
+            target *= .1
+            rate = 2.8
+        reaction['intensity'] += (target-previous)*(1.-math.exp(-dt*rate))
+        if reaction['intensity'] > .07:
+            reaction['until'] = now+.4
+        else:
+            self.release_reaction = {}
 
     def _reset_cursor_motion(self):
         self.cursor_sample = None
@@ -836,7 +907,7 @@ class Game:
         self.cursor_toy_near=near
 
     def _notice_toy_move(self, now):
-        if (not self.prefs.get('roaming',True) or not self.visible() or self.panel
+        if (not self.prefs.get('chaseEnabled',True) or not self.prefs.get('roaming',True) or not self.visible() or self.panel
                 or self.ball_stored or not self.ball.isVisible() or self.sleep.asleep
                 or self.body.held or self.castigo.dentro or now < self.quiet_until
                 or self.pop_started is not None or self._shy_returning(now)):
@@ -1087,11 +1158,12 @@ class Game:
         allowed = ['watch', 'rest']
         if self.prefs.get('roaming', True):
             allowed += ['explore']
-            if not self.ball_stored and self.ball.isVisible() and self.drives.energy > .18:
+            if self.prefs.get('chaseEnabled', True) and not self.ball_stored and self.ball.isVisible() and self.drives.energy > .18:
                 allowed += ['play']
             if self.prefs.get('senseCursor', True): allowed += ['attention']
-        if not self.mesa.escondido and self.activity in ('PROGRAMMING', 'DESIGNING'): allowed += ['work']
-        if self.panel or self.hover or self.body.held or self.sleep.asleep or self.castigo.dentro or self.castigo.fuga or self.protest.stage or self.sad.stage or self.behavior.mission: allowed = []
+        if self.prefs.get('notebookEnabled', True) and not self.mesa.escondido and self.activity in ('PROGRAMMING', 'DESIGNING'): allowed += ['work']
+        protesting = self.prefs.get('protestsEnabled', True) and (self.protest.stage or self.sad.stage)
+        if self.panel or self.hover or self.body.held or self.sleep.asleep or self.castigo.dentro or self.castigo.fuga or protesting or self.behavior.mission: allowed = []
         decisions_before = self.intelligence.decisions
         try:
             goal = self.intelligence.tick(now, time.time(), self.activity, self.state.emotion, self.rates, self.drives.energy, self.drives.contact, allowed, self.sleep.asleep)
@@ -1170,6 +1242,7 @@ class Game:
         self.inputs = inputs
         self.rates = self.brain.motor_activity()
         self.state.tone.update(self.rates,dt)
+        self._update_release_reaction(dt, now, caressing)
         if self.pingpong is not None or self.pop_started is not None or self._shy_returning(now):
             return
         self.sleep.rates = self.rates
@@ -1178,17 +1251,21 @@ class Game:
             protest.energy = self.drives.energy
             protest.contact = self.drives.contact
         for controller in (self.protest_ctl,self.sad_ctl):
-            change = controller.tick(dt,self.state.tone,self.prof,caressing,now,self.drives.channels()['LONELY'])
-            if change: controller.on_stage(*change)
-        self.state.protest_stage = self.protest.stage if not self.sleep.asleep else 0
+            if self.prefs.get('protestsEnabled', True):
+                change = controller.tick(dt,self.state.tone,self.prof,caressing,now,self.drives.channels()['LONELY'])
+                if change:
+                    controller.on_stage(*change)
+                    if not self.prefs.get('signsEnabled', True):
+                        controller.drop_sign()
+        self.state.protest_stage = self.protest.stage if self.prefs.get('protestsEnabled', True) and not self.sleep.asleep else 0
         reward = (1. if caressing else 0.) - (1. if self.mischief_ctl.penalty_active(now) else 0.) + self.castigo.punicao(now)
         self.brain.learn(reward,dt,self.prof['learn_rate'])
         emotion = self.emotion.update(self.rates,dt,self.prof,now)
         if self.state.dizzy(now): emotion = 'dramatico'
         self.state.emotion = emotion
         self.behavior.on_emotion(emotion,now)
-        self.behavior.canto = self.rates.get('CANTO',0) > 5 and self.sad.stage > 0
-        can_sit = self.body.grounded and not self.body.held and not self.sleep.asleep and not self.castigo.dentro and self.castigo.fuga is None
+        self.behavior.canto = self.prefs.get('protestsEnabled', True) and self.rates.get('CANTO',0) > 5 and self.sad.stage > 0
+        can_sit = self.prefs.get('notebookEnabled', True) and self.body.grounded and not self.body.held and not self.sleep.asleep and not self.castigo.dentro and self.castigo.fuga is None
         self.mesa.tick(now,self.brain.pool_rates(),self.rates['SENTAR'],can_sit,self.play)
         self._sync_desk_pose()
         self.behavior.play_pull = pull(self.brain.pool_rates())
@@ -1196,7 +1273,7 @@ class Game:
         self.play.energy = self.drives.energy
         self.play.contact = self.drives.contact
         if self.mesa.pop_recusa(): self.request_refused = min(1., .4 + .2 * self.mesa.pedidos_recentes())
-        self.sleep.tick(now,self.body,self.in_flight,self.protest.stage,self.behavior.mission)
+        self.sleep.tick(now,self.body,self.in_flight,self.state.protest_stage,self.behavior.mission)
         if self.sleep.asleep: self.state.emotion = 'dormindo'; self.behavior.on_emotion('dormindo',now)
         self.adapt(now)
 
@@ -1214,6 +1291,7 @@ class Game:
             self.cursor_prank.cancel(self, now)
             self.play.stop_juggle()
             self.festa.requested=False
+            self.revolucao.fechar()
             self.stop_pingpong()
             self._cancel_holds(now)
             self._reset_cursor_motion()
@@ -1227,6 +1305,7 @@ class Game:
             self.intelligence.until += elapsed
             self.paused_at = None; self.last_think = now
         if self.pop_started is not None:
+            self.revolucao.fechar()
             self.play.stop_juggle()
             if now >= self.pop_return_at:
                 self._return_from_pop(now)
@@ -1241,6 +1320,7 @@ class Game:
                                    [display for i,display in enumerate(self.displays) if i not in self.blocked])
                 return
         if self.pingpong is not None:
+            self.revolucao.fechar()
             if self.pingpong.area in self.available_areas():
                 self._tick_pingpong(dt,now)
                 return
@@ -1306,25 +1386,35 @@ class Game:
         for strength in impacts:
             self.senses.impact(min(1.,strength / 1600))
             self.landing = max(self.landing,min(1.,strength / 1000))
-        self.mesa.set_visible(not self.mesa.escondido)
-        self.protest_ctl.carry(now,self.sleep.asleep); self.sad_ctl.carry(now,self.sleep.asleep)
+        self.mesa.set_visible(self.prefs.get('notebookEnabled', True) and not self.mesa.escondido)
+        if self.prefs.get('protestsEnabled', True) and self.prefs.get('signsEnabled', True):
+            self.protest_ctl.carry(now,self.sleep.asleep)
+            self.sad_ctl.carry(now,self.sleep.asleep)
         self.mischief.tick(dt,area[3])
         self.mischief.rates = self.rates
         self.mischief.energy = self.drives.energy
         self.mischief.contact = self.drives.contact
-        perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), fotos=False)
+        perms = dict(config.DEFAULT_PERMISSIONS, travessuras=self.prefs.get('mischiefEnabled',True), memes=self.prefs.get('onlineReactions',True), online_reactions=self.prefs.get('onlineReactions',True), bilhetes=self.prefs.get('notesEnabled',True), fotos=False)
         if not self.play.count_text(now) and not self.cursor_prank.active and not shy_return and not self.castigo.dentro and not self.hover and not self.panel and now >= self.quiet_until and self.intelligence.goal not in ('watch','rest','work'):
-            self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.protest.stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
+            self.mischief_ctl.maybe_act(now,dt,area,self.cursor,self.body,motores=self.rates,activity=self.activity,emotion=self.state.emotion,perms=perms,prof=self.prof,fullscreen=False,asleep=self.sleep.asleep,protest_stage=self.state.protest_stage,working=self.activity in ('PROGRAMMING','DESIGNING') and not self.mesa.sentado)
         self.festa.rates = self.rates
         self.festa.energy = self.drives.energy
         self.festa.contact = self.drives.contact
         self.festa.tick(now,self.rates,self.state.emotion,self.body,
-                        not self.cursor_prank.active and not shy_return and self.visible() and not self.sleep.asleep
+                        self.prefs.get('fireworksEnabled', True) and not self.cursor_prank.active and not shy_return and self.visible() and not self.sleep.asleep
                         and not self.body.held and not self.panel and now>=self.quiet_until,dt)
         self.revolucao.rates = self.rates
         self.revolucao.energy = self.drives.energy
         self.revolucao.contact = self.drives.contact
-        self.revolucao.tick(now,dt,area,self.cursor,(0,0),self.body,self.visible(),self.protest.stage == 4,[],self.rates.get('PAPEL',0))
+        self.revolucao.tick(now,dt,area,self.cursor,self.cursor_velocity,self.body,self.visible(),
+            self.prefs.get('protestsEnabled', True) and self.protest.stage == 4,
+            [thing for thing in self.mischief.things if thing.isVisible()],self.rates.get('PAPEL',0),
+            enabled=(self.prefs.get('revolutionEnabled', True) and not self.panel and not self.body.held
+                     and not self.sleep.asleep and not shy_return and not self.cursor_prank.active
+                     and now >= self.quiet_until),
+            toy_appearance=self.prefs.get('toyAppearance', 'peanut'),
+            sense_cursor=self.prefs.get('senseCursor', True), areas=areas, monitors=monitors,
+            displays=[d for i,d in enumerate(self.displays) if i not in self.blocked])
         self.memory.tick(now,self.prof["episode_ok"],self.prof["episode_window"])
         if now - self.last_save >= 30: self.save(); self.last_save = now
 

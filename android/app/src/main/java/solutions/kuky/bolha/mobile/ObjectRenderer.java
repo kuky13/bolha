@@ -15,6 +15,8 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.view.View;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
 
 final class ObjectRenderer {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -31,7 +33,8 @@ final class ObjectRenderer {
     void draw(Canvas canvas, JSONObject object, float phase, View view) {
         float x = n(object,"x",0), y = n(object,"y",0), w = n(object,"width",100), h = n(object,"height",70);
         RectF rect = new RectF(x-w/2,y-h/2,x+w/2,y+h/2);
-        canvas.save(); canvas.rotate(n(object,"angle",0),x,y);
+        canvas.save();
+        if (!object.optString("kind").equals("sign")) canvas.rotate(n(object,"angle",0),x,y);
         switch (object.optString("kind")) {
             case "notebook": notebook(canvas,rect,object.optBoolean("working"),
                 object.optInt("typingKey",-1),n(object,"typingTap",0),object.optInt("typingProgress"),object.optBoolean("caret")); break;
@@ -42,7 +45,10 @@ final class ObjectRenderer {
                        rect.left+rect.width()*n(object,"anchor",.5f));
                 canvas.restoreToCount(layer);
                 break;
-            case "sign": bubble(canvas,rect,object.optString("text"),false); break;
+            case "sign": placard(canvas,object); break;
+            case "projectile":
+            case "paper":
+                toyShape(canvas,x,y,n(object,"radius",Math.min(w,h)*17/42),0,object.optString("appearance","ball")); break;
             case "corner":
                 fill("#272130"); canvas.drawRoundRect(rect,10,10,paint);
                 stroke("#9c83b7",1.2f); canvas.drawRoundRect(rect,10,10,paint);
@@ -55,8 +61,12 @@ final class ObjectRenderer {
 
     void toy(Canvas canvas, JSONObject state) {
         float x=n(state,"toyX",0), y=n(state,"toyY",0), r=n(state,"toyRadius",18);
-        canvas.save(); canvas.translate(x,y); canvas.rotate(n(state,"toyAngle",0));
-        if (state.optString("toyAppearance").equals("peanut")) {
+        toyShape(canvas,x,y,r,n(state,"toyAngle",0),state.optString("toyAppearance"));
+    }
+
+    private void toyShape(Canvas canvas,float x,float y,float r,float angle,String appearance) {
+        canvas.save(); canvas.translate(x,y); canvas.rotate(angle);
+        if (appearance.equals("peanut")) {
             canvas.scale(r/17,r/17);
             path.reset(); path.moveTo(-16,0); path.cubicTo(-18,-12,-11,-16,-5,-11);
             path.quadTo(0,-7,5,-11); path.cubicTo(11,-16,18,-12,16,0);
@@ -129,10 +139,91 @@ final class ObjectRenderer {
         drawText(canvas,value,new RectF(rect.left+10,top+7,rect.right-10,bottom-7),12);
     }
 
-    private void drawText(Canvas canvas, String value, RectF rect, float size) {
+    private StaticLayout textLayout(String value,int width,float size) {
         text.setColor(color("#fff1c7")); text.setTextSize(size*fontScale);
-        StaticLayout layout=StaticLayout.Builder.obtain(value,0,value.length(),text,Math.max(1,(int)rect.width())).setAlignment(Layout.Alignment.ALIGN_CENTER).setIncludePad(false).build();
-        canvas.save(); canvas.clipRect(rect); canvas.translate(rect.left,rect.top+Math.max(0,(rect.height()-layout.getHeight())/2)); layout.draw(canvas); canvas.restore();
+        return StaticLayout.Builder.obtain(value,0,value.length(),text,Math.max(1,width))
+            .setAlignment(Layout.Alignment.ALIGN_CENTER).setIncludePad(false).build();
+    }
+
+    private void drawText(Canvas canvas, String value, RectF rect, float size) {
+        StaticLayout layout=textLayout(value,(int)rect.width(),size);
+        int pageStart=0, pageEnd=layout.getLineCount();
+        java.util.ArrayList<int[]> pages=new java.util.ArrayList<>();
+        for (int line=0;line<layout.getLineCount();line++) {
+            if (line>pageStart && layout.getLineBottom(line)-layout.getLineTop(pageStart)>rect.height()) {
+                pages.add(new int[]{pageStart,line});pageStart=line;
+            }
+        }
+        pages.add(new int[]{pageStart,pageEnd});
+        int[] page=pages.get((int)((android.os.SystemClock.uptimeMillis()/4500)%pages.size()));
+        int top=layout.getLineTop(page[0]),bottom=page[1]>page[0]?layout.getLineBottom(page[1]-1):top;
+        float height=bottom-top;
+        canvas.save();
+        float y=rect.top+Math.max(0,(rect.height()-height)/2);
+        canvas.clipRect(rect.left,y,rect.right,y+height);
+        canvas.translate(rect.left,y-top);layout.draw(canvas);canvas.restore();
+    }
+
+    private void placard(Canvas canvas,JSONObject object) {
+        float bx=n(object,"boardX",n(object,"x",0)),by=n(object,"boardY",n(object,"y",0));
+        float width=n(object,"boardWidth",n(object,"width",120)),height=n(object,"boardHeight",n(object,"height",80));
+        stroke("#bb8f61",5);paint.setStrokeCap(Paint.Cap.ROUND);
+        canvas.drawLine(bx,by,n(object,"shaftX",bx),n(object,"shaftY",by),paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        canvas.save();canvas.rotate(n(object,"angle",0),bx,by);
+        RectF board=new RectF(bx-width/2,by-height/2,bx+width/2,by+height/2);
+        fill("#32283e");canvas.drawRoundRect(board,9,9,paint);
+        stroke("#b9a0d8",1.3f);canvas.drawRoundRect(board,9,9,paint);
+        board.inset(12,9);drawText(canvas,object.optString("text"),board,12);
+        canvas.restore();
+    }
+
+    static void fitTextObjects(JSONObject state,float fontScale) {
+        JSONArray items=state.optJSONArray("objects"),area=state.optJSONArray("bounds");
+        if (items==null) return;
+        float left=area==null?0:(float)area.optDouble(0),top=area==null?0:(float)area.optDouble(1);
+        float right=area==null?360:(float)area.optDouble(2,360),bottom=area==null?720:(float)area.optDouble(3,720);
+        TextPaint paint=new TextPaint(Paint.ANTI_ALIAS_FLAG);paint.setTextSize(12*fontScale);
+        for (int i=0;i<items.length();i++) {
+            JSONObject item=items.optJSONObject(i);
+            if (item==null) continue;
+            String kind=item.optString("kind");
+            if (!kind.equals("note") && !kind.equals("sign")) continue;
+            if (item.optDouble("textFitScale",-1)==fontScale) continue;
+            try { item.put("textFitScale",fontScale); } catch (JSONException error) { continue; }
+            boolean sign=kind.equals("sign");
+            float width=n(item,sign?"boardWidth":"width",140);
+            float padding=sign?24:20;
+            String value=item.optString("text");
+            StaticLayout layout=StaticLayout.Builder.obtain(value,0,value.length(),paint,Math.max(1,(int)(width-padding)))
+                .setAlignment(Layout.Alignment.ALIGN_CENTER).setIncludePad(false).build();
+            float height=Math.max(n(item,sign?"boardHeight":"height",60),layout.getHeight()+(sign?21:29));
+            height=Math.min(Math.max(40,bottom-top-16),height);
+            try {
+                if (sign) {
+                    item.put("boardHeight",height);
+                    double rad=Math.toRadians(n(item,"angle",0));
+                    float ex=(float)(Math.abs(Math.cos(rad))*width/2+Math.abs(Math.sin(rad))*height/2);
+                    float ey=(float)(Math.abs(Math.sin(rad))*width/2+Math.abs(Math.cos(rad))*height/2);
+                    float fit=Math.min(1,Math.min(Math.max(1,right-left-10)/(2*ex),Math.max(1,bottom-top-10)/(2*ey)));
+                    width*=fit;height*=fit;ex*=fit;ey*=fit;
+                    item.put("boardWidth",width);item.put("boardHeight",height);
+                    float bx=Math.max(left+ex+3,Math.min(right-ex-3,n(item,"boardX",n(item,"x",0))));
+                    float by=Math.max(top+ey+3,Math.min(bottom-ey-3,n(item,"boardY",n(item,"y",0))));
+                    float sx=Math.max(left+3,Math.min(right-3,n(item,"shaftX",bx))),sy=Math.max(top+3,Math.min(bottom-3,n(item,"shaftY",by)));
+                    item.put("shaftX",sx);item.put("shaftY",sy);
+                    float minX=Math.min(bx-ex,sx)-3,maxX=Math.max(bx+ex,sx)+3;
+                    float minY=Math.min(by-ey,sy)-3,maxY=Math.max(by+ey,sy)+3;
+                    item.put("boardX",bx);item.put("boardY",by);
+                    item.put("x",(minX+maxX)/2);item.put("y",(minY+maxY)/2);
+                    item.put("width",maxX-minX);item.put("height",maxY-minY);
+                } else {
+                    item.put("height",height);
+                    item.put("x",Math.max(left+width/2+3,Math.min(right-width/2-3,n(item,"x",0))));
+                    item.put("y",Math.max(top+height/2+3,Math.min(bottom-height/2-3,n(item,"y",0))));
+                }
+            } catch (JSONException error) { android.util.Log.w("Bolha","Texto do objeto",error); }
+        }
     }
 
     private void fireworks(Canvas canvas, RectF rect, float phase) {

@@ -11,6 +11,9 @@ import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.view.*;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -26,6 +29,11 @@ public final class FloatingBolha extends Service implements Engine.Listener {
     private final Rect area = new Rect();
     private final Map<String,Layer> layers = new HashMap<>();
     private float density;
+    private LinearLayout testControls;
+    private TextView testInstruction;
+    private Button nextTestStep;
+    private WindowManager.LayoutParams testControlParams;
+    private String lastTestInstruction="";
 
     static void foregroundUi(Activity activity, boolean resumed) {
         if (resumed) foregroundUi=activity;
@@ -123,9 +131,11 @@ public final class FloatingBolha extends Service implements Engine.Listener {
         if (error!=null || !Settings.canDrawOverlays(this)) { stopSelf();return; }
         // A sobreposição nunca deve cobrir os controles do próprio aplicativo.
         if (foregroundUi!=null) { detachAll();return; }
+        ObjectRenderer.fitTextObjects(state,getResources().getConfiguration().fontScale);
         Haptics.frame(this,state);
         Set<String> wanted=new HashSet<>();
         try {
+            syncTestControls(state.optJSONObject("functionTest"));
             float radius=(float)state.optDouble("radius",68);
             float x=(float)state.optDouble("x"),y=(float)state.optDouble("y");
             JSONArray objects=state.optJSONArray("objects");
@@ -158,10 +168,10 @@ public final class FloatingBolha extends Service implements Engine.Listener {
                 JSONObject object=objects.optJSONObject(index);
                 if (object==null) continue;
                 String kind=object.optString("kind"),id=object.optString("id");
-                if (id.isEmpty() || kind.equals("ball") || kind.equals("paper") || kind.equals("fireworks")) continue;
+                if (id.isEmpty() || kind.equals("ball") || kind.equals("fireworks")) continue;
                 if (kind.equals("meme") && !object.optBoolean("mediaReady")) continue;
                 float width=(float)object.optDouble("width",120),height=(float)object.optDouble("height",90);
-                show("object:"+id,"object:"+id,"BolhaObjeto-"+id,true,state,
+                show("object:"+id,"object:"+id,"BolhaObjeto-"+id,!kind.equals("projectile") && !kind.equals("paper"),state,
                         (float)object.optDouble("x")-width/2,(float)object.optDouble("y")-height/2,width,height,wanted);
             }
             JSONObject match=state.optJSONObject("pingpong");
@@ -198,12 +208,52 @@ public final class FloatingBolha extends Service implements Engine.Listener {
     }
 
     private void detachAll() {
-        if (layers.isEmpty()) return;
+        removeTestControls();
         for (String key:new HashSet<>(layers.keySet())) remove(key);
+    }
+
+    private void syncTestControls(JSONObject test) {
+        if (test==null) { removeTestControls();return; }
+        if (testControls==null) {
+            testControls=MobileUi.column(this);
+            testControls.setPadding(Math.round(12*density),Math.round(8*density),Math.round(12*density),Math.round(8*density));
+            testControls.setBackgroundColor(MobileUi.SURFACE);
+            testInstruction=MobileUi.text(this,"",13,MobileUi.TEXT);
+            testControls.addView(testInstruction,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout row=MobileUi.row(this);
+            nextTestStep=MobileUi.button(this,"Próximo passo",() -> testCommand("next-function-test"));
+            MobileUi.addEqual(row,nextTestStep);
+            MobileUi.addEqual(row,MobileUi.button(this,"Parar teste",() -> testCommand("stop-function-test")));
+            testControls.addView(row);
+            testControlParams=windowParams("BolhaControleTeste",true);
+            testControlParams.x=area.left+Math.round(8*density);
+            testControlParams.y=area.top+Math.round(8*density);
+            testControlParams.width=Math.max(1,Math.min(Math.round(320*density),area.width()-Math.round(16*density)));
+            testControlParams.height=WindowManager.LayoutParams.WRAP_CONTENT;
+            windows.addView(testControls,testControlParams);
+        }
+        String text=test.optString("title")+" · passo "+test.optInt("step")+" de "+test.optInt("total")
+                +"\n"+test.optString("instruction")+"\nMemória original preservada.";
+        if (!text.equals(lastTestInstruction)) { testInstruction.setText(text);lastTestInstruction=text; }
+        nextTestStep.setEnabled(test.optBoolean("hasNext"));
+    }
+
+    private void testCommand(String type) {
+        JSONObject command=new JSONObject();
+        try { command.put("type",type); }
+        catch (org.json.JSONException impossible) { throw new IllegalStateException(impossible); }
+        engine.control(command);
+    }
+
+    private void removeTestControls() {
+        if (testControls==null) return;
+        windows.removeView(testControls);
+        testControls=null;testInstruction=null;nextTestStep=null;testControlParams=null;lastTestInstruction="";
     }
 
     @Override public void onDestroy() {
         active=false;
+        if (engine!=null) testCommand("stop-function-test");
         detachAll();
         if (engine!=null) engine.remove(this);
         stopForeground(STOP_FOREGROUND_REMOVE);

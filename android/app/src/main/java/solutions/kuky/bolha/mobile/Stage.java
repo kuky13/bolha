@@ -52,6 +52,7 @@ final class Stage extends View {
 
     void origin(float x, float y) { originX = x; originY = y; }
     void frame(JSONObject state) {
+        ObjectRenderer.fitTextObjects(state,getResources().getConfiguration().fontScale);
         frame = state;
         ReactionMediaCache.get(engine).retain(state.optJSONArray("objects"));
         invalidate();
@@ -92,7 +93,7 @@ final class Stage extends View {
                 JSONArray all = state.optJSONArray("objects");
                 if (all != null) for (int index = 0; index < all.length(); index++) {
                     JSONObject item = all.optJSONObject(index);
-                    if (item != null && !item.optString("kind").equals("ball") && !item.optString("kind").equals("paper")) objects.draw(canvas,item,phase,this);
+                    if (item != null && !item.optString("kind").equals("ball")) objects.draw(canvas,item,phase,this);
                 }
             }
             JSONObject pose = state.optJSONObject("pose");
@@ -220,7 +221,7 @@ final class Stage extends View {
             float cx, cy;
             if (layer.startsWith("object:")) {
                 JSONObject item = findObject(layer.substring(7));
-                if (item == null || item.optString("kind").equals("fireworks")) return false;
+                if (item == null || item.optString("kind").equals("fireworks") || item.optString("kind").equals("projectile") || item.optString("kind").equals("paper")) return false;
                 held = item.optString("id"); cx = n(item,"x",x); cy = n(item,"y",y);
             } else if (layer.equals("toy") || layer.isEmpty() && frame.optBoolean("toyVisible") && Math.hypot(n(frame,"toyX",0)-x,n(frame,"toyY",0)-y) <= Math.max(24,n(frame,"toyRadius",18)+8)) {
                 held = "toy"; cx = n(frame,"toyX",x); cy = n(frame,"toyY",y);
@@ -271,7 +272,7 @@ final class Stage extends View {
         JSONArray all = frame.optJSONArray("objects");
         if (all != null) for (int i = all.length()-1; i >= 0; i--) {
             JSONObject item = all.optJSONObject(i);
-            if (item != null && !item.optString("kind").equals("fireworks") && !item.optString("kind").equals("ball") && Math.abs(n(item,"x",0)-x) <= n(item,"width",0)/2 && Math.abs(n(item,"y",0)-y) <= n(item,"height",0)/2) return item;
+            if (item != null && !item.optString("kind").equals("fireworks") && !item.optString("kind").equals("projectile") && !item.optString("kind").equals("paper") && !item.optString("kind").equals("ball") && Math.abs(n(item,"x",0)-x) <= n(item,"width",0)/2 && Math.abs(n(item,"y",0)-y) <= n(item,"height",0)/2) return item;
         }
         return null;
     }

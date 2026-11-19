@@ -8,7 +8,7 @@ from pestinha.core.physics import GRAVITY
 
 IDLE_SECONDS = 120.
 COOLDOWN_SECONDS = 300.
-ANGRY_CHEW_SECONDS = .75
+CHEW_SECONDS = .8
 
 
 class CursorPrank:
@@ -101,7 +101,8 @@ class CursorPrank:
                 and not game.panel and not game.body.held and not game.scene_dragging
                 and not game.sleep.asleep and not game.mesa.sentado
                 and not game.castigo.dentro and not game.castigo.fuga
-                and not game.protest.stage and not game.sad.stage
+                and not (game.prefs.get('protestsEnabled', True)
+                         and (game.protest.stage or game.sad.stage))
                 and not game.behavior.mission and game.pingpong is None
                 and not game.play.juggling() and not game.play.finishing_juggle(now)
                 and game.pop_started is None)
@@ -169,7 +170,7 @@ class CursorPrank:
             return self.holds_position
         if self.phase == 'chew':
             game.body.vx = game.body.vy = game.body.omega = 0.
-            if self.angry_attempt and now-self.started >= ANGRY_CHEW_SECONDS:
+            if now-self.started >= CHEW_SECONDS:
                 self._spit(game, now, 'cuspiu o ponteiro')
                 return False
             return True

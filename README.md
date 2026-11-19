@@ -15,7 +15,7 @@ próprio notebook e aprende com suas interações.
 [Como interagir](#como-interagir) · [Dados e contexto](#dados-e-contexto) ·
 [Créditos e licenças](NOTICE.md)
 
-A 0.5.3 corrige a última embaixadinha, deixa a Bolha mais expressiva nas brincadeiras e restaura a prioridade da janela no Windows.
+A 0.5.4 está em validação: corrige texto cortado nas placas e bilhetes, mantém a irritação ao soltar a Bolha e acrescenta controles individuais e testes das atividades. Veja o [relatório da revisão](docs/AUDITORIA-0.5.4.md). A versão publicada continua disponível no link de download acima.
 A série 0.5 aproxima as expressões e as atividades do Android da versão para PC,
 com central de configurações, painel neural e movimento opcional ao chacoalhar.
 No PC, a Bolha pode brincar de comer o ponteiro por decisão do cérebro; a opção
@@ -46,6 +46,11 @@ A bolinha adapta o desenho de mille-okws e contribuidores, sob
   tontura e irritação que giram e se achatam junto com o corpo.
 - Espreguiçada, espirro, soluço, cochilo, piscadela e movimentos de orelhas
   ocasionais. As manias cedem às interações, ao sono e aos painéis.
+- Revolução com placa presa ao corpo e até seis projéteis por vez, por cinco segundos.
+  Com amendoim selecionado, lança bolinhas; com bolinha, lança amendoins.
+  O cérebro escolhe quando lançar, com intervalo mínimo de 0,6 segundo.
+- Atividades com interruptores próprios na Central. A aba Testar oferece ensaios
+  passo a passo no jogo real usando uma cópia temporária do perfil, sem gravar o aprendizado original.
 - Amendoim como brinquedo padrão, bolinha original opcional nas configurações,
   notebook de brincadeira com digitação animada, fogos, cartazes, protestos e castigo.
 - Reações online de memes e GIFs (ReactionGIFs e fallback Nekos.best) carregadas

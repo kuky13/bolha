@@ -5,12 +5,12 @@ import math
 import random
 import time
 from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent,QUrl
-from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath,QDesktopServices
+from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath,QPainterPathStroker,QTransform,QDesktopServices
 from PySide6.QtWidgets import QWidget,QMenu
 from .pet import FLAGS
 from .objects import paint_notebook,paint_ball,paint_peanut,peanut_shape,notebook_shape
 from .grab import MouseGrab
-from .speech import SpeechWindow, bubble_path, paint_bubble
+from .speech import SpeechWindow, bubble_path, paint_bubble, measure_text_box, paint_box_text
 from .reactions import (
     InMemoryMedia, MAX_TOTAL_MEDIA_BYTES, NEKOS_HOSTS,
     OnlineReactionFetcher, REACTIONGIFS_HOSTS, validate_reaction_url,
@@ -24,9 +24,38 @@ def object_dimensions(item, avatar_size=136, object_scales=None, bounds=None):
     minimum_w,minimum_h=minimum_object_dimensions(getattr(item,'kind',''))
     return max(minimum_w,item._base_w*factor),max(minimum_h,item._base_h*factor)
 
+def placard_path(item):
+    ox, oy = item._cx-item.width()/2, item._cy-item.height()/2
+    bx, by = item.board_x-ox, item.board_y-oy
+    board = QPainterPath()
+    board.addRoundedRect(QRectF(-item.board_width/2,-item.board_height/2,
+                              item.board_width,item.board_height),9,9)
+    transform = QTransform().translate(bx,by).rotate(item.tilt)
+    board = transform.map(board)
+    shaft = QPainterPath(QPointF(bx,by))
+    shaft.lineTo(item.shaft_x-ox,item.shaft_y-oy)
+    stroker = QPainterPathStroker();stroker.setWidth(6.);stroker.setCapStyle(Qt.RoundCap)
+    return board.united(stroker.createStroke(shaft))
+
+
+def paint_placard(painter,item):
+    ox, oy = item._cx-item.width()/2, item._cy-item.height()/2
+    bx, by = item.board_x-ox, item.board_y-oy
+    painter.save()
+    painter.setPen(QPen(QColor('#bb8f61'),5.,Qt.SolidLine,Qt.RoundCap))
+    painter.drawLine(QPointF(bx,by),QPointF(item.shaft_x-ox,item.shaft_y-oy))
+    painter.translate(bx,by);painter.rotate(item.tilt)
+    rect=QRectF(-item.board_width/2,-item.board_height/2,item.board_width,item.board_height)
+    painter.setBrush(QColor('#32283e'));painter.setPen(QPen(QColor('#b9a0d8'),1.3))
+    painter.drawRoundedRect(rect,9,9)
+    painter.setPen(QColor('#fff1c7'))
+    paint_box_text(painter,rect.adjusted(12,9,-12,-9),item.text)
+    painter.restore()
+
+
 class ObjectWindow(QWidget):
     def __init__(self, scene, item):
-        super().__init__(None, FLAGS|(Qt.WindowTransparentForInput if item.kind=='fireworks' else Qt.WindowType(0)))
+        super().__init__(None, FLAGS|(Qt.WindowTransparentForInput if item.kind in ('fireworks','projectile') else Qt.WindowType(0)))
         self.scene,self.item=scene,item
         self.setWindowTitle('Bolha · '+item.kind)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -40,12 +69,13 @@ class ObjectWindow(QWidget):
         self._sync_mask()
     def _sync_mask(self):
         item=self.item
-        if item.kind=='fireworks':return
+        if item.kind in ('fireworks','projectile'):return
         image=self.reaction_media.current_image() if item.kind=='meme' and self.reaction_media is not None else None
         peanut=item.kind=='ball' and getattr(item,'appearance','ball')=='peanut'
         key=(self.width(),self.height(),self.devicePixelRatioF(),item.kind,item.working,
              getattr(item,'appearance',None),item.roll_angle if peanut else None,
-             image.width() if image is not None else None,image.height() if image is not None else None)
+             image.width() if image is not None else None,image.height() if image is not None else None,
+             (item.tilt,item.board_x-item._cx,item.board_y-item._cy,item.shaft_x-item._cx,item.shaft_y-item._cy) if item.kind=='sign' else None)
         if key==getattr(self,'_mask_key',None):return
         if peanut:
             path=peanut_shape(self.width()/2,self.height()/2,item.body.half_w,item.roll_angle)
@@ -53,14 +83,14 @@ class ObjectWindow(QWidget):
         elif item.kind=='meme':
             rect=self._media_rect(image) if image is not None and not image.isNull() else QRectF()
             mask=QRegion(QRect(round(rect.x()),round(rect.y()),max(0,round(rect.width())),max(0,round(rect.height()))))
-        elif item.kind in ('ball','paper'):
+        elif item.kind in ('ball','paper','projectile'):
             radius=item.body.half_w+1
             mask=QRegion(QRect(round(self.width()/2-radius),round(self.height()/2-radius),round(radius*2),round(radius*2)),QRegion.Ellipse)
         else:
             if item.kind=='notebook':path=notebook_shape(QRectF(self.rect()))
             elif item.kind=='note':
                 path=bubble_path(QRectF(self.rect()),True,self.width()*item.anchor,item.tail_top,compact=True)
-            elif item.kind=='sign':path=bubble_path(QRectF(self.rect()))
+            elif item.kind=='sign':path=placard_path(item)
             else:
                 path=QPainterPath();path.addRoundedRect(QRectF(self.rect()),8,8)
             mask=QRegion(path.toFillPolygon().toPolygon())
@@ -98,9 +128,11 @@ class ObjectWindow(QWidget):
         frame_no=self.reaction_media.frame_number() if self.reaction_media is not None else -1
         key=tuple(data[field] for field in ('kind','text','image','angle','working','x','y'))+(
             getattr(item,'appearance',None),
+            (data.get('boardX'),data.get('boardY'),data.get('boardWidth'),data.get('boardHeight'),data.get('shaftX'),data.get('shaftY')) if item.kind=='sign' else None,
             getattr(item,'emotion',None),getattr(item,'title',None),getattr(item,'attribution',None),
             frame_no,self.width(),self.height(),self.devicePixelRatioF(),visible,data.get('opacity'),
-            int(time.monotonic()*30) if visible and item.kind=='notebook' and item.working else None)
+            int(time.monotonic()*30) if visible and item.kind=='notebook' and item.working else None,
+            int(time.monotonic()/4.5) if visible and item.kind in ('sign','note') else None)
         if key!=getattr(self,'_paint_key',None) or (visible and item.kind=='fireworks'):
             self._paint_key=key;self.update()
     def enterEvent(self,event):
@@ -109,6 +141,7 @@ class ObjectWindow(QWidget):
     def leaveEvent(self,event):
         if self.offset is None:self.scene.game.hover=False
     def mousePressEvent(self,event):
+        if self.item.kind=='projectile':return
         if event.button()!=Qt.LeftButton or self.offset is not None or not self.scene.game.visible() or not self.item.isVisible():return
         if self.item.kind=='ball' and self.scene.game.pingpong is not None:return
         p=event.globalPosition();self.offset=(p.x()-self.item._cx,p.y()-self.item._cy)
@@ -220,8 +253,8 @@ class ObjectWindow(QWidget):
     def paintEvent(self,event):
         p=QPainter(self);p.setRenderHint(QPainter.Antialiasing);p.setRenderHint(QPainter.SmoothPixmapTransform)
         w,h=self.width(),self.height();kind=self.item.kind
-        if kind in ('ball','paper'):
-            if kind=='ball' and self.item.appearance=='peanut':
+        if kind in ('ball','paper','projectile'):
+            if kind in ('ball','projectile') and self.item.appearance=='peanut':
                 paint_peanut(p,w/2,h/2,self.item.body.half_w,self.item.roll_angle)
             else:
                 paint_ball(p,w/2,h/2,radius=self.item.body.half_w,
@@ -245,7 +278,7 @@ class ObjectWindow(QWidget):
             paint_bubble(p,QRectF(self.rect()),self.item.text,True,w*self.item.anchor,
                          self.item.opacity,self.item.tail_top,compact=True)
         elif kind=='sign':
-            paint_bubble(p,QRectF(self.rect()),self.item.text)
+            paint_placard(p,self.item)
         else:
             scale=min(w/max(1,self.item._base_w),h/max(1,self.item._base_h))
             corner=kind=='corner';p.setPen(QPen(QColor('#846c49'),max(1.,2*scale)));p.setBrush(QColor('#e4cfa1' if corner else '#fff0be'));p.drawRoundedRect(QRectF(1,1,w-2,h-2),7*scale,7*scale)
@@ -299,7 +332,7 @@ class NativeScene:
     @staticmethod
     def scale_kind(item):
         kind=getattr(item,'kind','')
-        return ('toy' if kind in ('ball','paper') else 'notebook' if kind=='notebook' else
+        return ('toy' if kind in ('ball','paper','projectile') else 'notebook' if kind=='notebook' else
                 'reaction' if kind=='meme' else 'note' if kind=='note' else 'sign' if kind=='sign' else
                 'corner' if kind=='corner' else 'effects' if kind=='fireworks' else 'sign')
     def get_reaction_status(self, ident):
@@ -392,6 +425,23 @@ class NativeScene:
             body=getattr(item,'body',None)
             previous_radius=(body.half_w,body.half_h) if body is not None else None
             item.apply_scale(object_scale(item,self.game.prefs.get('avatarSize',136),self.game.prefs.get('objectScales'),area))
+            if item.kind in ('sign','note'):
+                width=item.desired_board_width if item.kind=='sign' else item.width()
+                layout_key=(item.text,width,item._applied_scale,area,self.speech.devicePixelRatioF())
+                if layout_key!=getattr(item,'_text_layout_key',None):
+                    height,_font=measure_text_box(item.text,width,compact=item.kind=='note',device=self.speech,
+                                                padding=(12,9,0) if item.kind=='sign' else None)
+                    height=min(max(40.,area[3]-area[1]-16.),height)
+                    if item.kind=='sign':item.desired_board_height=max(item.desired_board_height,height)
+                    else:item._h=max(item.height(),height)
+                    item._text_layout_key=layout_key
+                if item.kind=='sign':
+                    controller=next((control for control in (self.game.protest_ctl,self.game.sad_ctl)
+                                     if control.protest.sign is item),None)
+                    if controller is not None:controller.attach_sign(item,now)
+                    else:
+                        item.board_width,item.board_height=item.desired_board_width,item.desired_board_height
+                        item._w,item._h=item.board_width+6.,item.board_height+6.
             held=bool(item.carried or getattr(item,'dragging',False) or getattr(body,'held',False))
             if not held and body is not None:
                 left,top,right,bottom=area
@@ -403,6 +453,8 @@ class NativeScene:
                 x=max(left+half_w,min(right-half_w,item._cx))
                 y=max(top+half_h,min(bottom-half_h,item._cy))
                 if (x,y)!=(item._cx,item._cy):item.place(x,y)
+            if item.kind=='sign' and not item.attached:
+                item.board_x=item.shaft_x=item._cx;item.board_y=item.shaft_y=item._cy
             if item.closed:
                 self.fetcher.cancel(ident)
                 if ident in self.windows:self.windows.pop(ident).close()

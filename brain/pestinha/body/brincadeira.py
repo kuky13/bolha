@@ -23,7 +23,6 @@ from ..ajustes import (
     ALCANCE_BRINCADEIRA as REACH,
     TEMPO_VOO_ARREMESSO as FLIGHT_TIME,
     INTERVALO_BRINCADEIRA as PLAY_EVERY,
-    INTERVALO_PAPEL as PAPER_EVERY,
 )
 
 JUGGLE_FINISH_SECONDS = 1.25
@@ -49,7 +48,8 @@ class Play:
         """Guarda os pesos de cada brincadeira (0 desliga) e o próximo instante permitido."""
         self.w = weights_of(weights)
         self.next_at = 0.0
-        self.next_paper = 0.0
+        self.chase_enabled = True
+        self.juggle_enabled = True
         self.policy = None
         self.rates = {}
         self.energy = 1.
@@ -105,6 +105,8 @@ class Play:
         return self.juggle_finished_at is not None and 0. <= now-self.juggle_finished_at < JUGGLE_FINISH_SECONDS
 
     def start_juggle(self, now, body, ball, area):
+        if not self.juggle_enabled:
+            return
         self.stop_chase()
         self.juggle_target = random.randint(1,100)
         self.juggle_count = 0
@@ -145,7 +147,7 @@ class Play:
 
     def notice_toy_move(self, now, body, ball):
         """Um movimento do jogador convida para brincar e pode tirar a bola do alcance."""
-        if self.weight('bola') <= 0.:
+        if not self.chase_enabled or self.weight('bola') <= 0.:
             return None
         self.stop_juggle()
         self.volley_left = 0
@@ -185,7 +187,7 @@ class Play:
 
     def follow(self, dt, now, body, ball, cursor, tone, emotion):
         """Corre e salta atrás do brinquedo, devolvendo apenas quando o alcança."""
-        if (now >= self.chase_until or not ball.isVisible() or self.energy <= .18):
+        if (not self.chase_enabled or now >= self.chase_until or not ball.isVisible() or self.energy <= .18):
             return None
         toy = ball.body
         dx, dy = toy.x-body.x, toy.y-body.y
@@ -245,7 +247,7 @@ class Play:
         if ball.dragging or ball.body.held:
             return None
         toy = ball.body
-        juggling_space = (area is not None and body.platform is None and body.grounded and toy.grounded
+        juggling_space = (self.juggle_enabled and area is not None and body.platform is None and body.grounded and toy.grounded
                           and abs(toy.x-body.x) <= body.half_w+toy.half_w+22.
                           and body.y-area[1] >= body.half_h+2*toy.half_h+100.
                           and toy.y-body.y > body.half_h*.3)
@@ -311,11 +313,4 @@ class Play:
         vx = max(-1400.0, min(1400.0, dx / T))
         vy = (dy - 0.5 * GRAVITY * T * T) / T
         ball.kick(vx, vy)
-        return True
-
-    def paper_due(self, now, revolution, body):
-        """Na revolução, uma bolinha de papel a cada PAPER_EVERY s, se ele ainda tiver peso para isso."""
-        if not revolution or self.weight("arremesso") <= 0 or now < self.next_paper:
-            return False
-        self.next_paper = now + PAPER_EVERY
         return True
