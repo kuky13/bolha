@@ -1,0 +1,39 @@
+name: Relatar um problema
+description: Conte o que não funcionou e como reproduzir.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Não anexe perfis, arquivos de aprendizado, credenciais ou dados pessoais.
+        Informe apenas o necessário para reproduzir o problema.
+  - type: input
+    id: version
+    attributes:
+      label: Versão
+      description: Encontre a versão na Central da Bolha ou no nome do instalador.
+      placeholder: "Versão mostrada na Central"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plataforma
+      options:
+        - Windows
+        - Android
+        - Linux ou execução pelo código
+        - Outra
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      description: Liste os passos e o que você esperava que acontecesse.
+      placeholder: |
+        1. Abra ...
+        2. Escolha ...
+        3. Observe ...
+    validations:
+      required: true

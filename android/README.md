@@ -1,4 +1,4 @@
-# Bolha 0.5.3 no Android
+# Bolha no Android
 
 A interface Android usa o cérebro local, a física e o relógio de expressões da
 Bolha em Python via Chaquopy, com desenho nativo em Canvas. O projeto é baseado

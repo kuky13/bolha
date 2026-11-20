@@ -41,13 +41,30 @@ def test_working_notebook_animates_only_screen_and_keys(qt_application):
     assert idle==render(132,96,False,.7)
     active,pause=render(132,96,True,.05),render(132,96,True,.15)
     changes={(x,y) for y in range(96) for x in range(132) if active.pixel(x,y)!=pause.pixel(x,y)}
-    keys={(x,y) for x,y in changes if 23<=x<=112 and 75<=y<=81}
+    keys={(x,y) for x,y in changes if 22<=x<=112 and 74<=y<=82}
     assert keys and changes==keys
-    # Os pontos ficam no terminal enquanto a Bolha solta a tecla.
-    assert active.pixelColor(55,37)==pause.pixelColor(55,37)
-    assert pause.pixelColor(55,37)!=idle.pixelColor(55,37)
+    # A escrita permanece na tela depois que a Bolha solta a tecla.
+    assert active.pixelColor(37,49)==pause.pixelColor(37,49)
+    assert pause.pixelColor(37,49)!=idle.pixelColor(37,49)
     blink=render(132,96,True,2.55)
-    assert blink.pixelColor(86,43)!=render(132,96,True,3.1).pixelColor(86,43)
+    assert blink.pixelColor(72,49)!=render(132,96,True,3.1).pixelColor(72,49)
+
+
+@pytest.mark.parametrize('phase',[.05,.25,.45,.65,1.15,1.35,1.55,1.75,2.55,3.1])
+def test_typing_preserves_chassis_and_silhouette(qt_application,phase):
+    idle,working=render(132,96),render(132,96,True,phase)
+    for y in range(96):
+        for x in range(132):
+            assert idle.pixelColor(x,y).alpha()==working.pixelColor(x,y).alpha()
+            if idle.pixel(x,y)!=working.pixel(x,y):
+                assert (31<=x<=101 and 18<=y<=58 or
+                        22<=x<=112 and 74<=y<=82 or
+                        111<=x<=116 and 83<=y<=87),(phase,x,y)
+
+
+@pytest.mark.parametrize('phase',[float('nan'),float('inf'),float('-inf')])
+def test_invalid_clock_does_not_break_drawing(qt_application,phase):
+    assert render(132,96,True,phase)==render(132,96,True,0.)
 
 
 @pytest.mark.parametrize('x, side', [(-608, -1), (-230, 1)])

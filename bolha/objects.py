@@ -45,46 +45,51 @@ def notebook_shape(rect):
 
 
 def paint_notebook(p,rect,working=False,phase=0.):
-    """Mini terminal grafite, com cursor e teclas ligados ao ritmo da Bolha."""
+    """Notebook lavanda, com escrita e teclas no mesmo ritmo da Bolha."""
     phase=phase if math.isfinite(phase) else 0.
     key,tap,progress=typing_frame(phase) if working else (-1,0.,0)
     p.save();p.setTransform(notebook_transform(rect),True)
     shell=QLinearGradient(0,7,0,72)
-    shell.setColorAt(0,QColor('#493e60'));shell.setColorAt(1,QColor('#242031'))
-    p.setPen(QPen(QColor('#a494bd'),1.1));p.setBrush(shell)
+    shell.setColorAt(0,QColor('#baaacc'));shell.setColorAt(1,QColor('#746780'))
+    p.setPen(QPen(QColor('#d2c1e2'),1.1));p.setBrush(shell)
     p.drawRoundedRect(_NOTEBOOK_LID,9,9)
-    glass=QLinearGradient(0,14,0,63)
-    glass.setColorAt(0,QColor('#242034'));glass.setColorAt(1,QColor('#0b0e15'))
-    p.setPen(QPen(QColor('#51445e'),1));p.setBrush(glass)
-    p.drawRoundedRect(QRectF(27,14,78,49),6,6)
-    p.setPen(Qt.NoPen);p.setBrush(QColor('#131520'))
-    p.drawRoundedRect(QRectF(34,21,64,33),4,4)
-    for x,color in ((34,'#db99ad'),(39,'#ffd16e'),(44,'#89d3bf')):
-        p.setBrush(QColor(color));p.drawEllipse(QPointF(x,19),1.2,1.2)
-    p.setPen(QPen(QColor('#ffd16e'),2,Qt.SolidLine,Qt.RoundCap,Qt.RoundJoin));p.setBrush(Qt.NoBrush)
-    prompt=QPainterPath(QPointF(43,32));prompt.lineTo(49,37);prompt.lineTo(43,42)
-    p.drawPath(prompt)
-    p.setPen(Qt.NoPen);p.setBrush(QColor('#b98b64'))
+    glass=QLinearGradient(26,13,100,64)
+    glass.setColorAt(0,QColor('#34374f'));glass.setColorAt(1,QColor('#182133'))
+    p.setPen(QPen(QColor('#51465f'),.9));p.setBrush(glass)
+    p.drawRoundedRect(QRectF(25.5,13,81,51),4,4)
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#3d3249'))
+    p.drawEllipse(QPointF(66,9.8),.8,.8)
+    p.setBrush(QColor('#83738f'));p.drawRoundedRect(QRectF(57,67,18,1.1),.5,.5)
+    # Poucas linhas grandes continuam reconhecíveis na escala mínima.
+    p.setBrush(QColor('#242b40'));p.drawRoundedRect(QRectF(31,18,70,40),2,2)
+    p.setBrush(QColor('#817895'));p.drawRoundedRect(QRectF(35,22,17,1.5),.6,.6)
+    p.setBrush(QColor('#ffd16e'));p.drawRoundedRect(QRectF(35,29,28,2.4),1,1)
+    p.setBrush(QColor('#ddd3e8'));p.drawRoundedRect(QRectF(35,36,18,1.8),.7,.7)
+    p.setBrush(QColor('#9f9ab9'));p.drawRoundedRect(QRectF(35,41,43,1.6),.6,.6)
+    p.drawRoundedRect(QRectF(57,36,31,1.8),.7,.7)
+    p.setBrush(QColor('#efd29b'))
     for index in range(progress):
-        p.drawEllipse(QPointF(55+3.5*index,37),.8,.8)
+        p.drawRoundedRect(QRectF(35+4.6*index,48,3,1.8),.6,.6)
     if not working or key>=0 or int(phase*2)%2==0:
-        p.setPen(QPen(QColor('#ffd16e'),2,Qt.SolidLine,Qt.RoundCap))
-        x=54+3.5*progress
-        p.drawLine(QPointF(x,43),QPointF(x+9,43))
-    p.setPen(Qt.NoPen);p.setBrush(QColor('#55425d'))
-    for x in (84,90):p.drawEllipse(QPointF(x,48),1,1)
-    p.setBrush(QColor('#24202e'));p.drawRoundedRect(_NOTEBOOK_HINGE,4,4)
+        p.setBrush(QColor('#ffd16e'))
+        p.drawRoundedRect(QRectF(35+4.6*progress,46.5,1.2,4.5),.5,.5)
+    p.setBrush(QColor('#51465f'));p.drawRoundedRect(_NOTEBOOK_HINGE,4,4)
+    p.setBrush(QColor('#c3b2d2'))
+    for x in (28,96):p.drawRoundedRect(QRectF(x,69,8,4),1.5,1.5)
     base=QLinearGradient(0,72,0,91)
-    base.setColorAt(0,QColor('#665a79'));base.setColorAt(1,QColor('#2a2638'))
-    p.setPen(QPen(QColor('#9383ae'),1));p.setBrush(base);p.drawPath(_notebook_base())
+    base.setColorAt(0,QColor('#c6b8d7'));base.setColorAt(.8,QColor('#998ba9'));base.setColorAt(1,QColor('#6a5c7a'))
+    p.setPen(QPen(QColor('#d2c1e2'),1));p.setBrush(base);p.drawPath(_notebook_base())
+    p.setPen(QPen(QColor('#776785'),.7));p.drawLine(QPointF(8,88),QPointF(124,88))
     p.setPen(Qt.NoPen)
-    for col in range(8):
-        pressed=tap if col==key else 0.
-        p.setBrush(QColor(round(50+205*pressed),round(43+164*pressed),round(64+57*pressed)))
-        p.drawRoundedRect(QRectF(24+11*col,76+.35*pressed,7.5,3.4),1,1)
-    p.setBrush(QColor('#81708b'));p.drawRoundedRect(QRectF(53,82.5,26,4),1,1)
-    p.setBrush(QColor('#ffd16e') if working else QColor('#8a7161'))
-    p.drawEllipse(QPointF(114,85),1.3,1.3)
+    for row in range(2):
+        for col in range(8):
+            pressed=tap if col==key and row==key%2 else 0.
+            p.setBrush(QColor(round(77+178*pressed),round(66+143*pressed),round(92+18*pressed)))
+            p.drawRoundedRect(QRectF(24+11*col-row,74.5+4*row+.35*pressed,7.8,2.6),.7,.7)
+    p.setPen(QPen(QColor('#7a698a'),.65));p.setBrush(QColor('#d3c7df'))
+    p.drawRoundedRect(QRectF(53,83,26,3.5),1,1)
+    p.setPen(Qt.NoPen);p.setBrush(QColor('#ffd16e') if working else QColor('#756b80'))
+    p.drawRoundedRect(QRectF(112.5,84.3,3,1.4),.7,.7)
     p.restore()
 
 
