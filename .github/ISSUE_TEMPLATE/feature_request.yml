@@ -1,0 +1,24 @@
+name: Sugerir uma ideia
+description: Explique a ideia e qual problema ela ajudaria a resolver.
+title: "[Ideia]: "
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Uma descrição curta ajuda a comunidade a entender a proposta. Não anexe
+        perfis, credenciais, dados pessoais ou materiais privados de referência.
+  - type: input
+    id: idea
+    attributes:
+      label: Ideia
+      description: O que você gostaria que a Bolha fizesse?
+      placeholder: Uma frase curta
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Motivo
+      description: Que problema isso resolve ou como ajudaria?
+    validations:
+      required: true

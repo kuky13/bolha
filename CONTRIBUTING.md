@@ -3,6 +3,9 @@
 A Bolha é um projeto open source da comunidade. Relatos de erros, sugestões e
 pull requests são bem-vindos.
 
+Para criar uma versão própria, comece pelo [guia de personalização](docs/PERSONALIZAR.md).
+Para usar a Bolha sem alterar o código, veja o [guia de uso](docs/USO.md).
+
 ## Desenvolver e validar
 
 Use Python 3.11 e instale as dependências de desenvolvimento:

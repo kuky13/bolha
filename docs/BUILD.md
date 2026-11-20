@@ -13,7 +13,7 @@ py -3.11 -m venv .venv
 
 O compilador NSIS 3.11 portátil é baixado do SourceForge e validado pelo SHA-256
 publicado pelo projeto. Se já tiver makensis, use `--makensis C:\caminho\makensis.exe`.
-O script gera o ícone sem boca a partir do mesmo desenho Qt do aplicativo,
+O script gera o ícone a partir do mesmo desenho Qt do aplicativo,
 coleta licenças, rejeita bibliotecas web e cria instalador, `latest.yml` e
 `SHA256SUMS.txt`. A versão do aplicativo fica em `bolha/__init__.py` e
 `pyproject.toml`; uma versão de teste pode ser passada por `--version`.

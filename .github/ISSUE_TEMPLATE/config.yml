@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Guias da Bolha
+    url: https://github.com/kuky13/bolha/blob/main/docs/README.md
+    about: Veja instruções de uso, personalização, compilação e histórico.
+  - name: Como contribuir
+    url: https://github.com/kuky13/bolha/blob/main/CONTRIBUTING.md
+    about: Leia as orientações antes de abrir um pull request.

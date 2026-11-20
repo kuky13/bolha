@@ -148,22 +148,28 @@ def animation_pose(mode, seconds, strength=1.):
         stride = t*math.tau*2.
         push = math.sin(stride)
         playing = mode == 'brinquedo_perseguindo'
+        press, spring = max(0.,-push)**1.3, max(0.,push)**1.3
+        # Uma abertura breve a cada duas passadas; o sorriso também corre junto.
+        breath = _mouth_pulse(t%1.-.10,.22,.065)
         pose.update(emotion='contente' if playing else 'atento',
-                    eye_open=1.16+.10*push if playing else 1.16,
+                    eye_open=1.08+.14*spring,
                     ear_raise=-1.4*strength+1.1*push,
                     ear_tilt=-9.-6.*strength-3.*math.cos(stride-.6),
                     squash=(.045*push-.035)*strength,
                     angle_offset=(9.+2.7*math.sin(stride-.3))*strength,
+                    mouth_curve=.66+.12*spring-.10*press,
+                    mouth_open=(.16+.14*strength)*breath,
+                    mouth_width=1.04+.08*spring-.04*press,
                     effect='perseguindo',effect_strength=.28+.4*strength)
         if playing:
-            grin = _mouth_pulse(t%1.12,.52,.12)
-            press, spring = max(0.,-push)**1.3, max(0.,push)**1.3
             ear_swing = math.sin(stride-.65)
             pose.update(squash=(.11*press-.083*spring)*strength,
                         ear_raise=.65+2.5*ear_swing*strength,
                         ear_tilt=-5.-7.*ear_swing*strength,
                         angle_offset=(7.5+3.8*math.sin(stride-.42))*strength,
-                        mouth_curve=.86+.12*grin, mouth_open=.44*grin, mouth_width=1.14)
+                        mouth_curve=.82+.14*spring-.05*press,
+                        mouth_open=(.24+.16*strength)*breath,
+                        mouth_width=1.10+.06*spring-.02*press)
     elif mode == 'brinquedo_esperando':
         spring = .5+.5*math.sin(t*6.)
         pose.update(emotion='contente', eye_open=1.13+.10*spring,
@@ -355,6 +361,7 @@ class ExpressionMotion:
         self.blink_until = 0.
         self.run_phase = 0.
         self.run_tick = now
+        self.run_transition = None
         self.irritation = None
         self.pose = animation_pose(self.mode, 0)
 
@@ -445,7 +452,12 @@ class ExpressionMotion:
                 self.quirk = choice
                 self.quirk_since = now;self.last_quirk = choice
         if self.quirk is not None:mode = self.quirk;elapsed = now - self.quirk_since
-        if mode != self.mode:self.mode = mode;self.started = now
+        if mode != self.mode:
+            changing_run = self.mode in ('correndo','brinquedo_perseguindo') or running
+            settling = mode in ('correndo','brinquedo_perseguindo','brinquedo_esperando',
+                                'observando','contente','curioso','feliz','entediado','atento','neutro')
+            self.run_transition = previous_pose if changing_run and settling else None
+            self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
         if mode in ('brinquedo_esperando','brinquedo_escapou','preparar_bote'):
             toy = game.ball.body
@@ -538,6 +550,15 @@ class ExpressionMotion:
                 self.pose['impact_phase'] = age
                 self.pose['impact_strength'] = play_reaction['intensity'] * (1.-_ease((age-.035)/.22))
         self._ease_irritation(game, now, expression_dt, previous_pose)
+        if self.run_transition is not None and self.pose['anger'] < .03:
+            blend = _ease((now-self.started)/.18)
+            for key in ('eye_open','ear_raise','ear_tilt','mouth_curve','mouth_width','mouth_open'):
+                start = self.run_transition[key]
+                self.pose[key] = start+(self.pose[key]-start)*blend
+            before = self.run_transition.get('face_profile', feature_profile(self.run_transition['emotion']))
+            self.pose['face_profile'] = tuple(start+(end-start)*blend
+                for start,end in zip(before,self.pose['face_profile']))
+            if blend >= 1.:self.run_transition = None
         self.pose['blink'] = max(self.pose['blink'], float(now < self.blink_until))
         self.pose['mouth_enabled'] = game.prefs.get('mouthEnabled', True)
         return self.pose

@@ -261,6 +261,76 @@ def test_corrida_compensa_rolagem_oposta_e_voltas_completas(tmp_path, velocity, 
     assert pose['gaze'][0]*velocity>0.
 
 
+@pytest.mark.parametrize('mode', ['correndo','brinquedo_perseguindo'])
+def test_corrida_sorri_com_a_passada_e_abre_a_boca_brevemente_a_cada_duas(mode):
+    samples = [animation_pose(mode, 20.+frame/240., .85) for frame in range(241)]
+    assert all(pose['eye_open'] >= 1. and pose['mouth_skew'] == 0. for pose in samples)
+    assert min(pose['mouth_curve'] for pose in samples) > .5
+    assert max(pose['mouth_curve'] for pose in samples)-min(pose['mouth_curve'] for pose in samples) > .15
+    assert .2 < max(pose['mouth_open'] for pose in samples) < .45
+    assert sum(pose['mouth_open'] <= .025 for pose in samples) > len(samples)*.78
+    opening = animation_pose(mode, 20.165, .85)
+    alternate = animation_pose(mode, 20.665, .85)
+    repeated = animation_pose(mode, 21.165, .85)
+    assert opening['mouth_open'] > .2 and alternate['mouth_open'] == 0.
+    assert opening['squash'] == pytest.approx(alternate['squash'])
+    for key in ('mouth_open','mouth_curve','mouth_width','ear_raise','squash'):
+        assert repeated[key] == pytest.approx(opening[key])
+
+
+@pytest.mark.parametrize('direction', [-1.,1.])
+@pytest.mark.parametrize('speed', [90.,300.])
+def test_corrida_usa_velocidade_fase_continua_e_toggle_da_boca(tmp_path,direction,speed):
+    game = game_at_rest(tmp_path)
+    game.state.emotion = 'observando'
+    game.configure(dict(mouthEnabled=False))
+    game.body.vx = speed*direction
+    motion = ExpressionMotion(100.)
+    poses = []
+    before = vars(game.body).copy()
+    for frame in range(151):
+        now = 100.+frame/60.
+        # O cérebro pode renovar a perseguição sem reiniciar o ritmo visual.
+        game.play_reaction = dict(kind='brinquedo_perseguindo',started=now,until=now+.1,intensity=.9)
+        poses.append(motion.update(game,now))
+    assert vars(game.body) == before
+    assert motion.run_phase == pytest.approx(speed*2.5/max(24.,game.body.half_w)/3.4)
+    assert max(pose['mouth_open'] for pose in poses[12:]) > .18
+    assert any(pose['mouth_open'] == 0. for pose in poses[12:])
+    assert all(pose['mouth_enabled'] is False for pose in poses)
+    assert all(pose['gaze'][0]*direction > .6 for pose in poses)
+
+
+def test_partir_e_parar_amacia_o_rosto_sem_reiniciar_a_fase_ou_segurar_boca_aberta(tmp_path):
+    game = game_at_rest(tmp_path)
+    game.state.emotion = 'observando'
+    game.choose_expression = lambda *args: None
+    motion = ExpressionMotion(100.)
+    resting = motion.update(game,100.)
+    game.body.vx = 300.
+    starting = motion.update(game,100.+1/60.)
+    for key in ('eye_open','ear_raise','ear_tilt','mouth_open','mouth_curve'):
+        assert starting[key] == resting[key]
+    motion.run_phase = .165
+    motion.run_tick = 100.5
+    running = motion.update(game,100.5)
+    assert running['mouth_curve'] > .7 and running['mouth_open'] > .15
+    game.body.vx = 0.
+    stopping = motion.update(game,100.5+1/60.)
+    phase = motion.run_phase
+    for key in ('eye_open','ear_raise','ear_tilt','mouth_open','mouth_curve'):
+        assert stopping[key] == running[key]
+    halfway = motion.update(game,100.59)
+    settled = motion.update(game,100.8)
+    assert 0. < halfway['mouth_open'] < stopping['mouth_open']
+    assert settled['mouth_open'] == 0.
+    assert settled['mouth_curve'] == resting['mouth_curve']
+    assert motion.run_phase == phase
+    game.body.vx = -180.
+    motion.update(game,100.8+1/60.)
+    assert motion.run_phase > phase and motion.pose['gaze'][0] < -.6
+
+
 @pytest.mark.parametrize('mode', ['feliz', 'caress', 'comemorando', 'airborne', 'assustado', 'impact', 'held'])
 def test_boca_abre_no_gesto_e_fecha_antes_da_emocao_terminar(mode):
     assert animation_pose(mode,.08)['mouth_open'] > .1
