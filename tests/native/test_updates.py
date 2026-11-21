@@ -189,6 +189,36 @@ def test_bad_pending_cache_restarts_automatic_check(tmp_path):
     updater.stop()
 
 
+def test_completion_keeps_pending_marker_until_recovery_can_finish(tmp_path, monkeypatch):
+    import sys
+    from PySide6.QtWidgets import QApplication
+    from bolha.installation import record_update
+    from bolha.updates import Updater
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(sys, 'frozen', True, raising=False)
+    monkeypatch.setenv('BOLHA_TEST', '1')
+    updater = Updater(tmp_path, '0.5.9.1', lambda: True, lambda: None)
+    updater.cache_root.mkdir()
+    installer = updater.cache_root / 'Bolha.exe'
+    installer.touch()
+    marker = tmp_path / 'pending-update.json'
+    record_update(tmp_path, '0.5.9.1', installer, updater.cache_root)
+
+    def run(kind, operation):
+        updater._apply((kind, operation(), None))
+
+    with (patch.object(updater, '_background', side_effect=run),
+          patch('bolha.updates.cleanup_recovery', side_effect=[False, True])):
+        updater.healthy()
+        assert marker.exists() and installer.exists()
+        assert updater.state['phase'] != 'completed'
+        updater.healthy()
+    assert not marker.exists() and not installer.exists()
+    assert updater.state == {'phase': 'completed', 'installedVersion': '0.5.9.1'}
+    updater.stop()
+
+
 def test_four_component_release_detection_notes_and_verified_download(feed, tmp_path):
     from bolha.installation import compare_versions
     from scripts.test_windows_native import installer_version

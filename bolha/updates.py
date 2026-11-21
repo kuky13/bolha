@@ -390,7 +390,7 @@ class Updater(QObject):
                 self._cleanup_timer.start()
             elif value == 'updated':
                 self.updated = True
-                if self.state['phase'] in ('idle', 'checking'):
+                if self.state['phase'] in ('idle', 'checking', 'error'):
                     self._send({'phase': 'completed'})
             return
         if kind in ('check', 'resume'): self._checking = False
@@ -446,12 +446,21 @@ class Updater(QObject):
                 pending = read_json(self.data_dir / 'pending-update.json')
             except FileNotFoundError:
                 pending = None
-            applied = (isinstance(pending, dict)
-                       and compare_versions(self.version, pending.get('version')) == 0)
+            applied = False
+            if pending is not None:
+                if not isinstance(pending, dict):
+                    raise ValueError('Registro de atualização inválido.')
+                ordering = compare_versions(self.version, pending.get('version'))
+                if ordering < 0:
+                    return False
+                applied = ordering == 0
+            # Mantenha o registro pendente se a transação ainda estiver ativa
+            # ou se a remoção do backup precisar ser repetida.
+            if not cleanup_recovery(self.data_dir, Path(sys.executable).parent, self.version):
+                return False
             if not cleanup_applied_update(self.data_dir, self.version, self.cache_root):
                 return False
-            recovered = cleanup_recovery(self.data_dir, Path(sys.executable).parent, self.version)
-            return ('updated' if applied else True) if recovered else False
+            return 'updated' if applied else True
         self._background('cleanup', cleanup)
 
     def stop(self):
