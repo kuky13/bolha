@@ -47,6 +47,24 @@ EYE_SHAPES = {
     "dormindo":   dict(w=32, h=4, inner=0.0, outer=0.0, smile=0.0, dy=8.0),     # olhinhos fechados
 }
 
+# Onde cada emoção cai no plano (valência, ativação). O rosto mistura as formas pela proximidade.
+ANCHORS = {
+    "observando": (0.0, 0.0),
+    "contente": (0.55, -0.25),
+    "feliz": (0.85, 0.6),
+    "curioso": (0.0, 0.7),
+    "bravo": (-0.8, 0.7),
+    "triste": (-0.8, -0.5),
+}
+
+
+def affect_weights(valence, arousal):
+    """Peso de cada expressão pela distância ao humor atual."""
+    weights = {name: math.exp(-((valence - v) ** 2 + (arousal - a) ** 2) / 0.08)
+               for name, (v, a) in ANCHORS.items()}
+    total = sum(weights.values())
+    return {name: weight / total for name, weight in weights.items()}
+
 
 def classify(valence, arousal):
     """Dá nome à emoção a partir de valência (agradável ou não) e excitação (calmo ou agitado)."""

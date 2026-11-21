@@ -5,6 +5,7 @@ import math
 from .facial_motion import WINK_DURATION, wink_state, mouth_state, feature_profile
 from .desk import TYPING_SECONDS, typing_frame
 from cursor_prank import CHEW_SECONDS
+from pestinha.core.emotion import ANCHORS, affect_weights
 
 QUIRK_SECONDS = dict(stretch=2.3, sneeze=1.65, hiccup=1.6, doze=3.3,
                      ear_wiggle=1.5, wink=WINK_DURATION)
@@ -600,6 +601,16 @@ class ExpressionMotion:
                 pose['effect'] = 'bravo'
                 pose['effect_strength'] = max(pose['effect_strength'], .7*self.irritation)
         pose['face_profile'] = feature_profile(pose['emotion'], self.irritation)
+        # A transição contínua do Pestinha usa a geometria própria da Bolha.
+        affect = getattr(game, 'emotion', None)
+        if (affect and not affect.override and self.mode in ANCHORS
+                and self.mode == game.state.emotion and self.irritation <= .03):
+            weights = affect_weights(affect.valence, affect.arousal)
+            profiles = [feature_profile(name) for name in weights]
+            pose['face_profile'] = tuple(
+                sum(value * weight for value, weight in zip(values, weights.values()))
+                for values in zip(*profiles)
+            )
         # A troca de modo físico não deve trocar os olhos/orelhas em um só quadro.
         if not first_frame and max(previous_anger, self.irritation) > .03:
             facial_blend = 1. - math.exp(-dt / .14)

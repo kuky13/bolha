@@ -158,16 +158,23 @@ def test_settings_capture_and_individual_values(qt_application, tmp_path):
     shell.close()
 
 
-def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_application, tmp_path):
+def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_application, tmp_path, monkeypatch):
+    monkeypatch.setattr('bolha.battery_panel.getpass.getuser', lambda: 'Conta <local>')
     monitor = BatteryMonitor(lambda _: None, tmp_path)
     monitor.enabled = True
     monitor.devices = parse_devices(json.dumps([
-        dict(key='a', name='A sleeping', percent=20, asleep=True),
-        dict(key='z', name='Z connected', percent=80),
+        dict(key='a', name='A sleeping', percent=20, asleep=True, kind=['unknown']),
+        dict(key='z', name='Z <connected>', percent=80, kind='mouse'),
     ]).encode())
     panel = BatteryPanel(monitor, QSystemTrayIcon())
     labels = [label.text() for label in panel.scroll.widget().findChildren(QLabel)]
-    assert labels.index('Z connected') < labels.index('A sleeping')
+    assert labels.index('Z <connected>') < labels.index('A sleeping')
+    assert [device.kind for device in monitor.devices] == ['other', 'mouse']
+    icons = panel.scroll.widget().findChildren(QLabel, 'batteryDeviceIcon')
+    assert len(icons) == 2 and all(not icon.pixmap().isNull() for icon in icons)
+    assert icons[0].pixmap().toImage() != icons[1].pixmap().toImage()
+    assert 'Z &lt;connected&gt;' in icons[0].toolTip()
+    assert 'Conta &lt;local&gt;' in icons[0].toolTip()
     panel.toggle()
     assert panel.isVisible()
     monitor.configure(False, 15, True)

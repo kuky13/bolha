@@ -57,3 +57,12 @@ mantêm suas próprias licenças. Consulte
   e `headsetcontrol-4.3.0.tar.gz` da mesma publicação Windows.
 - [Python/WinRT](https://github.com/pywinrt/pywinrt/tree/v3.2.1), MIT, dá acesso às
   sessões locais de mídia do Windows. Veja [a licença](licenses/PYWINRT-MIT.txt).
+
+
+## Sincronização com o Pestinha
+
+A sincronização com a [main do Pestinha no commit `0bb768a`](https://github.com/mille-okws/pestinha/tree/0bb768a2be024221ee1da62cc335362279d912d6)
+incorpora o histórico do fork e adapta a interpolação de expressões a partir
+da valência e ativação do cérebro. A Bolha mantém seus próprios desenhos,
+comportamentos, instaladores e superfícies Windows e Android. Os executáveis
+originais e os testes específicos da interface original seguem no Pestinha.

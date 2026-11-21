@@ -1,14 +1,11 @@
-# Bolha 0.5.8 para Windows
+# Bolha 0.5.9 para Windows
 
-- Dois toques rápidos no Alt esquerdo chamam a própria Bolha para seguir o
-  cursor. Ela mastiga uma cópia do ponteiro até o próximo clique. Esc cancela.
-- O ícone de bateria perto do relógio abre o painel de periféricos. Os
-  dispositivos conectados e acordados aparecem automaticamente no topo.
-- A bolinha é o brinquedo padrão em perfis novos. O amendoim continua
-  disponível na Central, e a atualização preserva a aparência já escolhida.
-
-- O instalador explica problemas na pasta escolhida quando você clica em
-  Instalar, como um caminho inválido ou espaço insuficiente.
+- O painel de baterias exibe um ícone por tipo de periférico. Ao passar o
+  mouse, aparecem o nome do dispositivo e o usuário local do Windows.
+- Em repouso, o rosto acompanha mais suavemente as mudanças de humor do
+  cérebro. A adaptação vem do Pestinha e usa o desenho próprio da Bolha.
+- O código do fork foi sincronizado com o Pestinha. A Bolha continua usando
+  seus próprios instaladores e recursos. [Créditos e licenças](https://github.com/kuky13/bolha/blob/main/NOTICE.md).
 
 A versão [0.5.6 para Android](https://github.com/kuky13/bolha/releases/tag/v0.5.6)
 continua disponível.
