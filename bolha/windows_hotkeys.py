@@ -128,6 +128,8 @@ class Hotkeys(QAbstractNativeEventFilter):
         self.double = None
         self.tap = DoubleTap()
         self.raw = False
+        self.mouse_callback = None
+        self.input_buffer = ctypes.create_string_buffer(ctypes.sizeof(RawHeader) + 24)
         self.next_id = 0xB10
         self.app.installNativeEventFilter(self)
 
@@ -140,6 +142,13 @@ class Hotkeys(QAbstractNativeEventFilter):
         if not self.user.RegisterRawInputDevices(ctypes.byref(device), 1, ctypes.sizeof(device)):
             raise OSError('O Windows recusou a leitura do atalho do localizador')
         self.raw = enabled
+
+    def listen_click(self, callback):
+        if bool(callback) != bool(self.mouse_callback):
+            device = RawDevice(1, 2, 0x100 if callback else 1, self.hwnd if callback else None)
+            if not self.user.RegisterRawInputDevices(ctypes.byref(device), 1, ctypes.sizeof(device)):
+                raise OSError('O Windows recusou a leitura do clique do localizador')
+        self.mouse_callback = callback
 
     def configure(self, prefs):
         layout = self.keyboard_layout()
@@ -186,16 +195,21 @@ class Hotkeys(QAbstractNativeEventFilter):
             if not self.editing():
                 self.callbacks[self.active[msg.wParam][0]]()
             return True, 0
-        if msg.message != 0xFF or not self.raw:
+        if msg.message != 0xFF or not (self.raw or self.mouse_callback):
             return False, 0
         if self.editing():
             self.tap.reset()
             return False, 0
         header = ctypes.sizeof(RawHeader)
-        buffer = ctypes.create_string_buffer(header + ctypes.sizeof(RawKeyboard))
+        buffer = self.input_buffer
         size = wintypes.UINT(len(buffer))
         read = self.user.GetRawInputData(msg.lParam, 0x10000003, buffer, ctypes.byref(size), header)
-        if read == len(buffer) and RawHeader.from_buffer(buffer).type == 1:
+        if read == header + 24 and RawHeader.from_buffer(buffer).type == 0:
+            # RAWMOUSE guarda os botões no primeiro USHORT da união de 32 bits.
+            flags = ctypes.c_uint16.from_buffer(buffer, header + 4).value
+            if self.mouse_callback and flags & 0x155:
+                self.mouse_callback()
+        elif read == header + ctypes.sizeof(RawKeyboard) and RawHeader.from_buffer(buffer).type == 1:
             data = RawKeyboard.from_buffer(buffer, header)
             key, pressed = data.key, not data.flags & 1
             if key in (0x11, 0x12):
@@ -215,6 +229,11 @@ class Hotkeys(QAbstractNativeEventFilter):
 
     def stop(self):
         self.app.removeNativeEventFilter(self)
+        if self.mouse_callback:
+            try:
+                self.listen_click(None)
+            except OSError:
+                pass
         if self.raw:
             try:
                 self._raw_subscription(False)

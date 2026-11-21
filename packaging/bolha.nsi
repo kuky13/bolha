@@ -28,6 +28,7 @@ BrandingText "Bolha — companhia local"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
 !define MUI_DIRECTORYPAGE_TEXT_TOP "Escolha uma pasta exclusiva para a Bolha. Ao clicar Instalar, a pasta será verificada e qualquer impedimento será explicado."
+!define MUI_DIRECTORYPAGE_VERIFYONLEAVE
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE PrepareInstallDirectory
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -149,7 +150,13 @@ FunctionEnd
 
 Function PrepareInstallDirectory
   StrCpy $ConfirmedInstallDirectory ""
-  ; Valida uma vez ao clicar Instalar, exibindo o motivo em vez de desativar o botão.
+  ; A página permanece clicável e exibe o erro da verificação nativa.
+  GetInstDirError $0
+  ${If} $0 == 1
+    !insertmacro RejectInstallDirectory "O Windows recusou o caminho da instalação. Escolha outra pasta."
+  ${ElseIf} $0 == 2
+    !insertmacro RejectInstallDirectory "Não há espaço suficiente para instalar a Bolha nesse disco."
+  ${EndIf}
   Call NormalizeInstallDirectory
   ${GetRoot} "$INSTDIR" $0
   ${If} $INSTDIR == $0

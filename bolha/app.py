@@ -138,7 +138,7 @@ class NativeApp:
     def refresh_desktop(self,*_):
         exclude=[int(self.pet.winId()),int(self.pet.visual.winId())]+self.scene.ids()+[int(d.winId()) for d in self.dialogs]
         if self.windows_features is not None:
-            exclude.append(int(self.windows_features.finder.winId()))
+            exclude.extend(int(widget.winId()) for widget in (self.windows_features.finder, self.windows_features.battery_panel))
         if self.pingpong_view.isVisible():
             exclude.append(int(self.pingpong_view.winId()))
         self.game.desktop(desktop_layout(self.qapp,exclude));self.game.last_native=0;self.game.read_context(time.monotonic());self.pet.sync();self.scene.sync()
@@ -152,9 +152,12 @@ class NativeApp:
             if getattr(self.game, 'prefs', self.store.preferences).get('senseCursor',True):
                 point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()), now=now)
             else:self.game.cursor=(self.game.body.x,self.game.body.y)
+            features = getattr(self, 'windows_features', None)
+            if features is not None:
+                features.guide_cursor()
             self.game.tick(dt,now)
-            if getattr(self, 'windows_features', None) is not None:
-                self.windows_features.tick(now)
+            if features is not None:
+                features.tick(now)
             self.pet.sync();self.scene.sync()
             self.sync_pingpong()
             self.game.excluded.update(self.scene.ids())
@@ -251,6 +254,9 @@ class NativeApp:
         menu=QMenu()
         action=menu.addAction('Central da Bolha…')
         action.triggered.connect(self.show_settings)
+        if sys.platform == 'win32' and QApplication.platformName() == 'windows':
+            self.battery_action = menu.addAction('Baterias dos periféricos…')
+            self.battery_action.triggered.connect(self.show_batteries)
         play=menu.addMenu('Brincar')
         self.pingpong_action=play.addAction('Jogar pingue-pongue')
         self.pingpong_action.triggered.connect(self.toggle_pingpong)
@@ -281,6 +287,10 @@ class NativeApp:
             'Encerrar pingue-pongue' if self.game.pingpong else 'Jogar pingue-pongue'))
         menu.aboutToShow.connect(lambda:pause.setText('Retomar a Bolha' if self.game.panicked else 'Pausar tudo'))
         return menu
+    def show_batteries(self):
+        features = self.windows_features
+        if features is not None:
+            QTimer.singleShot(0, features.battery_panel.toggle)
     def show_menu(self,point):self.menu.popup(point)
     def _tray_activated(self,reason):
         if reason==QSystemTrayIcon.DoubleClick:self.show_settings()

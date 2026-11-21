@@ -1,16 +1,19 @@
 import asyncio
+import ctypes
+from ctypes import wintypes
 import json
 from types import SimpleNamespace as NS
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QSystemTrayIcon, QVBoxLayout, QWidget
 
+from bolha.battery_panel import BatteryPanel, panel_position
 from bolha.cursor_finder import locate
 from bolha.preferences import defaults, sanitize
 from bolha.windows_battery import BatteryAlerts, BatteryMonitor, parse_devices
-from bolha.windows_hotkeys import DoubleTap, binding
+from bolha.windows_hotkeys import DoubleTap, Hotkeys, RawHeader, binding
 from bolha.windows_media import SpotifyReaction, session_operation
 from bolha.windows_settings import WindowsSettings
 
@@ -138,7 +141,8 @@ def test_battery_parses_utf8_suppresses_initial_alert_and_requires_recovery():
 def test_settings_capture_and_individual_values(qt_application, tmp_path):
     shell = QWidget()
     battery = BatteryMonitor(lambda _: None, tmp_path)
-    features = NS(battery=battery, shortcut_status='', media=NS(status=''), capture_shortcut=lambda _: None)
+    features = NS(battery=battery, battery_panel=NS(toggle=lambda: None),
+                  shortcut_status='', media=NS(status=''), capture_shortcut=lambda _: None)
     settings = WindowsSettings(QVBoxLayout(shell), features, lambda: None)
     settings.load(defaults())
     assert settings.values()['finderKey'] == 'Alt esquerdo'
@@ -148,7 +152,49 @@ def test_settings_capture_and_individual_values(qt_application, tmp_path):
     QTest.keyClick(settings.media_key, Qt.Key_Equal, Qt.ControlModifier)
     assert settings.values()['finderKey'] == 'F8'
     assert settings.values()['mediaKey'] == 'Ctrl+='
-    prefs = sanitize(dict(settings.values(), finderSeconds=999, batteryThreshold=-9))
-    assert prefs['finderSeconds'] == 10 and prefs['batteryThreshold'] == 1
+    prefs = sanitize(dict(settings.values(), batteryThreshold=-9))
+    assert prefs['batteryThreshold'] == 1
     assert prefs['batteryEnabled'] and prefs['spotifyEnabled']
     shell.close()
+
+
+def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_application, tmp_path):
+    monitor = BatteryMonitor(lambda _: None, tmp_path)
+    monitor.enabled = True
+    monitor.devices = parse_devices(json.dumps([
+        dict(key='a', name='A sleeping', percent=20, asleep=True),
+        dict(key='z', name='Z connected', percent=80),
+    ]).encode())
+    panel = BatteryPanel(monitor, QSystemTrayIcon())
+    labels = [label.text() for label in panel.scroll.widget().findChildren(QLabel)]
+    assert labels.index('Z connected') < labels.index('A sleeping')
+    panel.toggle()
+    assert panel.isVisible()
+    monitor.configure(False, 15, True)
+    assert not panel.isVisible() and not panel.tray.isVisible()
+    panel.close()
+    screen = QRect(-960, 0, 960, 680)
+    work = QRect(-960, 24, 960, 656)
+    pos = panel_position(work, screen, QRect(-42, 0, 20, 20), QSize(300,200))
+    assert work.contains(QRect(pos, QSize(300,200)))
+    assert pos.y() >= 24
+
+
+def test_raw_mouse_button_down_releases_without_consuming_click():
+    events = []
+    header_length = ctypes.sizeof(RawHeader)
+    message = wintypes.MSG(message=0xFF)
+
+    def native_packet(flags):
+        def receive(_handle, _command, buffer, _size, _header):
+            ctypes.memset(buffer, 0, len(buffer))
+            ctypes.c_uint16.from_buffer(buffer, header_length + 4).value = flags
+            return header_length + 24
+        return receive
+
+    hotkeys = NS(active={}, raw=True, mouse_callback=lambda: events.append('release'),
+                 editing=lambda: False, input_buffer=ctypes.create_string_buffer(header_length + 24))
+    for flags in (0, 0x2, 0x400, 0x4):
+        hotkeys.user = NS(GetRawInputData=native_packet(flags))
+        assert Hotkeys.nativeEventFilter(hotkeys, 'windows_generic_MSG', ctypes.addressof(message)) == (False,0)
+    assert events == ['release']

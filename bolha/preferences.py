@@ -22,12 +22,12 @@ ACTIVITY_SWITCHES = (
 DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 mouthEnabled=True, cursorPrankEnabled=False,
                 objectScales={key:1. for key in OBJECT_SCALE_TYPES},
-                toyAppearance='peanut',
+                toyAppearance='ball',
                 mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
                 popEnabled=True, popThrowLimit=12,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True,
-                finderEnabled=True,finderDouble=True,finderKey='Alt esquerdo',finderSeconds=3,
+                finderEnabled=True,finderDouble=True,finderKey='Alt esquerdo',
                 mediaEnabled=True,mediaKey='Ctrl+=',spotifyEnabled=True,
                 batteryEnabled=True,batteryAlerts=True,batteryThreshold=15)
 DEFAULTS.update({key: True for _, key, _ in ACTIVITY_SWITCHES})
@@ -59,9 +59,8 @@ def sanitize(patch, previous=None):
         result['objectScales']=scales
     for key,low,high in (('avatarSize',48,200),('mischiefInterval',60,1800),('maxObjects',1,5)):
         if number(patch.get(key)):result[key]=math.floor(max(low,min(high,patch[key]))+.5)
-    for key, low, high in (('finderSeconds', 1, 10), ('batteryThreshold', 1, 50)):
-        if type(patch.get(key)) is int:
-            result[key] = max(low, min(high, patch[key]))
+    if type(patch.get('batteryThreshold')) is int:
+        result['batteryThreshold'] = max(1, min(50, patch['batteryThreshold']))
     for key in ('finderKey', 'mediaKey'):
         value = patch.get(key)
         if isinstance(value, str) and 0 < len(value) <= 48 and value.isprintable():

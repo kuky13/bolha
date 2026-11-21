@@ -2,10 +2,11 @@
 """Integrações optativas do desktop Windows."""
 import time
 
-from PySide6.QtCore import QTimer
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QSystemTrayIcon, QWidget
 
-from .cursor_finder import CursorFinder
+from .battery_panel import BatteryPanel
+from .cursor_finder import CursorFinder, locate
 from .windows_battery import BatteryMonitor
 from .windows_hotkeys import Hotkeys
 from .windows_media import Media, SpotifyReaction
@@ -18,13 +19,14 @@ class WindowsFeatures:
         self.media = Media()
         self.reaction = SpotifyReaction()
         self.battery = BatteryMonitor(self.low_battery)
+        self.battery_panel = BatteryPanel(self.battery, controller.tray)
         self.capture = False
         self.shortcut_status = ''
         self.last_layout = None
         self.raw_receiver = QWidget()
         self.hotkeys = Hotkeys(controller.qapp, int(self.raw_receiver.winId()),
                                {'finder': self.show_cursor, 'media': self.toggle_media},
-                               self.finder.dismiss, lambda: self.capture)
+                               self.cancel_finder, lambda: self.capture)
         self.prefs = {}
         self.configure(controller.store.preferences, strict=False)
 
@@ -33,7 +35,7 @@ class WindowsFeatures:
         if not self.capture and any(self.prefs.get(key) != prefs[key] for key in shortcut_keys):
             self._bind(prefs, strict=strict)
         if not prefs['finderEnabled'] or not prefs['senseWindows']:
-            self.finder.dismiss()
+            self.cancel_finder()
         if not prefs['spotifyEnabled']:
             self.reaction.last_track = None
             self.controller.pet.dance_started = None
@@ -65,7 +67,7 @@ class WindowsFeatures:
     def capture_shortcut(self, active):
         self.capture = active
         if active:
-            self.finder.dismiss()
+            self.cancel_finder()
             self.hotkeys.configure(dict(self.prefs, finderEnabled=False, mediaEnabled=False))
         else:
             self._bind(self.prefs, strict=False)
@@ -77,7 +79,55 @@ class WindowsFeatures:
 
     def show_cursor(self):
         if self._available() and self.prefs['finderEnabled'] and self.prefs['senseWindows']:
-            self.finder.start(self.prefs['finderSeconds'])
+            game = self.controller.game
+            if game.native_error:
+                return
+            if game.cursor_prank.start_finder(game, time.monotonic()):
+                try:
+                    self.hotkeys.listen_click(self.release_finder)
+                except OSError as error:
+                    self.cancel_finder()
+                    self.shortcut_status = str(error) + '.'
+
+    def release_finder(self):
+        game = self.controller.game
+        game.cursor_prank.release_finder(game, time.monotonic())
+        self.finder.hide()
+
+    def cancel_finder(self):
+        game = self.controller.game
+        if game.cursor_prank.guided:
+            game.cursor_prank.cancel(game, time.monotonic())
+            self.controller.pet._restore_prank_cursor()
+        self.finder.hide()
+        self._stop_listening_for_click()
+
+    def _stop_listening_for_click(self):
+        if self.hotkeys.mouse_callback:
+            try:
+                self.hotkeys.listen_click(None)
+            except OSError:
+                # Descarta a entrada mesmo se o Windows não remover a inscrição.
+                self.hotkeys.mouse_callback = None
+
+    def guide_cursor(self):
+        game = self.controller.game
+        prank = game.cursor_prank
+        if not prank.guided or prank.phase == 'spit':
+            self.finder.hide()
+            self._stop_listening_for_click()
+            return
+        if not self._available() or game.native_error or not self.prefs['senseWindows']:
+            self.cancel_finder()
+            return
+        point = QCursor.pos()
+        target = locate((point.x(), point.y()), game.areas, game.monitors, game.blocked)
+        if target is None:
+            self.cancel_finder()
+            return
+        index, (x, y), direction = target
+        prank.target = x, y, game.areas[index], direction is None
+        self.finder.indicate((x, y), direction)
 
     def toggle_media(self):
         if self._available() and self.prefs['mediaEnabled']:
@@ -94,10 +144,6 @@ class WindowsFeatures:
                 and not game.play.finishing_juggle(now) and not game.behavior.toy_action)
 
     def tick(self, now):
-        if self._available() and not self.controller.game.native_error:
-            self.finder.tick(self.controller.game, now)
-        else:
-            self.finder.dismiss()
         pet = self.controller.pet
         if pet.dance_started is not None:
             if now - pet.dance_started >= 2.2 or not self.can_dance(now):
@@ -124,7 +170,7 @@ class WindowsFeatures:
         self.controller.tray.showMessage('Bolha · Bateria fraca', names, QSystemTrayIcon.Warning, 6000)
 
     def cancel(self):
-        self.finder.dismiss()
+        self.cancel_finder()
         self.controller.pet.dance_started = None
         self.controller.scene.speech.clear_external()
 
@@ -132,5 +178,6 @@ class WindowsFeatures:
         self.cancel()
         self.hotkeys.stop()
         self.battery.stop()
+        self.battery_panel.close()
         self.finder.close()
         self.raw_receiver.close()
