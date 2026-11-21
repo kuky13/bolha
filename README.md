@@ -4,8 +4,9 @@ A Bolha é uma mascote virtual de desktop, open source e feita pela comunidade.
 Ela passeia pela tela, reage a carinho e brinca com um brinquedo e um notebook.
 Seu cérebro e seu aprendizado funcionam localmente.
 
-**Windows x64 e Android.** [Baixar para Windows](https://github.com/kuky13/bolha/releases/latest) ·
-[Baixar APK 0.5.6](https://github.com/kuky13/bolha/releases/tag/v0.5.6) · [Guia Android](android/README.md)
+**Windows x64 e Android.** [Baixar para Windows](https://github.com/kuky13/bolha/releases/download/v0.5.9.0/Bolha-Setup-0.5.9.0-x64.exe) ·
+[Baixar APK 0.5.9.0](https://github.com/kuky13/bolha/releases/download/v0.5.9.0/Bolha-0.5.9.0-Android.apk) ·
+[Notas da versão](https://github.com/kuky13/bolha/releases/latest) · [Guia Android](android/README.md)
 
 ![Bolha perseguindo o brinquedo](docs/images/bolha-brincando.png)
 
@@ -57,9 +58,9 @@ esquerdo** para a própria Bolha seguir e mastigar o cursor até o próximo
 clique. Use **Esc** para cancelar ou **Ctrl+=** para
 pausar ou retomar a sessão atual de mídia. Os atalhos são configuráveis.
 O Spotify para Windows pode fazer a Bolha dançar quando começa outra faixa.
-O ícone de bateria perto do relógio abre um painel compacto com a carga dos
-periféricos compatíveis e fixa automaticamente os conectados e acordados no topo.
-A Central permite ajustar os avisos e desligar cada opção separadamente.
+O ícone de bateria perto do relógio dá acesso ao menu da Bolha e ao painel com a
+carga dos periféricos compatíveis. Os conectados e acordados aparecem no topo.
+A Central permite ajustar os avisos e ativar um ícone separado para a mascote.
 
 O localizador e a dança respeitam telas cheias usando a leitura opcional
 **Janelas abertas**. O controle de mídia, os metadados da música e a leitura
