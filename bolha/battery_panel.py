@@ -1,11 +1,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Painel de bateria da Bolha, ancorado na bandeja do Windows."""
-from PySide6.QtCore import QPoint, QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
+import getpass
+from html import escape
+
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
+from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
     QSystemTrayIcon, QVBoxLayout, QWidget,
 )
+
+
+from .windows_media import clean_label
 
 
 def panel_position(area, monitor, anchor, size):
@@ -51,6 +57,51 @@ def battery_icon():
     return icon
 
 
+def device_icon(kind):
+    size = 22
+    pixmap = QPixmap(size*2, size*2)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.scale(2, 2)
+    painter.setPen(QPen(QColor('#e5d4ff'), 1.55, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+    if kind == 'mouse':
+        painter.drawRoundedRect(QRectF(5.1, 2.8, 11.8, 16.4), 5, 5)
+        painter.drawLine(QPointF(11, 5.4), QPointF(11, 8.4))
+    elif kind == 'headset':
+        painter.drawArc(QRectF(3.1, 3.9, 15.8, 16), 0, 180*16)
+        painter.drawRoundedRect(QRectF(2.4, 11.5, 4.1, 6), 1.35, 1.35)
+        painter.drawRoundedRect(QRectF(15.5, 11.5, 4.1, 6), 1.35, 1.35)
+    elif kind == 'keyboard':
+        painter.drawRoundedRect(QRectF(2, 5.4, 18, 11.2), 2, 2)
+        for y in (9, 12):
+            for x in (5.5, 9, 12.5, 16):
+                painter.drawPoint(QPointF(x, y))
+        painter.drawLine(QPointF(8, 14.2), QPointF(14, 14.2))
+    elif kind == 'gamepad':
+        outline = QPainterPath(QPointF(6.8, 6.1))
+        outline.cubicTo(3.4, 6.1, 2.6, 10, 2.1, 13.8)
+        outline.cubicTo(1.8, 17.2, 5.6, 17.2, 8.2, 13.6)
+        outline.lineTo(13.8, 13.6)
+        outline.cubicTo(16.4, 17.2, 20.2, 17.2, 19.9, 13.8)
+        outline.cubicTo(19.4, 10, 18.6, 6.1, 15.2, 6.1)
+        outline.closeSubpath()
+        painter.drawPath(outline)
+        painter.drawLine(QPointF(6.4, 8.6), QPointF(6.4, 12))
+        painter.drawLine(QPointF(4.7, 10.3), QPointF(8.1, 10.3))
+        painter.drawPoint(QPointF(15.2, 9.3))
+        painter.drawPoint(QPointF(17, 11))
+    elif kind == 'phone':
+        painter.drawRoundedRect(QRectF(5.5, 2.4, 11, 17.2), 2.2, 2.2)
+        painter.drawLine(QPointF(9.4, 16.5), QPointF(12.6, 16.5))
+    else:
+        painter.drawRoundedRect(QRectF(4, 4, 14, 14), 3, 3)
+        painter.drawEllipse(QPointF(11, 11), 2, 2)
+    painter.end()
+    pixmap.setDevicePixelRatio(2)
+    return pixmap
+
+
 def label(text='', name=''):
     widget = QLabel(text, objectName=name)
     widget.setTextFormat(Qt.PlainText)
@@ -63,6 +114,10 @@ class BatteryPanel(QFrame):
         super().__init__(None, Qt.Popup | Qt.FramelessWindowHint)
         self.monitor = monitor
         self.fallback_tray = fallback_tray
+        try:
+            self.local_user = clean_label(getpass.getuser(), 90)
+        except (ImportError, KeyError, OSError):
+            self.local_user = ''
         self.setObjectName('batteryPanel')
         self.setWindowTitle('Baterias da Bolha')
         self.setAccessibleName('Baterias dos periféricos')
@@ -74,6 +129,7 @@ class BatteryPanel(QFrame):
             QLabel#batteryTitle { font-size: 19px; font-weight: 650; }
             QLabel#batteryStatus, QLabel#batteryGroup { color: #ccc0db; font-size: 12px; }
             QFrame#batteryRow { background: #30293e; border-radius: 9px; }
+            QLabel#batteryDeviceIcon { background: #453857; border-radius: 8px; }
             QScrollArea { border: none; background: #211d2c; }
             QWidget#batteryRows { background: #211d2c; }
             QPushButton { background: #3e3354; color: #f7f2ff; padding: 6px 9px;
@@ -158,8 +214,21 @@ class BatteryPanel(QFrame):
 
     def _row(self, device):
         row = QFrame(objectName='batteryRow')
-        layout = QVBoxLayout(row)
-        layout.setContentsMargins(10,8,10,8)
+        tooltip = f'<b>{escape(device.name)}</b>'
+        if self.local_user:
+            tooltip += f'<br>Usuário do Windows: {escape(self.local_user)}'
+        row.setToolTip(tooltip)
+        content = QHBoxLayout(row)
+        content.setContentsMargins(9,8,10,8)
+        content.setSpacing(9)
+        icon = QLabel(objectName='batteryDeviceIcon')
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(32, 32)
+        icon.setPixmap(device_icon(device.kind))
+        icon.setToolTip(tooltip)
+        content.addWidget(icon, 0, Qt.AlignVCenter)
+        layout = QVBoxLayout()
+        content.addLayout(layout, 1)
         title = QHBoxLayout()
         title.addWidget(label(device.name), 1)
         if device.percent is not None:

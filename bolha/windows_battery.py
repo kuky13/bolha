@@ -18,6 +18,7 @@ class DeviceBattery:
     level: str
     charging: bool
     asleep: bool
+    kind: str = 'other'
 
     @property
     def display(self):
@@ -40,11 +41,13 @@ def parse_devices(raw):
         if item.get('connected') is False and item.get('asleep') is not True:
             continue
         level = item.get('level')
+        kind = item.get('kind')
         devices[key] = DeviceBattery(
             key, clean_label(name, 90) or 'Dispositivo sem nome',
             percent if type(percent) is int and 0 <= percent <= 100 else None,
             clean_label(level, 40) if isinstance(level, str) else '',
             item.get('charging') is True, item.get('asleep') is True,
+            kind if kind in ('mouse', 'headset', 'keyboard', 'gamepad', 'phone') else 'other',
         )
     return list(devices.values())
 
