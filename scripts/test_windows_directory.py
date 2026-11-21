@@ -31,6 +31,7 @@ def validate(installer, output):
         previous=transaction.read_bytes() if transaction.exists() else None
         owned={process.pid}
         set_directory=False
+        directory_ready_at=None
         confirmed=False
         finished=False
         deadline=time.monotonic()+75
@@ -76,14 +77,12 @@ def validate(installer, output):
                         continue
                     edit=next((h for h in controls if wg.GetClassName(h)=='Edit' and wg.GetDlgCtrlID(h)==1019),None)
                     if edit and not set_directory:
-                        wg.SendMessage(edit,wc.WM_SETTEXT,0,str(selected))
-                        time.sleep(.3)
-                        button=control(hwnd,1)
-                        assert wg.IsWindowEnabled(button), (
-                            f'Instalar desabilitado para {str(selected)!r}; controles={last_page!r}'
-                        )
-                        set_directory=True
-                        click(hwnd,1)
+                        if directory_ready_at is None:
+                            assert wg.SendMessage(edit,wc.WM_SETTEXT,0,str(selected)), 'O assistente recusou preencher a pasta.'
+                            directory_ready_at=time.monotonic()+5
+                        set_directory=click(hwnd,1)
+                        if not set_directory and time.monotonic()>=directory_ready_at:
+                            raise AssertionError(f'Instalar desabilitado para {str(selected)!r}; controles={last_page!r}')
                     elif not set_directory:
                         click(hwnd,1)  # boas-vindas e licença
                     elif not finished and (expected/'Bolha.exe').is_file():

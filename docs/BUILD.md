@@ -41,7 +41,8 @@ só é aceito com modo teste e origem `http://127.0.0.1` na mesma porta.
 
 O app consulta Releases de kuky13/bolha, valida tamanho e SHA-256 e confere o
 arquivo novamente antes de instalar. O manifesto e o executável ficam na mesma
-release. SHA-512 em latest.yml permite a transição das versões Electron.
+release. O SHA-512 de `latest.yml` atende também os atualizadores Electron
+quando o feed usa o formato antigo de três componentes.
 O instalador não aceita uma pasta existente arbitrária: exige a instalação
 registrada do produto ou o marcador nativo. Reparse points/junctions são recusados.
 A instalação anterior é renomeada no mesmo volume antes da troca; somente o
