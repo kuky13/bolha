@@ -75,7 +75,6 @@ class WindowsSettings:
         self.finder = QCheckBox('Localizar o cursor')
         self.double = QCheckBox('Usar dois toques rápidos')
         self.finder_key = ShortcutButton('Tecla para localizar o cursor')
-        self.seconds = QSpinBox(minimum=1, maximum=10, suffix=' s', accessibleName='Duração do localizador')
         self.media = QCheckBox('Pausar ou retomar a sessão atual de mídia')
         self.media_key = ShortcutButton('Atalho de mídia')
         self.spotify = QCheckBox('Dançar quando começar outra música no Spotify')
@@ -86,6 +85,8 @@ class WindowsSettings:
         self.shortcut_status = plain_label()
         self.media_status = plain_label()
         self.devices = plain_label()
+        self.open_panel = QPushButton('Abrir painel da bandeja')
+        self.open_panel.clicked.connect(features.battery_panel.toggle)
         self.refresh = QPushButton('Atualizar baterias agora')
         self.checks = {'finderEnabled': self.finder, 'finderDouble': self.double, 'mediaEnabled': self.media,
                        'spotifyEnabled': self.spotify, 'batteryEnabled': self.battery, 'batteryAlerts': self.alert}
@@ -94,16 +95,14 @@ class WindowsSettings:
         for widget in (self.finder_key, self.media_key):
             widget.changed.connect(dirty)
             widget.capturing.connect(features.capture_shortcut)
-        for widget in (self.seconds, self.threshold):
-            widget.valueChanged.connect(dirty)
+        self.threshold.valueChanged.connect(dirty)
         self.double.toggled.connect(self._mode_changed)
         for widget in (self.finder, self.double, plain_label('Tecla do localizador'), self.finder_key,
-                       plain_label('Tempo na tela'), self.seconds,
-                       plain_label('Esc fecha o localizador. Ele usa o cursor só durante a busca, mesmo com a leitura contínua desligada.'),
+                       plain_label('A Bolha segue o ponteiro e segura uma cópia dele na boca até o próximo clique. Esc cancela. O localizador também funciona com a leitura contínua do cursor desligada.'),
                        self.media, self.media_key, self.spotify,
                        plain_label('Funciona com o aplicativo Spotify para Windows. O localizador e a dança dependem de “Janelas abertas” para respeitar a tela cheia.'),
                        self.shortcut_status, self.media_status, self.battery, self.alert, plain_label('Limite de bateria fraca'),
-                       self.threshold, self.refresh, self.battery_status, self.devices):
+                       self.threshold, self.open_panel, self.refresh, self.battery_status, self.devices):
             layout.addWidget(widget)
         self.refresh.clicked.connect(features.battery.refresh)
         features.battery.changed.connect(self.refresh_status)
@@ -117,14 +116,13 @@ class WindowsSettings:
             control.setChecked(prefs[key])
         self.finder_key.load(prefs['finderKey'])
         self.media_key.load(prefs['mediaKey'])
-        self.seconds.setValue(prefs['finderSeconds'])
         self.threshold.setValue(prefs['batteryThreshold'])
         self.refresh_status()
 
     def values(self):
         return dict({key: control.isChecked() for key, control in self.checks.items()},
                     finderKey=self.finder_key.value, mediaKey=self.media_key.value,
-                    finderSeconds=self.seconds.value(), batteryThreshold=self.threshold.value())
+                    batteryThreshold=self.threshold.value())
 
     def finish_capture(self):
         self.finder_key.finish()
@@ -133,6 +131,7 @@ class WindowsSettings:
     def refresh_status(self):
         battery = self.features.battery
         self.refresh.setEnabled(battery.enabled)
+        self.open_panel.setEnabled(battery.enabled)
         self.battery_status.setText(battery.status)
         self.devices.setText('\n'.join(device.display for device in battery.devices))
         self.shortcut_status.setText(self.features.shortcut_status)

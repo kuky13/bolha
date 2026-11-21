@@ -223,21 +223,21 @@ def test_seletor_real_salva_reabre_e_preserva_privacidade(app,tmp_path,monkeypat
         sensors=dict(senseApp=False,senseIdle=False,senseCursor=False,senseWindows=False)
         controller.save_preferences(sensors)
         controller.show_settings();dialog=controller.dialogs[0]
-        assert dialog.toy_appearance.currentData()=='peanut'
+        assert dialog.toy_appearance.currentData()=='ball'
         body=controller.game.ball.body
         controller.game.brain.learned[0,0]=.04
-        dialog.toy_appearance.setCurrentIndex(dialog.toy_appearance.findData('ball'))
+        dialog.toy_appearance.setCurrentIndex(dialog.toy_appearance.findData('peanut'))
         dialog.apply_button.click()
-        assert controller.game.ball.appearance=='ball' and controller.game.ball.body is body
+        assert controller.game.ball.appearance=='peanut' and controller.game.ball.body is body
         assert controller.game.brain.learned[0,0]==pytest.approx(.04)
         persisted=PreferencesStore(tmp_path).preferences
-        assert persisted['toyAppearance']=='ball' and all(persisted[key] is value for key,value in sensors.items())
+        assert persisted['toyAppearance']=='peanut' and all(persisted[key] is value for key,value in sensors.items())
         dialog.close();controller.show_settings()
-        assert dialog.toy_appearance.currentData()=='ball' and not dialog.apply_button.isEnabled()
+        assert dialog.toy_appearance.currentData()=='peanut' and not dialog.apply_button.isEnabled()
         assert all(not dialog.checks[key].isChecked() for key in sensors)
         reloaded=type(controller.game)(tmp_path/'reload-brain',controller.game.conteudo.proprio)
         reloaded.configure(persisted)
-        assert reloaded.ball.appearance=='ball' and all(reloaded.prefs[key] is False for key in sensors)
+        assert reloaded.ball.appearance=='peanut' and all(reloaded.prefs[key] is False for key in sensors)
     finally:controller.quit()
 
 

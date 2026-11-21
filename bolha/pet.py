@@ -9,7 +9,7 @@ import math
 import time
 from collections import deque
 from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent,Signal
-from PySide6.QtGui import QPainter,QColor,QRegion
+from PySide6.QtGui import QPainter,QColor,QRegion,QCursor
 from PySide6.QtWidgets import QWidget
 from .character import draw_character,draw_sleep_marks,draw_reaction_marks
 from .motion import ExpressionMotion,FLOOR_POSES
@@ -176,19 +176,27 @@ class PetWindow(QWidget):
 
     def _sync_prank_cursor(self,input_show):
         prank=getattr(self.game,'cursor_prank',None)
-        inside=self.mask().contains(self.mapFromGlobal(QPointF(*self.game.cursor).toPoint()))
+        point=QCursor.pos() if prank and prank.guided else QPointF(*self.game.cursor).toPoint()
+        inside=self.mask().contains(self.mapFromGlobal(point))
         hidden=bool(prank and prank.hidden_cursor and input_show and inside)
         if hidden and self._saved_prank_cursor is None:
             self._saved_prank_cursor=self.cursor()
             self.setCursor(Qt.BlankCursor)
         elif not hidden:
             self._restore_prank_cursor()
-            if prank and prank.hidden_cursor:
+            if prank and prank.hidden_cursor and not prank.guided:
                 prank.pointer_moved(self.game,time.monotonic())
 
     def _release_prank_cursor(self,moved_to=None):
         prank=getattr(self.game,'cursor_prank',None)
         if prank is None or not prank.hidden_cursor:return False
+        if prank.guided:
+            if moved_to is not None:
+                return False
+            prank.release_finder(self.game,time.monotonic())
+            self._restore_prank_cursor()
+            self.sync()
+            return True
         if moved_to is not None and prank.anchor is not None:
             if math.dist((moved_to.x(),moved_to.y()),prank.anchor)<=1.:return False
         prank.pointer_moved(self.game,time.monotonic())
@@ -205,6 +213,10 @@ class PetWindow(QWidget):
         if not self.press:self.game.hover=False
 
     def mousePressEvent(self,event):
+        if self.game.cursor_prank.guided:
+            self.game.cursor_prank.release_finder(self.game,time.monotonic())
+            self._restore_prank_cursor()
+            event.accept();return
         if self._release_prank_cursor():
             event.accept();return
         if event.button()!=Qt.LeftButton or self.press is not None or not self.game.visible():return
@@ -218,7 +230,7 @@ class PetWindow(QWidget):
         except (OSError,AttributeError,RuntimeError):self.cancel_interaction()
 
     def mouseMoveEvent(self,event):
-        if self._release_prank_cursor(event.globalPosition()):return
+        if self.game.cursor_prank.guided or self._release_prank_cursor(event.globalPosition()):return
         if self.game.pingpong is not None:return
         pos=event.globalPosition();now=time.monotonic()
         if self.press is None:
@@ -268,9 +280,11 @@ class PetWindow(QWidget):
         if down:self._drag_to(pos)
         else:self._release_at(pos)
 
-    def contextMenuEvent(self,event):self.cancel_interaction();self.menu_requested.emit(event.globalPos())
+    def contextMenuEvent(self,event):
+        if not self.game.cursor_prank.guided:
+            self.cancel_interaction();self.menu_requested.emit(event.globalPos())
     def wheelEvent(self,event):
-        if not self._release_prank_cursor():
+        if not self.game.cursor_prank.guided and not self._release_prank_cursor():
             self.game.interact(dict(type='spin',value=event.angleDelta().y()/120*100))
     def cancel_interaction(self):
         self._restore_prank_cursor()

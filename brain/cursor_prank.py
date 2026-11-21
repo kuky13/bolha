@@ -26,6 +26,8 @@ class CursorPrank:
         self.recent_episode = None
         self.recent_until = 0.
         self.intensity = .5
+        self.guided = False
+        self.target = None
 
     @property
     def active(self):
@@ -53,6 +55,8 @@ class CursorPrank:
 
     def cancel(self, game, now, result='interrompido', reward=0.):
         self.hidden_cursor = False
+        self.guided = False
+        self.target = None
         self.phase = None
         self.anchor = None
         if self.episode is not None and any(ep is self.episode for ep in game.memory.open):
@@ -87,6 +91,8 @@ class CursorPrank:
         self.episode = None
 
     def pointer_moved(self, game, now):
+        if self.guided:
+            return
         if self.hidden_cursor:
             self._spit(game, now, 'ponteiro escapou')
         elif self.phase in ('approach', 'pounce') and not self.angry_attempt:
@@ -107,7 +113,79 @@ class CursorPrank:
                 and not game.play.juggling() and not game.play.finishing_juggle(now)
                 and game.pop_started is None)
 
+    def start_finder(self, game, now):
+        if (not game.pet_interactive() or game.panel or game.body.held
+                or game.scene_dragging or game.castigo.dentro or game.castigo.fuga):
+            return False
+        if self.active:
+            self.cancel(game, now)
+        game.play.stop_chase()
+        game.play.stop_juggle()
+        game.stop_pingpong()
+        if game.mesa.sentado:
+            game.mesa.levantar_arrancado(now)
+            game._sync_desk_pose()
+        if game.sleep.asleep:
+            game.sleep.wake(startled=False)
+        self.guided = True
+        self.angry_attempt = False
+        self.intensity = .68
+        self._enter('approach', now)
+        return True
+
+    def release_finder(self, game, now):
+        if not self.guided or self.phase in ('spit', 'recover'):
+            return
+        if self.holds_position:
+            self._enter('spit', now)
+        else:
+            self.cancel(game, now)
+
+    def _follow_finder(self, game, dt, now):
+        if not game.pet_interactive() or game.panel or game.body.held or game.sleep.asleep:
+            self.cancel(game, now)
+            return False
+        if self.phase == 'spit':
+            if now - self.started >= 1.35:
+                self.cancel(game, now)
+            return False
+        if self.target is None:
+            return False
+        x, y, area, reachable = self.target
+        areas = game.available_areas()
+        if area not in areas:
+            return True
+        body = game.body
+        body.angle *= math.exp(-16. * dt)
+        offset = body.half_w * 18. / 49.
+        hop = 0. if self.holds_position else 13. * abs(math.sin((now-self.started)*9.))
+        left, top, right, bottom = area
+        radius = body.half_w
+        goal_x = min(right-radius, max(left+radius, x)) if right-left > 2*radius else (left+right)/2
+        goal_y = min(bottom-radius, max(top+radius, y-offset-hop)) if bottom-top > 2*radius else (top+bottom)/2
+        distance = math.hypot(goal_x-body.x, goal_y-body.y)
+        travel = min(distance, (380. + min(1420., distance * 2.6))*dt)
+        if distance > 0.:
+            body.x += (goal_x-body.x) * travel / distance
+            body.y += (goal_y-body.y) * travel / distance
+        # O vão do desktop e telas cheias não podem prender a Bolha no caminho.
+        # Nesse caso ela reaparece no lado seguro da tela de destino.
+        if not any(l <= body.x < r and t <= body.y < b for l, t, r, b in areas):
+            body.x, body.y = goal_x, goal_y
+        body.vx = body.vy = body.omega = 0.
+        body.grounded = False
+        body.platform = None
+        game.state.gaze = (max(-1., min(1., (x-body.x)/max(radius,1.))),
+                           max(-1., min(1., (y-body.y)/max(radius,1.))))
+        if self.phase == 'approach' and reachable and distance <= max(10., hop + 4.):
+            self._enter('swallow', now)
+        elif self.phase == 'swallow' and now - self.started >= .32:
+            self._enter('chew', now)
+        return True
+
     def update(self, game, dt, now):
+        if self.guided:
+            return self._follow_finder(game, dt, now)
         idle = game.prefs.get('senseIdle', True) and float(game.idle or 0.) >= IDLE_SECONDS
         if (not self._allowed(game, now) or now < game.quiet_until
                 or (self.active and not self.angry_attempt and not game.prefs.get('senseIdle', True))):

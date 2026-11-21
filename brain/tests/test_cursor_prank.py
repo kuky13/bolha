@@ -227,3 +227,25 @@ def test_disabled_protests_do_not_block_cursor_prank_but_enabled_ones_do(tmp_pat
     game.cursor_prank.update(game, .016, 100.)
     assert game.cursor_prank.active is not enabled
     assert not game.cursor_prank.hidden_cursor
+
+
+def test_cursor_finder_tracks_until_click_with_autonomous_pranks_and_cursor_sensor_off(tmp_path):
+    game = Game(tmp_path, CONTENT)
+    game.configure({'senseCursor':False, 'cursorPrankEnabled':False})
+    game.body.x, game.body.y = (400,300)
+    prank = game.cursor_prank
+    assert prank.start_finder(game, 10.)
+    prank.target = 500, 330, game.areas[0], True
+    for i in range(240):
+        assert prank.update(game, .016, 10. + .016*i)
+    assert prank.phase == 'chew' and prank.hidden_cursor
+    prank.pointer_moved(game, 14.)
+    prank.target = 950, 690, game.areas[0], True
+    for i in range(120):
+        prank.update(game, .016, 14. + .016*i)
+    assert prank.phase == 'chew'
+    assert abs(game.body.x - 950) < 2
+    prank.release_finder(game, 16.)
+    assert prank.phase == 'spit' and not prank.hidden_cursor
+    assert not prank.update(game, .016, 18.)
+    assert not prank.active

@@ -103,6 +103,7 @@ class Game:
         self.play = Play({'bola': 1., 'arremesso': 0.5, 'postit': 0.5})
         self.behavior.play = self.play
         self.ball = Ball(800., 650.)
+        self.ball.appearance = 'ball'
         self.ball.show()
         self.behavior.ball = self.ball
         self.toy_tracker = ToyTracker()
@@ -246,7 +247,7 @@ class Game:
             self.mesa.caderno.set_working(False)
             self.mesa.caderno.hide()
             self._sync_desk_pose()
-        if not (self.prefs.get('cursorPrankEnabled', False)
+        if not self.cursor_prank.guided and not (self.prefs.get('cursorPrankEnabled', False)
                 and self.prefs.get('senseCursor', True)
                 and self.prefs.get('adaptiveBehavior', True)
                 and (self.prefs.get('senseIdle', True) or self.cursor_prank.angry_attempt)):
@@ -257,8 +258,9 @@ class Game:
                 self.pop_return_at = min(self.pop_return_at,time.monotonic())
         if not self.prefs.get('senseCursor', True):
             self._reset_cursor_motion()
-        if self.prefs.get('toyAppearance','peanut') in ('peanut','ball'):
-            self.ball.appearance=self.prefs.get('toyAppearance','peanut')
+        toy_appearance = self.prefs.get('toyAppearance', 'ball')
+        if toy_appearance in ('peanut','ball'):
+            self.ball.appearance = toy_appearance
         self.intelligence.enabled = self.prefs.get('adaptiveBehavior', True)
         self.intelligence.learn_routine = self.prefs.get('learnRoutine', True)
         if not self.intelligence.enabled:
@@ -1412,7 +1414,7 @@ class Game:
             enabled=(self.prefs.get('revolutionEnabled', True) and not self.panel and not self.body.held
                      and not self.sleep.asleep and not shy_return and not self.cursor_prank.active
                      and now >= self.quiet_until),
-            toy_appearance=self.prefs.get('toyAppearance', 'peanut'),
+            toy_appearance=self.ball.appearance,
             sense_cursor=self.prefs.get('senseCursor', True), areas=areas, monitors=monitors,
             displays=[d for i,d in enumerate(self.displays) if i not in self.blocked])
         self.memory.tick(now,self.prof["episode_ok"],self.prof["episode_window"])

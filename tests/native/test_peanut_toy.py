@@ -34,18 +34,18 @@ def test_amendoim_gira_sem_recorte_e_sem_sprites(qt_application):
 
 def test_seletor_persiste_sem_reativar_sensores(tmp_path):
     store=PreferencesStore(tmp_path)
-    assert store.preferences['toyAppearance']=='peanut'
-    store.save({'toyAppearance':'ball','senseCursor':False})
+    assert store.preferences['toyAppearance']=='ball'
+    store.save({'toyAppearance':'peanut','senseCursor':False})
     reopened=PreferencesStore(tmp_path)
-    assert reopened.preferences['toyAppearance']=='ball' and reopened.preferences['senseCursor'] is False
+    assert reopened.preferences['toyAppearance']=='peanut' and reopened.preferences['senseCursor'] is False
     reopened.save({'toyAppearance':'unknown'})
-    assert reopened.preferences['toyAppearance']=='ball'
+    assert reopened.preferences['toyAppearance']=='peanut'
     reopened.reset_appearance()
-    assert reopened.preferences['toyAppearance']=='ball' and reopened.preferences['senseCursor'] is False
+    assert reopened.preferences['toyAppearance']=='peanut' and reopened.preferences['senseCursor'] is False
 
 
 def test_trocar_aparencia_atualiza_mascara_sem_mudar_fisica(qt_application,tmp_path):
-    game=Game(tmp_path,CONTENT);scene=NativeScene(game);window=ObjectWindow(scene,game.ball)
+    game=Game(tmp_path,CONTENT);game.configure({'toyAppearance':'peanut'});scene=NativeScene(game);window=ObjectWindow(scene,game.ball)
     body=game.ball.body
     window.sync();before=window.mask()
     game.ball.roll_angle=math.pi/2;window.sync()

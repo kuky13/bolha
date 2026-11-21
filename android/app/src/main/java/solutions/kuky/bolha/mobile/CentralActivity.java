@@ -270,11 +270,11 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         toggle("mouthEnabled","Boca nas expressões","A boca acompanha o olhar, a emoção e a rotação do corpo.");
         divider("Brinquedo");
         toyAppearance=spinner(new String[]{"Amendoim","Bolinha"});
-        toyAppearance.setSelection(preferences.optString("toyAppearance","peanut").equals("ball")?1:0);
+        toyAppearance.setSelection(preferences.optString("toyAppearance","ball").equals("ball")?1:0);
         toyAppearance.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id) {
                 String value=position==1?"ball":"peanut";
-                if (!loading && !value.equals(preferences.optString("toyAppearance","peanut"))) change("toyAppearance",value);
+                if (!loading && !value.equals(preferences.optString("toyAppearance","ball"))) change("toyAppearance",value);
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
@@ -516,7 +516,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
             int[] range=sliderRanges.get(key);
             entry.getValue().setProgress(Math.max(0,Math.min(range[1]-range[0],(int)Math.round(value)-range[0])));
         }
-        if (toyAppearance!=null) toyAppearance.setSelection(preferences.optString("toyAppearance","peanut").equals("ball")?1:0);
+        if (toyAppearance!=null) toyAppearance.setSelection(preferences.optString("toyAppearance","ball").equals("ball")?1:0);
         loading=false;
     }
 

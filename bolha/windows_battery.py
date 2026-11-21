@@ -97,6 +97,8 @@ class BatteryMonitor(QObject):
             self.alerts = BatteryAlerts()
             self.alerts.observe(self.devices, self.threshold, False)
         if enabled == self.enabled:
+            if threshold_changed:
+                self.changed.emit()
             return
         self.enabled = enabled
         if enabled:

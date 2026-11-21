@@ -56,6 +56,11 @@ def animation_pose(mode, seconds, strength=1.):
                     ear_raise=.7, squash=.022*chew, mouth_open=0.,
                     mouth_curve=.12+.12*chew, mouth_chew=.48*chew,
                     mouth_width=.92+.08*chew, mouth_skew=0.)
+    elif mode == 'cursor_hold':
+        jaw = math.sin(math.pi * t / .59) ** 2
+        pose.update(emotion='atento', eye_open=1.04, ear_raise=1.+1.2*jaw,
+                    ear_tilt=2.5*jaw, squash=.025*jaw, mouth_open=.20+.21*jaw,
+                    mouth_curve=.4, mouth_chew=.58*jaw, cursor_inside=True)
     elif mode == 'cursor_spit':
         progress = _unit(t / 1.35)
         pulse = math.sin(math.pi * _unit(t / .35)) if t < .35 else 0.
@@ -398,7 +403,8 @@ class ExpressionMotion:
             # A irritação neural acelera o gesto; o relógio só interpola seus quadros.
             strength = .6 + .4 * tones['ANGRY'];elapsed *= .8 + .5 * tones['ANGRY']
         elif prank is not None and prank.active:
-            mode='cursor_'+prank.phase;elapsed=now-prank.started;strength=prank.intensity
+            mode='cursor_hold' if prank.guided and prank.phase == 'chew' else 'cursor_'+prank.phase
+            elapsed=now-prank.started;strength=prank.intensity
         elif game.play.count_text(now) is not None:
             if game.play.finishing_juggle(now) and game.play.juggle_count < game.play.juggle_target:
                 mode='brinquedo_escapou';elapsed=now-game.play.juggle_finished_at
@@ -459,6 +465,8 @@ class ExpressionMotion:
             self.run_transition = previous_pose if changing_run and settling else None
             self.mode = mode;self.started = now
         self.pose = animation_pose(mode, elapsed if elapsed is not None else now - self.started, strength)
+        if mode == 'cursor_swallow' and prank.guided:
+            self.pose['cursor_inside'] = True
         if mode in ('brinquedo_esperando','brinquedo_escapou','preparar_bote'):
             toy = game.ball.body
             angle = math.atan2(toy.y-body.y,toy.x-body.x)-math.radians(body.angle+self.pose['angle_offset'])

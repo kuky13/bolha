@@ -33,7 +33,7 @@ Para personalizar cores, expressões, frases ou o notebook, veja o
 - Mova o ponteiro de um lado para o outro sobre a Bolha para fazer carinho; mantenha pressionado para segurá-la.
 - Arraste e solte para mover; solte em movimento para arremessar.
 - Use a rodinha para girar. Clique com o botão direito para abrir o menu e a Central.
-- No menu **Brincar**, mostre ou guarde o brinquedo e inicie pingue-pongue.
+- No menu **Brincar**, mostre ou guarde o brinquedo e inicie pingue-pongue. O brinquedo padrão é a bolinha. Você pode trocar pelo amendoim na Central.
 - **Ctrl + Alt + Shift + B** pausa ou retoma a Bolha.
 
 Veja o [guia de uso](docs/USO.md) para os demais gestos, menus e opções.
@@ -53,11 +53,13 @@ Você pode desligar as reações online na Central. Os detalhes estão em
 ## Integrações do Windows
 
 Na Central, abra **App → Integrações do Windows**. Toque duas vezes no **Alt
-esquerdo** para chamar a Bolha até o cursor ou pressione **Ctrl+=** para
+esquerdo** para a própria Bolha seguir e mastigar o cursor até o próximo
+clique. Use **Esc** para cancelar ou **Ctrl+=** para
 pausar ou retomar a sessão atual de mídia. Os atalhos são configuráveis.
 O Spotify para Windows pode fazer a Bolha dançar quando começa outra faixa.
-A Central mostra a bateria dos periféricos compatíveis e permite configurar
-os avisos. Cada opção pode ser desligada separadamente.
+O ícone de bateria perto do relógio abre um painel compacto com a carga dos
+periféricos compatíveis e fixa automaticamente os conectados e acordados no topo.
+A Central permite ajustar os avisos e desligar cada opção separadamente.
 
 O localizador e a dança respeitam telas cheias usando a leitura opcional
 **Janelas abertas**. O controle de mídia, os metadados da música e a leitura
