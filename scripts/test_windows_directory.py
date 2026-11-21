@@ -79,7 +79,9 @@ def validate(installer, output):
                         wg.SendMessage(edit,wc.WM_SETTEXT,0,str(selected))
                         time.sleep(.3)
                         button=control(hwnd,1)
-                        assert wg.IsWindowEnabled(button), 'Instalar desabilitado ao selecionar pasta válida'
+                        assert wg.IsWindowEnabled(button), (
+                            f'Instalar desabilitado para {str(selected)!r}; controles={last_page!r}'
+                        )
                         set_directory=True
                         click(hwnd,1)
                     elif not set_directory:
