@@ -254,7 +254,7 @@ class NativeApp:
         menu=QMenu()
         action=menu.addAction('Central da Bolha…')
         action.triggered.connect(self.show_settings)
-        if sys.platform == 'win32' and self.qapp.platformName() == 'windows':
+        if sys.platform == 'win32' and QApplication.platformName() == 'windows':
             self.battery_action = menu.addAction('Baterias dos periféricos…')
             self.battery_action.triggered.connect(self.show_batteries)
         play=menu.addMenu('Brincar')
