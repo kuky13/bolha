@@ -5,10 +5,13 @@ from pathlib import Path
 import os
 import struct
 import subprocess
+import sys
 import tomllib
 from fetch_nsis import fetch
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from bolha.versioning import windows_version
 
 
 def build():
@@ -25,7 +28,7 @@ def build():
     icon.write_bytes(struct.pack('<HHH',0,1,1)+struct.pack('<BBBBHHII',w,w,0,0,1,32,len(dib),22)+dib)
     filelist=work/'files.nsh';filelist.write_text('Delete "$INSTDIR\\Bolha.exe"\n')
     subprocess.run([str(fetch(ROOT/'build/tools')),'/V2','/WX','/INPUTCHARSET','UTF8',
-                    '/DVERSION='+version,'/DBUNDLE='+str(bundle),'/DOUTPUT='+str(work),
+                    '/DVERSION='+version,'/DNUMERIC_VERSION='+windows_version(version),'/DBUNDLE='+str(bundle),'/DOUTPUT='+str(work),
                     '/DICON='+str(icon),'/DFILELIST='+str(filelist),str(ROOT/'packaging/bolha.nsi')],check=True,cwd=ROOT)
 
 

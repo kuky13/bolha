@@ -8,15 +8,16 @@ from bolha.updates import parse_checksums
 from scripts.audit_native import audit
 
 
-def test_metadata_preserves_electron_and_native_integrity_contracts(tmp_path):
+@pytest.mark.parametrize('version', ['0.3.0', '0.5.9.0'])
+def test_metadata_preserves_electron_and_native_integrity_contracts(tmp_path, version):
     content=b'NSIS installer binary fixture'
-    name='Bolha-Setup-0.3.0-x64.exe'
+    name=f'Bolha-Setup-{version}-x64.exe'
     (tmp_path/name).write_bytes(content)
-    generate(tmp_path,'0.3.0')
+    generate(tmp_path,version)
     latest=(tmp_path/'latest.yml').read_text()
     checksum=base64.b64encode(hashlib.sha512(content).digest()).decode()
     assert latest.count('sha512: '+checksum)==2
-    assert 'version: 0.3.0\n' in latest
+    assert f'version: {version}\n' in latest
     assert 'path: '+name in latest and 'size: '+str(len(content)) in latest
     manifest=parse_checksums((tmp_path/'SHA256SUMS.txt').read_bytes())
     assert manifest[name]==hashlib.sha256(content).hexdigest()

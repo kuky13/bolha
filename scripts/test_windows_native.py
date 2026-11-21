@@ -28,6 +28,9 @@ import time
 from urllib.parse import urlsplit
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from bolha.versioning import VERSION_PATTERN, compare_versions
+
 
 def read_json(path):
     try:
@@ -50,7 +53,7 @@ def digest(path, algorithm='sha256'):
 
 
 def installer_version(path):
-    match = re.fullmatch(r'Bolha-Setup-(\d+\.\d+\.\d+)-x64\.exe', Path(path).name)
+    match = re.fullmatch(rf'Bolha-Setup-({VERSION_PATTERN})-x64\.exe', Path(path).name)
     if not match:
         raise ValueError('Nome de instalador inválido: '+str(path))
     return match[1]
@@ -272,7 +275,9 @@ class NativeValidation:
     def __init__(self, installer, target, output, keep=False):
         self.installer, self.target = Path(installer).resolve(), Path(target).resolve()
         self.base_version, self.target_version = installer_version(installer), installer_version(target)
-        assert tuple(map(int, self.target_version.split('.'))) > tuple(map(int, self.base_version.split('.')))
+        self.manual_transition = self.base_version.count('.') == 2 and self.target_version.count('.') == 3
+        ordering = compare_versions(self.target_version, self.base_version)
+        assert ordering > 0 or (ordering == 0 and self.manual_transition), 'Versão alvo inválida.'
         self.output = Path(output).resolve()
         self.output.mkdir(parents=True, exist_ok=True)
         self.root = Path(tempfile.mkdtemp(prefix='bolha-native-validation-'+uuid.uuid4().hex[:8]+'-')).resolve()
@@ -283,7 +288,7 @@ class NativeValidation:
         self.keep = keep
         self.processes = []
         self.results = []
-        self.report = dict(platform=platform.platform(), mode='isolated-native',
+        self.report = dict(platform=platform.platform(), mode='isolated-manual-transition' if self.manual_transition else 'isolated-native',
                            base=self.base_version, target=self.target_version,
                            workspace=str(self.root), results=self.results)
         self.current_report = None
@@ -387,6 +392,17 @@ class NativeValidation:
             assert memory['seed'] == 1313
             memory['learned']['PRESO']['CALM'] = .06
             write_json(memory_file, memory)
+
+            if self.manual_transition:
+                (self.data/'health.json').unlink(missing_ok=True)
+                self.install_package(self.target, self.environment('manual-transition'), force=True)
+                target_health = self.healthy(self.target_version)
+                target_metrics = self.stop(target_health)
+                self.preserved()
+                assert registry_fingerprint() == before_registry
+                self.record('manual_transition_preserves_preferences_and_learning', metrics=target_metrics)
+                self.report['passed'] = True
+                return
 
             with Feed(self.target) as feed:
                 for mode in ('checksum', 'interrupted'):

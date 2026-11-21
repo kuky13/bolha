@@ -77,6 +77,7 @@ O código, as artes e as animações próprias da Bolha são licenciados sob
 - [Licença das artes da Bolha](licenses/BOLHA-ASSETS.md)
 - [Contribuir com o projeto](CONTRIBUTING.md)
 - [Notas da versão](docs/RELEASE.md) e [histórico de validação](docs/VALIDATION-NATIVE.md)
+- [Roadmap futuro de otimização com Rust](docs/ROADMAP-RUST.md)
 
 O personagem Bolha e suas artes próprias são de André Ribeiro Lima
 (KukySolutions). O notebook foi redesenhado a partir do notebook do Pestinha;

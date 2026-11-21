@@ -22,7 +22,7 @@ def publication_code():
 def harness(case):
     return r'''
 $case = '__CASE__' | ConvertFrom-Json
-$env:BOLHA_VERSION='0.3.0'
+$env:BOLHA_VERSION='0.3.0.0'
 $env:GITHUB_SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 $env:GITHUB_REPOSITORY='kuky13/bolha'
 $env:GITHUB_EVENT_NAME=$case.Event
@@ -52,7 +52,7 @@ try { & { __PUBLISH_CODE__ } } catch { $failed=$true }
 if ($failed -ne $case.MustFail) { throw "Falha esperada=$($case.MustFail), recebida=$failed" }
 if (($null -ne $script:Created) -ne $case.MustCreate) { throw 'Publicação chamada indevidamente ou ausente.' }
 if ($script:Created) {
-  if ($script:Created[2] -ne 'v0.3.0') { throw 'Tag errada.' }
+  if ($script:Created[2] -ne 'v0.3.0.0') { throw 'Tag errada.' }
   $target=[array]::IndexOf($script:Created, '--target')
   if ($target -lt 0 -or $script:Created[$target+1] -ne $env:GITHUB_SHA) { throw 'Alvo não corresponde ao SHA compilado.' }
   if ($script:Created -contains '--clobber') { throw 'Sobrescrita proibida.' }
@@ -62,17 +62,17 @@ if ($script:Created) {
 
 def cases():
     base=dict(Event='workflow_dispatch',RefType='branch',RefName='native/qt-0.3',Publish='true',
-              CodeVersion='0.3.0',LocalSha=SHA,RemoteSha=SHA,ApiExit=0,CreateExit=0,Refs='[]',
+              CodeVersion='0.3.0.0',LocalSha=SHA,RemoteSha=SHA,ApiExit=0,CreateExit=0,Refs='[]',
               MustFail=False,MustCreate=True,ReleaseTags='')
-    edits=[{},dict(Refs='[{"ref":"refs/tags/v0.3.0-next"}]'),
-           dict(Refs='[{"ref":"refs/tags/v0.3.0"}]',MustFail=True,MustCreate=False),
+    edits=[{},dict(Refs='[{"ref":"refs/tags/v0.3.0.0-next"}]'),
+           dict(Refs='[{"ref":"refs/tags/v0.3.0.0"}]',MustFail=True,MustCreate=False),
            dict(Publish='false',MustFail=True,MustCreate=False),
            dict(LocalSha='b'*40,MustFail=True,MustCreate=False),
-           dict(CodeVersion='0.3.1',MustFail=True,MustCreate=False),
+           dict(CodeVersion='0.3.0.1',MustFail=True,MustCreate=False),
            dict(ApiExit=1,MustFail=True,MustCreate=False),
-           dict(Event='push',RefType='tag',RefName='v0.3.0'),
-           dict(Event='push',RefType='tag',RefName='v0.3.0',RemoteSha='b'*40,MustFail=True,MustCreate=False),
-           dict(ReleaseTags='v0.3.0',MustFail=True,MustCreate=False),
+           dict(Event='push',RefType='tag',RefName='v0.3.0.0'),
+           dict(Event='push',RefType='tag',RefName='v0.3.0.0',RemoteSha='b'*40,MustFail=True,MustCreate=False),
+           dict(ReleaseTags='v0.3.0.0',MustFail=True,MustCreate=False),
            dict(CreateExit=1,MustFail=True)]
     return [dict(base,**edit) for edit in edits]
 
@@ -81,7 +81,7 @@ def test_workflow_publication_is_opt_in_and_requires_success_and_legacy_tests():
     source=WORKFLOW.read_text(encoding='utf-8')
     assert re.search(r'publish_release:\n(?:.*\n){0,4}?\s+default: false\n',source)
     assert "if: success() && (github.ref_type == 'tag' || inputs.publish_release)" in source
-    assert source.count("if: github.ref_type == 'tag' || inputs.legacy_validation || inputs.publish_release")==3
+    assert source.count("if: github.ref_type == 'tag' || inputs.legacy_validation || inputs.publish_release")==4
     assert 'GH_TOKEN: ${{ github.token }}' in source
     assert '--target $env:GITHUB_SHA' in publication_code()
     assert '--clobber' not in publication_code()

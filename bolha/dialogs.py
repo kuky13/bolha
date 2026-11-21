@@ -429,22 +429,34 @@ class SettingsDialog(QDialog):
         state = self.controller.updater.state
         phase = state.get('phase', 'idle')
         message = state.get('message')
-        descriptions = dict(idle='Nenhuma atualização pendente.', checking='Consultando o GitHub…',
-                            downloading=f"Baixando atualização: {max(0, min(100, _number(state.get('percent')))):.0f}%.",
-                            ready=f"Versão {state.get('version', '')} pronta para instalar.",
-                            verifying='Conferindo o instalador…', installing='Instalando. A Bolha será reaberta.',
-                            error='A atualização falhou. Você pode continuar usando esta versão.')
-        text = str(message or descriptions.get(phase, 'Aguardando atualização.'))
+        percent = max(0, min(100, _number(state.get('percent'))))
+        installed = state.get('installedVersion', VERSION)
+        available = state.get('version')
+        descriptions = dict(idle='Aguardando verificação.', checking='Verificando atualizações…',
+                            available='Nova atualização disponível.',
+                            downloading=f'Baixando atualização… {percent:.0f}%.',
+                            ready='Nova atualização pronta para instalar.',
+                            verifying='Preparando a instalação…',
+                            installing='Instalando a atualização. A Bolha vai reabrir em instantes.',
+                            completed='Atualização concluída.',
+                            error='Não foi possível atualizar. Você pode continuar usando a Bolha.')
+        versions = f'Versão instalada {installed}'
+        if available:
+            versions += f' · Versão disponível {available}'
+        text = versions + '\n' + str(message or descriptions.get(phase, 'Aguardando verificação.'))
         deadline = _number(state.get('installAt'))
         if phase == 'ready' and deadline:
             seconds = max(0, math.ceil((deadline-time.time()*1000)/1000))
             text += f' Instalação em {seconds} s.' if seconds <= 60 else f' Instalação em {math.ceil(seconds/60)} min.'
+        notes = state.get('notes')
+        if available and isinstance(notes, (tuple, list)) and notes:
+            text += '\n' + '\n'.join('• ' + note[:280] for note in notes[:3] if isinstance(note, str))
         self.update_label.setText(text)
         self.update_progress.setVisible(phase == 'downloading')
         self.update_progress.setValue(int(max(0., min(100., _number(state.get('percent'))))))
         self.check_update.setText('Tentar novamente' if phase == 'error' else 'Verificar atualizações')
         self.install_update.setVisible(phase == 'ready')
-        self.check_update.setEnabled(phase in ('idle', 'error'))
+        self.check_update.setEnabled(phase in ('idle', 'completed', 'error'))
         self.defer_update.setVisible(phase == 'ready')
         self.defer_update.setEnabled(phase == 'ready')
 

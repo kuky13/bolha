@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
-"""SHA-256 nativo e latest.yml SHA-512 compatível com electron-updater 6.8.11."""
+"""SHA-256 nativo e latest.yml SHA-512 com campos legados para feeds de três componentes."""
 import argparse
 import base64
 from datetime import datetime, timezone
 import hashlib
 from pathlib import Path
-import re
+import sys
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from bolha.versioning import version_tuple
 
 
 def generate(directory, version):
-    if not re.fullmatch(r'\d+\.\d+\.\d+', version): raise ValueError('Versão inválida.')
+    version_tuple(version)
     directory = Path(directory)
     name = f'Bolha-Setup-{version}-x64.exe'
     installer = directory / name

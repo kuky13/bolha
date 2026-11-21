@@ -87,13 +87,18 @@ class NativeApp:
         self.pet.menu_requested.connect(self.show_menu)
         self.tray=QSystemTrayIcon(icon(),qapp);self.tray.setToolTip('Bolha '+VERSION)
         self.tray.activated.connect(self._tray_activated)
-        self.menu=self.make_menu();self.tray.setContextMenu(self.menu);self.tray.show()
+        self.menu=self.make_menu();self.tray.setContextMenu(self.menu)
+        self.mascot_tray = None
         self.hotkey=PanicHotkey(lambda:self.interact('panic'));qapp.installNativeEventFilter(self.hotkey)
         self.windows_features = None
         if sys.platform == 'win32' and qapp.platformName() == 'windows' and (
                 os.getenv('BOLHA_TEST') != '1' or os.getenv('BOLHA_TEST_WINDOWS_INTEGRATIONS') == '1'):
+            from .battery_panel import battery_icon
             from .windows_features import WindowsFeatures
+            self.tray.setIcon(battery_icon())
             self.windows_features = WindowsFeatures(self)
+            self.sync_mascot_tray(self.store.preferences['mascotTrayIcon'])
+        self.tray.show()
         qapp.screenAdded.connect(self._screens_changed);qapp.screenRemoved.connect(self._screens_changed)
         for screen in qapp.screens():self._connect_screen(screen)
         self.refresh_desktop()
@@ -281,7 +286,14 @@ class NativeApp:
         pause=menu.addAction('Pausar tudo')
         pause.setToolTip('Pausa de emergência · Ctrl+Alt+Shift+B')
         pause.triggered.connect(lambda:self.interact('panic'))
-        menu.addSeparator();action=menu.addAction('Sair');action.triggered.connect(self.quit)
+        menu.addSeparator()
+        check = menu.addAction('Verificar atualizações')
+        check.triggered.connect(lambda: self.updater.check())
+        defer = menu.addAction('Adiar atualização por uma hora')
+        defer.triggered.connect(lambda: self.updater.defer())
+        menu.aboutToShow.connect(lambda: defer.setVisible(
+            getattr(self.updater, 'state', {}).get('phase') == 'ready'))
+        action=menu.addAction('Sair');action.triggered.connect(self.quit)
         menu.aboutToShow.connect(self._panel_opened);menu.aboutToHide.connect(self._panel_closed)
         menu.aboutToShow.connect(lambda:self.pingpong_action.setText(
             'Encerrar pingue-pongue' if self.game.pingpong else 'Jogar pingue-pongue'))
@@ -292,8 +304,27 @@ class NativeApp:
         if features is not None:
             QTimer.singleShot(0, features.battery_panel.toggle)
     def show_menu(self,point):self.menu.popup(point)
-    def _tray_activated(self,reason):
-        if reason==QSystemTrayIcon.DoubleClick:self.show_settings()
+    def sync_mascot_tray(self, enabled):
+        if enabled and self.mascot_tray is None:
+            self.mascot_tray = QSystemTrayIcon(icon(), self.qapp)
+            self.mascot_tray.setToolTip('Mascote Bolha')
+            self.mascot_tray.setContextMenu(self.menu)
+            self.mascot_tray.activated.connect(self._mascot_tray_activated)
+            self.mascot_tray.show()
+        elif not enabled and self.mascot_tray is not None:
+            self.mascot_tray.hide()
+            self.mascot_tray.deleteLater()
+            self.mascot_tray = None
+
+    def _mascot_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.DoubleClick:
+            self.show_settings()
+
+    def _tray_activated(self, reason):
+        if reason == QSystemTrayIcon.Trigger and self.windows_features is not None:
+            self.show_batteries()
+        elif reason == QSystemTrayIcon.DoubleClick:
+            self.show_settings()
     def _panel_closed(self,*_):
         self.game.interact(dict(type='panel',value=any(dialog.isVisible() for dialog in self.dialogs)))
     def _panel_opened(self):
@@ -401,6 +432,8 @@ class NativeApp:
             if features is not None:
                 features.configure(previous, strict=False)
             raise
+        if features is not None:
+            self.sync_mascot_tray(result['mascotTrayIcon'])
         self.game.configure(result);self.pet.sync();self.scene.sync()
         return result
     def reset_appearance(self):
@@ -447,11 +480,18 @@ class NativeApp:
     def on_recover(self):self.updating=False;self.last_tick=time.monotonic();self.pet.sync();self.scene.sync()
     def update_changed(self,state):
         phase=state.get('phase')
+        if phase != 'ready':
+            features = self.windows_features
+            self.tray.setToolTip(features.battery_panel.tray_text() if features else 'Bolha '+VERSION)
         if phase=='ready' and state.get('installAt') and state.get('version') != getattr(self,'update_notified',None):
             self.update_notified=state.get('version')
             remaining=max(0,round((state['installAt']-time.time()*1000)/1000))
             message=('Instalação em '+str(remaining)+' segundos.') if remaining<=30 else 'O adiamento salvo foi mantido.'
-            self.tray.showMessage('Bolha','Atualização pronta. '+message+' Você pode adiar por uma hora no menu da bandeja.',QSystemTrayIcon.Information,15000)
+            self.tray.showMessage('Bolha',f"Versão {state['version']} pronta para instalar. "+message+' Você pode adiar por uma hora no menu da bandeja.',QSystemTrayIcon.Information,15000)
+        if phase == 'completed' and not getattr(self, 'completion_notified', False):
+            self.completion_notified = True
+            self.tray.showMessage('Bolha', f'Atualização concluída. Você está na versão {VERSION}.',
+                                  QSystemTrayIcon.Information, 7000)
         if phase=='error':self.warn('Atualização: '+str(state.get('error',state.get('message','não foi possível concluir'))))
     def show_update_countdown(self,remaining):
         if self.update_dialog is None:
@@ -496,6 +536,7 @@ class NativeApp:
             if not self.writer.close():self.warn('Alguns dados não puderam ser gravados. Os arquivos anteriores foram preservados.')
         finally:
             brain_store.set_dispatcher(None)
+            self.sync_mascot_tray(False)
             self.pingpong_view.close();self.scene.close();self.pet.close();self.tray.hide();self.lock.unlock()
             for dialog in self.dialogs:dialog.close()
             if self.update_dialog:

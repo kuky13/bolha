@@ -30,3 +30,5 @@ Este índice aponta para os detalhes de cada tarefa.
 Para relatar um problema ou sugerir uma ideia, use **Issues** no GitHub. Não
 anexe perfis, arquivos de aprendizado, logs com dados pessoais, credenciais ou
 materiais privados de referência.
+
+- [Roadmap futuro de otimização com Rust](ROADMAP-RUST.md)

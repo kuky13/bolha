@@ -29,11 +29,11 @@ DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 adaptiveBehavior=True,learnRoutine=True,
                 finderEnabled=True,finderDouble=True,finderKey='Alt esquerdo',
                 mediaEnabled=True,mediaKey='Ctrl+=',spotifyEnabled=True,
-                batteryEnabled=True,batteryAlerts=True,batteryThreshold=15)
+                batteryEnabled=True,batteryAlerts=True,batteryThreshold=15,mascotTrayIcon=False)
 DEFAULTS.update({key: True for _, key, _ in ACTIVITY_SWITCHES})
 BOOLEAN_KEYS = ('roaming','mouthEnabled','cursorPrankEnabled','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
                 'adaptiveBehavior','learnRoutine','popEnabled','finderEnabled','finderDouble','mediaEnabled',
-                'spotifyEnabled','batteryEnabled','batteryAlerts') + tuple(key for _, key, _ in ACTIVITY_SWITCHES)
+                'spotifyEnabled','batteryEnabled','batteryAlerts','mascotTrayIcon') + tuple(key for _, key, _ in ACTIVITY_SWITCHES)
 SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 
 

@@ -3,28 +3,17 @@
 """Contratos de instalação, inicialização e limpeza compatíveis com a Bolha 0.1/0.2."""
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 import time
 from .migration import atomic_json, read_json
+from .versioning import compare_versions, version_tuple
 
 APP_ID = 'solutions.kuky.bolha'
 INSTALLER_GUID = 'efdda9e4-adbf-5481-bf79-1ee5a33cbceb'
 COUNTDOWN = 30_000
 CHECK_INTERVAL = 6 * 60 * 60 * 1000
 DEFER_INTERVAL = 60 * 60 * 1000
-
-
-def version_tuple(value):
-    if not isinstance(value, str) or not re.fullmatch(r'\d{1,6}\.\d{1,6}\.\d{1,6}', value):
-        raise ValueError('Versão inválida.')
-    return tuple(map(int, value.split('.')))
-
-
-def compare_versions(left, right):
-    a, b = version_tuple(left), version_tuple(right)
-    return (a > b) - (a < b)
 
 
 def test_mode():

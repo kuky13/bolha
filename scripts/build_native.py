@@ -7,7 +7,6 @@ import json
 import hashlib
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
@@ -15,6 +14,7 @@ import sys
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from bolha import VERSION
+from bolha.versioning import windows_version
 from scripts.release_metadata import generate
 from scripts.fetch_batteryhub import prepare as prepare_batteryhub, verify as verify_batteryhub
 
@@ -78,7 +78,7 @@ def prune_optional_qt(bundle):
 def build(version, output, makensis=None, reuse_bundle=None):
     if os.name!='nt' or sys.maxsize<=2**32:raise OSError('Compile no Windows x64.')
     if sys.version_info[:2]!=(3,11):raise OSError('Use Python3.11.')
-    if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise ValueError('Versão inválida.')
+    numeric_version = windows_version(version)
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=True)
     work=ROOT/'build'/version;work.mkdir(parents=True,exist_ok=True)
     resource=work/'resources';resource.mkdir(exist_ok=True)
@@ -130,7 +130,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
         from scripts.fetch_nsis import fetch
         compiler=str(fetch(ROOT/'build/tools'))
     # /D before script: paths stay separate arguments, no shell interpolation.
-    subprocess.run([compiler,'/V2','/WX','/INPUTCHARSET','UTF8','/DVERSION='+version,'/DBUNDLE='+str(bundle),
+    subprocess.run([compiler,'/V2','/WX','/INPUTCHARSET','UTF8','/DVERSION='+version,'/DNUMERIC_VERSION='+numeric_version,'/DBUNDLE='+str(bundle),
                     '/DOUTPUT='+str(output),'/DICON='+str(resource/'icons/icon.ico'),'/DFILELIST='+str(filelist),
                     str(ROOT/'packaging/bolha.nsi')],check=True,cwd=ROOT)
     shutil.copy2(ROOT/'packaging/THIRD-PARTY-NOTICES.txt',output/'THIRD-PARTY-NOTICES.txt')

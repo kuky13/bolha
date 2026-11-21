@@ -78,6 +78,7 @@ class WindowsSettings:
         self.media = QCheckBox('Pausar ou retomar a sessão atual de mídia')
         self.media_key = ShortcutButton('Atalho de mídia')
         self.spotify = QCheckBox('Dançar quando começar outra música no Spotify')
+        self.mascot_tray = QCheckBox('Mostrar também o ícone da mascote na bandeja')
         self.battery = QCheckBox('Ler a bateria dos periféricos')
         self.alert = QCheckBox('Avisar quando a bateria baixar')
         self.threshold = QSpinBox(minimum=1, maximum=50, suffix='%', accessibleName='Limite de bateria fraca')
@@ -89,7 +90,8 @@ class WindowsSettings:
         self.open_panel.clicked.connect(features.battery_panel.toggle)
         self.refresh = QPushButton('Atualizar baterias agora')
         self.checks = {'finderEnabled': self.finder, 'finderDouble': self.double, 'mediaEnabled': self.media,
-                       'spotifyEnabled': self.spotify, 'batteryEnabled': self.battery, 'batteryAlerts': self.alert}
+                       'spotifyEnabled': self.spotify, 'batteryEnabled': self.battery, 'batteryAlerts': self.alert,
+                       'mascotTrayIcon': self.mascot_tray}
         for widget in self.checks.values():
             widget.toggled.connect(dirty)
         for widget in (self.finder_key, self.media_key):
@@ -101,7 +103,7 @@ class WindowsSettings:
                        plain_label('A Bolha segue o ponteiro e segura uma cópia dele na boca até o próximo clique. Esc cancela. O localizador também funciona com a leitura contínua do cursor desligada.'),
                        self.media, self.media_key, self.spotify,
                        plain_label('Funciona com o aplicativo Spotify para Windows. O localizador e a dança dependem de “Janelas abertas” para respeitar a tela cheia.'),
-                       self.shortcut_status, self.media_status, self.battery, self.alert, plain_label('Limite de bateria fraca'),
+                       self.shortcut_status, self.media_status, self.mascot_tray, self.battery, self.alert, plain_label('Limite de bateria fraca'),
                        self.threshold, self.open_panel, self.refresh, self.battery_status, self.devices):
             layout.addWidget(widget)
         self.refresh.clicked.connect(features.battery.refresh)
@@ -131,7 +133,6 @@ class WindowsSettings:
     def refresh_status(self):
         battery = self.features.battery
         self.refresh.setEnabled(battery.enabled)
-        self.open_panel.setEnabled(battery.enabled)
         self.battery_status.setText(battery.status)
         self.devices.setText('\n'.join(device.display for device in battery.devices))
         self.shortcut_status.setText(self.features.shortcut_status)

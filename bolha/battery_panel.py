@@ -7,7 +7,7 @@ from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
-    QSystemTrayIcon, QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget,
 )
 
 
@@ -110,10 +110,11 @@ def label(text='', name=''):
 
 
 class BatteryPanel(QFrame):
-    def __init__(self, monitor, fallback_tray):
+    def __init__(self, monitor, tray):
         super().__init__(None, Qt.Popup | Qt.FramelessWindowHint)
         self.monitor = monitor
-        self.fallback_tray = fallback_tray
+        self.tray = tray
+        self._rendered = None
         try:
             self.local_user = clean_label(getpass.getuser(), 90)
         except (ImportError, KeyError, OSError):
@@ -129,7 +130,7 @@ class BatteryPanel(QFrame):
             QLabel#batteryTitle { font-size: 19px; font-weight: 650; }
             QLabel#batteryStatus, QLabel#batteryGroup { color: #ccc0db; font-size: 12px; }
             QFrame#batteryRow { background: #30293e; border-radius: 9px; }
-            QLabel#batteryDeviceIcon { background: #453857; border-radius: 8px; }
+            QFrame#batteryTile { background: #453857; border-radius: 8px; }
             QScrollArea { border: none; background: #211d2c; }
             QWidget#batteryRows { background: #211d2c; }
             QPushButton { background: #3e3354; color: #f7f2ff; padding: 6px 9px;
@@ -155,28 +156,23 @@ class BatteryPanel(QFrame):
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         layout.addWidget(self.scroll)
-        self.tray = QSystemTrayIcon(battery_icon(), self)
-        self.tray.activated.connect(self._activated)
         monitor.changed.connect(self.sync)
         self.sync()
 
-    def _activated(self, reason):
-        if reason == QSystemTrayIcon.Trigger:
-            self.toggle()
-
     def toggle(self):
-        if self.isVisible() or not self.monitor.enabled:
+        if self.isVisible():
             self.hide()
             return
         self.sync()
         self.show()
+        self._place()
         self.raise_()
-        self.refresh.setFocus(Qt.OtherFocusReason)
+        if self.monitor.enabled:
+            self.refresh.setFocus(Qt.OtherFocusReason)
+            self.monitor.refresh()
 
     def _place(self):
         anchor = self.tray.geometry()
-        if not anchor.isValid():
-            anchor = self.fallback_tray.geometry()
         screen = QGuiApplication.screenAt(anchor.center()) if anchor.isValid() else None
         screen = screen or QGuiApplication.primaryScreen()
         if screen is not None:
@@ -185,32 +181,45 @@ class BatteryPanel(QFrame):
                 corner = screen.geometry().bottomRight()
                 anchor = QRect(corner, corner)
             self.scroll.setFixedHeight(min(self.rows_height, 355, max(40, area.height() - 120)))
+            self.layout().activate()
             self.adjustSize()
             self.move(panel_position(area, screen.geometry(), anchor, self.size()))
 
+    def tray_text(self):
+        active = sum(not device.asleep for device in self.monitor.devices)
+        return f'Bolha · Baterias ({active} em uso)' if active else 'Bolha · Baterias'
+
     def sync(self):
-        self.tray.setVisible(self.monitor.enabled)
-        if not self.monitor.enabled:
-            self.hide()
-        devices = ordered_devices(self.monitor.devices)
-        active = sum(not device.asleep for device in devices)
-        self.tray.setToolTip(f'Bolha · Baterias ({active} em uso)' if active else 'Bolha · Baterias')
         self.status.setText(self.monitor.status)
-        rows = QWidget(objectName='batteryRows')
-        column = QVBoxLayout(rows)
-        column.setContentsMargins(0,0,0,0)
-        column.setSpacing(6)
-        for is_asleep, title in ((False, 'Em uso · fixados automaticamente'), (True, 'Em repouso')):
-            group = [device for device in devices if device.asleep == is_asleep]
-            if group:
-                column.addWidget(label(title, 'batteryGroup'))
-            for device in group:
-                column.addWidget(self._row(device))
-        column.addStretch()
-        self.scroll.setWidget(rows)
-        self.scroll.setVisible(bool(devices))
-        self.rows_height = column.sizeHint().height()+2
-        self._place()
+        self.refresh.setEnabled(self.monitor.enabled)
+        devices = ordered_devices(self.monitor.devices)
+        snapshot = (tuple(devices), self.monitor.threshold)
+        # O sinal de progresso/erro pode mudar apenas a mensagem. Nesse caso,
+        # conserva o viewport e os widgets de dispositivo já exibidos.
+        if snapshot != self._rendered:
+            self._rendered = snapshot
+            rows = QWidget(objectName='batteryRows')
+            column = QVBoxLayout(rows)
+            column.setContentsMargins(0, 0, 0, 0)
+            column.setSpacing(6)
+            for asleep, title in ((False, 'Em uso'), (True, 'Em repouso')):
+                group = [device for device in devices if device.asleep == asleep]
+                if group:
+                    column.addWidget(label(title, 'batteryGroup'))
+                for device in group:
+                    column.addWidget(self._row(device))
+            self.scroll.setWidget(rows)
+            rows.ensurePolished()
+            column.activate()
+            self.rows_height = rows.sizeHint().height() + 2
+            self.scroll.setVisible(bool(devices))
+            if devices:
+                # QScrollArea ignora o sizeHint do filho. Dê ao viewport espaço
+                # explícito, inclusive quando a primeira leitura chega oculto.
+                rows.setMinimumHeight(self.rows_height - 2)
+        self.tray.setToolTip(self.tray_text())
+        if self.isVisible():
+            self._place()
 
     def _row(self, device):
         row = QFrame(objectName='batteryRow')
@@ -221,33 +230,45 @@ class BatteryPanel(QFrame):
         content = QHBoxLayout(row)
         content.setContentsMargins(9,8,10,8)
         content.setSpacing(9)
+        tile = QFrame(objectName='batteryTile')
+        tile.setFixedWidth(79)
+        tile.setToolTip(tooltip)
+        tile_layout = QVBoxLayout(tile)
+        tile_layout.setContentsMargins(6, 4, 6, 5)
+        tile_layout.setSpacing(3)
+        top = QHBoxLayout()
+        tile_layout.addLayout(top)
         icon = QLabel(objectName='batteryDeviceIcon')
         icon.setAlignment(Qt.AlignCenter)
-        icon.setFixedSize(32, 32)
+        icon.setFixedSize(22, 22)
         icon.setPixmap(device_icon(device.kind))
         icon.setToolTip(tooltip)
-        content.addWidget(icon, 0, Qt.AlignVCenter)
-        layout = QVBoxLayout()
-        content.addLayout(layout, 1)
-        title = QHBoxLayout()
-        title.addWidget(label(device.name), 1)
-        if device.percent is not None:
-            percent = label(f'{device.percent}%')
-            percent.setWordWrap(False)
-            title.addWidget(percent)
-        layout.addLayout(title)
+        top.addWidget(icon)
+        percent = label(f'{device.percent}%' if device.percent is not None else '—')
+        percent.setWordWrap(False)
+        top.addWidget(percent, 0, Qt.AlignRight)
+        content.addWidget(tile, 0, Qt.AlignVCenter)
         if device.percent is not None:
             meter = QProgressBar()
             meter.setAccessibleName(f'Carga de {device.name}')
-            meter.setRange(0,100)
+            meter.setRange(0, 100)
             meter.setValue(device.percent)
             meter.setTextVisible(False)
-            meter.setFixedHeight(6)
+            meter.setFixedHeight(5)
             meter.setProperty('lowBattery', device.percent <= self.monitor.threshold)
             meter.setProperty('charging', device.charging)
-            layout.addWidget(meter)
+            tile_layout.addWidget(meter)
+        details = QVBoxLayout()
+        details.setSpacing(3)
+        content.addLayout(details, 1)
+        name = label(device.name)
+        name.setToolTip(tooltip)
+        details.addWidget(name)
+        if device.percent is None:
+            reason = 'Carga indisponível'
+            if device.level:
+                reason += ' · ' + device.level
+            details.addWidget(label(reason, 'batteryStatus'))
         if device.charging:
-            layout.addWidget(label('Carregando', 'batteryStatus'))
-        elif device.percent is None:
-            layout.addWidget(label(device.level or 'Carga indisponível', 'batteryStatus'))
+            details.addWidget(label('Carregando', 'batteryStatus'))
         return row

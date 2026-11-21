@@ -5,7 +5,17 @@ plugins {
 }
 def projectRoot = rootProject.projectDir.parentFile
 def sharedVersion = (new File(projectRoot, 'pyproject.toml').text =~ /(?m)^version = "([^"]+)"/)[0][1]
+if (!(sharedVersion ==~ /[0-9]{1,6}(\.[0-9]{1,6}){2,3}/)) {
+    throw new GradleException('Versão da Bolha inválida.')
+}
 def parts = sharedVersion.tokenize('.').collect { it.toInteger() }
+if (parts.size() == 3) parts.add(0)
+def (major, minor, patch, revision) = parts
+if (major > 20 || minor > 99 || patch > 999 || revision > 999) {
+    throw new GradleException('Versão fora dos limites do código de versão Android.')
+}
+// Dá espaço à revisão e mantém a atualização acima dos APKs 0.5.x já publicados.
+def androidVersionCode = major * 100_000_000 + minor * 1_000_000 + patch * 1_000 + revision
 def projectKeystore = System.getenv('BOLHA_ANDROID_KEYSTORE')
 android {
     namespace 'solutions.kuky.bolha.mobile'
@@ -15,7 +25,7 @@ android {
         applicationId 'solutions.kuky.bolha.mobile'
         minSdk 24
         targetSdk 35
-        versionCode parts[0]*1000000 + parts[1]*1000 + parts[2]
+        versionCode androidVersionCode
         versionName sharedVersion
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
     }

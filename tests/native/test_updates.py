@@ -187,3 +187,35 @@ def test_bad_pending_cache_restarts_automatic_check(tmp_path):
         check.assert_called_once()
     assert not updater._checking
     updater.stop()
+
+
+def test_four_component_release_detection_notes_and_verified_download(feed, tmp_path):
+    from bolha.installation import compare_versions
+    from scripts.test_windows_native import installer_version
+
+    base, files, data, release = feed
+    assert compare_versions('0.5.9', '0.5.9.0') == 0
+    assert compare_versions('0.5.9.1', '0.5.9') == 1
+    assert compare_versions('0.5.10', '0.5.9.65535') == 1
+
+    def announce(version):
+        name = f'Bolha-Setup-{version}-x64.exe'
+        checksum = hashlib.sha256(data).hexdigest()
+        manifest = f'{checksum}  {name}\n'.encode()
+        release.update(tag_name='v'+version, body='# Novidades\n\n- Melhorias no **painel**.\n  Exibe [a bateria](https://github.com/kuky13/bolha).')
+        release['assets'][0].update(name=name, browser_download_url=base+name)
+        release['assets'][1]['size'] = len(manifest)
+        files['/'+name] = (200, {'Content-Length': str(len(data))}, data)
+        files['/SHA256SUMS.txt'] = (200, {}, manifest)
+        files['/release.json'] = (200, {}, json.dumps(release).encode())
+        return name
+
+    assert installer_version(announce('0.5.9.0')) == '0.5.9.0'
+    assert find_release(Transport(base), '0.5.9') is None
+    assert installer_version(announce('0.5.9.1')) == '0.5.9.1'
+    available = []
+    result = fetch_update(Transport(base), '0.5.9.0', tmp_path/'data', tmp_path/'cache',
+                          available=available.append)
+    assert available[0].version == '0.5.9.1'
+    assert result['notes'] == ['Melhorias no painel. Exibe a bateria.']
+    assert read_json(tmp_path/'data/pending-update.json')['notes'] == result['notes']

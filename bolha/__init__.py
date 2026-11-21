@@ -3,12 +3,14 @@
 """Bolha nativa: versão do código e versão do pacote instalado."""
 import json
 from pathlib import Path
-import re
 import sys
+from .versioning import version_tuple
 
-VERSION = '0.5.9'
+VERSION = '0.5.9.0'
 if getattr(sys, 'frozen', False):
     value = json.loads((Path(sys._MEIPASS) / 'bolha-version.json').read_text(encoding='utf-8'))
-    if not isinstance(value, dict) or not re.fullmatch(r'\d+\.\d+\.\d+', str(value.get('version', ''))):
-        raise RuntimeError('Versão do pacote Bolha inválida.')
-    VERSION = value['version']
+    try:
+        VERSION = value['version']
+        version_tuple(VERSION)
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError('Versão do pacote Bolha inválida.') from error

@@ -1,11 +1,9 @@
-# Bolha 0.5.9 para Windows
+# Bolha 0.5.9.0 em desenvolvimento
 
-- O painel de baterias exibe um ícone por tipo de periférico. Ao passar o
-  mouse, aparecem o nome do dispositivo e o usuário local do Windows.
-- Em repouso, o rosto acompanha mais suavemente as mudanças de humor do
-  cérebro. A adaptação vem do Pestinha e usa o desenho próprio da Bolha.
-- O código do fork foi sincronizado com o Pestinha. A Bolha continua usando
-  seus próprios instaladores e recursos. [Créditos e licenças](https://github.com/kuky13/bolha/blob/main/NOTICE.md).
+- Versões com quatro componentes. Consulte o [guia de transição](BUILD.md#numeração-e-transição-para-quatro-componentes).
+- O painel de baterias atualiza os periféricos conectados e mostra a carga ao lado de cada ícone. A dica do mouse mostra o nome do dispositivo.
+- O ícone de bateria reúne o menu principal. O ícone adicional da mascote pode ser ativado nas preferências do Windows.
+- O atualizador usa mensagens em português e exibe as versões e os destaques publicados.
+- O [roadmap de Rust](ROADMAP-RUST.md) documenta uma proposta futura para 1.0.0.0 ou posterior.
 
-A versão [0.5.6 para Android](https://github.com/kuky13/bolha/releases/tag/v0.5.6)
-continua disponível.
+As versões públicas estão na [página de releases](https://github.com/kuky13/bolha/releases).

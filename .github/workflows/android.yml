@@ -73,16 +73,23 @@ jobs:
           set -euo pipefail
           previous="$RUNNER_TEMP/bolha-previous-android"
           mkdir -p "$previous"
-          gh release download v0.5.1 --repo kuky13/bolha --pattern Bolha-0.5.1-Android.apk --pattern ANDROID-SHA256SUMS.txt --dir "$previous"
-          (cd "$previous" && awk '$2 == "Bolha-0.5.1-Android.apk"' ANDROID-SHA256SUMS.txt > previous-apk.sha256 && test -s previous-apk.sha256 && sha256sum --check previous-apk.sha256)
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous/Bolha-0.5.1-Android.apk" > "$RUNNER_TEMP/bolha-previous-cert.txt"
+          gh release download v0.5.6 --repo kuky13/bolha --pattern Bolha-0.5.6-Android.apk --pattern ANDROID-SHA256SUMS.txt --dir "$previous"
+          (cd "$previous" && awk '$2 == "Bolha-0.5.6-Android.apk"' ANDROID-SHA256SUMS.txt > previous-apk.sha256 && test -s previous-apk.sha256 && sha256sum --check previous-apk.sha256)
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous/Bolha-0.5.6-Android.apk" > "$RUNNER_TEMP/bolha-previous-cert.txt"
           grep -q '10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-previous-cert.txt"
-          echo "BOLHA_TEST_PREVIOUS_APK=$previous/Bolha-0.5.1-Android.apk" >> "$GITHUB_ENV"
+          echo "BOLHA_TEST_PREVIOUS_APK=$previous/Bolha-0.5.6-Android.apk" >> "$GITHUB_ENV"
       - name: Guardar o APK candidato e seu checksum para diagnóstico
         run: |
           set -euo pipefail
           mkdir -p validation/android
           version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if ! [[ "$version" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+            echo 'Use MAJOR.MINOR.PATCH.REVISION no APK.' >&2
+            exit 1
+          fi
+          grep -Fq "versionName='$version'" "$RUNNER_TEMP/bolha-apk.txt"
+          installed_code=$(sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p" "$RUNNER_TEMP/bolha-apk.txt")
+          test "$installed_code" -gt 5006
           apk="Bolha-${version}-Android.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "validation/android/$apk"
           (cd validation/android && sha256sum "$apk" > ANDROID-SHA256SUMS.txt)

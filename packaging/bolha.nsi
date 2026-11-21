@@ -13,6 +13,12 @@ ${StrStr}
 !error "Informe VERSION, BUNDLE, OUTPUT e ICON."
 !endif
 !define APPGUID "efdda9e4-adbf-5481-bf79-1ee5a33cbceb"
+VIProductVersion "${NUMERIC_VERSION}"
+VIAddVersionKey /LANG=1046 "ProductName" "Bolha"
+VIAddVersionKey /LANG=1046 "LegalCopyright" "Bolha e colaboradores (GPL-3.0-or-later)"
+VIAddVersionKey /LANG=1046 "ProductVersion" "${VERSION}"
+VIAddVersionKey /LANG=1046 "FileVersion" "${VERSION}"
+VIAddVersionKey /LANG=1046 "FileDescription" "Instalador da Bolha"
 Name "Bolha ${VERSION}"
 OutFile "${OUTPUT}\Bolha-Setup-${VERSION}-x64.exe"
 InstallDir "$LOCALAPPDATA\Programs\Bolha"

@@ -31,24 +31,30 @@ def parse_devices(raw):
     if len(raw) > 256*1024:
         raise ValueError('Resposta de bateria grande demais')
     data = json.loads(raw.decode('utf-8'))
-    if not isinstance(data, list) or any(not isinstance(device, dict) for device in data):
+    if not isinstance(data, list):
         raise ValueError('Resposta de bateria inválida')
     devices = {}
+    valid = 0
     for item in data:
+        if not isinstance(item, dict):
+            continue
         key, name, percent = (item.get(field) for field in ('key', 'name', 'percent'))
         if not isinstance(key, str) or not key or not isinstance(name, str):
-            raise ValueError('Dispositivo inválido')
+            continue
+        valid += 1
         if item.get('connected') is False and item.get('asleep') is not True:
             continue
         level = item.get('level')
         kind = item.get('kind')
         devices[key] = DeviceBattery(
-            key, clean_label(name, 90) or 'Dispositivo sem nome',
+            key, clean_label(name, 512) or 'Dispositivo sem nome',
             percent if type(percent) is int and 0 <= percent <= 100 else None,
             clean_label(level, 40) if isinstance(level, str) else '',
             item.get('charging') is True, item.get('asleep') is True,
             kind if kind in ('mouse', 'headset', 'keyboard', 'gamepad', 'phone') else 'other',
         )
+    if data and not valid:
+        raise ValueError('Nenhum dispositivo válido na resposta de bateria')
     return list(devices.values())
 
 
@@ -84,6 +90,7 @@ class BatteryMonitor(QObject):
         self.status = 'Leitura desativada.'
         self.success = False
         self.timed_out = False
+        self.cancelled_read = False
         self.process = QProcess(self)
         self.process.finished.connect(self._finish)
         self.process.errorOccurred.connect(self._process_error)
@@ -110,6 +117,7 @@ class BatteryMonitor(QObject):
         else:
             self.period.stop()
             self.deadline.stop()
+            self.cancelled_read = True
             self.process.kill()
             self.devices = []
             self.success = False
@@ -128,10 +136,11 @@ class BatteryMonitor(QObject):
             self._status('BatteryHub ausente neste pacote.')
             return
         self.timed_out = False
+        self.cancelled_read = False
         self.process.setWorkingDirectory(str(self.folder))
-        self.process.start(str(executable), ['--json'], QProcess.ReadOnly)
-        self.deadline.start()
         self._status('Consultando periféricos…')
+        self.deadline.start()
+        self.process.start(str(executable), ['--json'], QProcess.ReadOnly)
 
     def _timeout(self):
         self.timed_out = True
@@ -153,6 +162,9 @@ class BatteryMonitor(QObject):
         self.deadline.stop()
         raw = bytes(self.process.readAllStandardOutput())
         if not self.enabled:
+            return
+        if self.cancelled_read:
+            self.refresh()
             return
         if code or exit_status != QProcess.NormalExit or self.timed_out:
             self._failed()

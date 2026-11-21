@@ -59,6 +59,7 @@ class Release:
     url: str
     size: int
     sha256: str
+    notes: tuple[str, ...] = ()
 
 
 def validate_url(url, test_base=None):
@@ -171,6 +172,20 @@ def release_asset(data, name, version, transport):
     return asset
 
 
+def release_highlights(body):
+    """Extrai texto curto exibido pela Central sem interpretar HTML ou Markdown."""
+    if not isinstance(body, str):
+        return ()
+    body = body[:8000]
+    notes = re.findall(r'(?m)^[-*] (.+(?:\n[ \t]+[^\n]+)*)', body)
+    if not notes:
+        notes = [next((line for line in body.splitlines()
+                       if line.strip() and not line.lstrip().startswith('#')), '')]
+    return tuple(text[:280] for note in notes[:3] if (text := ' '.join(
+        re.sub(r'\[([^]]+)\]\([^)]+\)', r'\1', note).replace('`', '').replace('**', '').split()
+    )))
+
+
 def find_release(transport, current_version):
     url = urljoin(transport.test_base.rstrip('/') + '/', 'release.json') if transport.test_base else RELEASE_URL
     try:
@@ -201,7 +216,8 @@ def find_release(transport, current_version):
     digest = installer.get('digest')
     if digest and digest != 'sha256:' + checksum:
         raise ValueError('Manifesto diverge do digest publicado pelo GitHub.')
-    return Release(version, name, installer['browser_download_url'], installer['size'], checksum)
+    return Release(version, name, installer['browser_download_url'], installer['size'],
+                   checksum, release_highlights(data.get('body')))
 
 
 def verify_file(path, size, checksum):
@@ -216,9 +232,11 @@ def verify_file(path, size, checksum):
     return path
 
 
-def fetch_update(transport, current_version, data_dir, cache_root, progress=None):
+def fetch_update(transport, current_version, data_dir, cache_root, progress=None, available=None):
     release = find_release(transport, current_version)
     if release is None: return None
+    if available:
+        available(release)
     directory = Path(cache_root) / release.version
     directory.mkdir(parents=True, exist_ok=True)
     installer = cached_installer(cache_root, directory / release.name)
@@ -240,8 +258,9 @@ def fetch_update(transport, current_version, data_dir, cache_root, progress=None
             os.replace(part, installer)
         finally:
             part.unlink(missing_ok=True)
-    record_update(data_dir, release.version, installer, cache_root, size=release.size, sha256=release.sha256)
-    return dict(version=release.version, installer=str(installer), size=release.size, sha256=release.sha256)
+    record = dict(size=release.size, sha256=release.sha256, notes=list(release.notes))
+    record_update(data_dir, release.version, installer, cache_root, **record)
+    return dict(version=release.version, installer=str(installer), **record)
 
 
 class Updater(QObject):
@@ -255,7 +274,8 @@ class Updater(QObject):
         self.data_dir, self.version = Path(data_dir), version
         self.before_install, self.on_recover = before_install, on_recover
         self.cache_root = cache_directory(self.data_dir)
-        self.state = {'phase': 'idle'}
+        self.state = {'phase': 'idle', 'installedVersion': version}
+        self.updated = False
         self._stopped, self._checking = False, False
         self._cancelled = threading.Event()
         test_feed = os.environ.get('BOLHA_TEST_UPDATE_URL') if test_mode() else None
@@ -276,9 +296,9 @@ class Updater(QObject):
 
     def _send(self, state):
         if not self._stopped:
-            self.state = dict(state); self.changed.emit(dict(state))
+            self.state = dict(state, installedVersion=self.version); self.changed.emit(dict(self.state))
             if test_mode() and os.environ.get('BOLHA_TEST_STATUS') == '1':
-                try: atomic_json(self.data_dir / 'update-state.json', state)
+                try: atomic_json(self.data_dir / 'update-state.json', self.state)
                 except OSError: pass
 
     def _background(self, kind, operation):
@@ -308,24 +328,30 @@ class Updater(QObject):
         if not self.enabled:
             self._send({'phase': 'idle', 'message': 'Atualizações disponíveis no aplicativo instalado para Windows.'})
             return
-        if self._stopped or self._checking or self.state['phase'] in ('downloading', 'ready', 'installing', 'verifying'):
+        if self._stopped or self._checking or self.state['phase'] in ('available', 'downloading', 'ready', 'installing', 'verifying'):
             return
         self._checking = True
         self._send({'phase': 'checking'})
         last_progress = [0.]
+        candidate = {}
+
+        def available(release):
+            candidate.update(version=release.version, notes=list(release.notes))
+            self._progress.emit(dict(candidate, phase='available'))
+
         def progress(percent):
             now = time.monotonic()
             if percent >= 100 or now - last_progress[0] >= .15:
                 last_progress[0] = now
-                self._progress.emit({'phase': 'downloading', 'percent': percent})
+                self._progress.emit(dict(candidate, phase='downloading', percent=percent))
         self._background('check', lambda: fetch_update(self.transport, self.version, self.data_dir,
-                                                       self.cache_root, progress))
+                                                       self.cache_root, progress, available))
 
     def _schedule(self, deferred=False):
         if self.state['phase'] != 'ready': return
         now = int(time.time() * 1000)
         deadline = now + (DEFER_INTERVAL if deferred else COUNTDOWN)
-        if self.state['version'] == self._deferred_version:
+        if self._deferred_version and compare_versions(self.state['version'], self._deferred_version) == 0:
             deadline = max(deadline, self._deferred_until)
         if deferred:
             try:
@@ -350,7 +376,7 @@ class Updater(QObject):
     def install(self):
         if self.state['phase'] != 'ready' or not self._pending: return
         self._install_timer.stop()
-        self._send(dict(self.state, phase='verifying', message='Conferindo o instalador…'))
+        self._send(dict(self.state, phase='verifying', message='Preparando a instalação…'))
         pending = dict(self._pending)
         self._background('install', lambda: verify_file(cached_installer(self.cache_root, pending['installer']),
                                                        pending['size'], pending['sha256']))
@@ -362,6 +388,10 @@ class Updater(QObject):
             if error or value is False:
                 if error: LOG.warning('Limpeza da atualização adiada: %s', error)
                 self._cleanup_timer.start()
+            elif value == 'updated':
+                self.updated = True
+                if self.state['phase'] in ('idle', 'checking'):
+                    self._send({'phase': 'completed'})
             return
         if kind in ('check', 'resume'): self._checking = False
         if error:
@@ -371,15 +401,18 @@ class Updater(QObject):
                 self.check()
                 return
             if kind == 'flushed': self.on_recover()
-            self._send({'phase': 'error', 'message': 'Não foi possível atualizar agora. Você pode continuar usando a Bolha.'})
+            self._send(dict(self.state, phase='error', message='Não foi possível atualizar. Você pode continuar usando a Bolha.'))
             return
         if kind in ('check', 'resume'):
             if value is None:
                 if kind == 'resume': self.check()
-                else: self._send({'phase': 'idle', 'message': 'Você está na versão mais recente.'})
+                else:
+                    self._send({'phase': 'completed' if self.updated else 'idle',
+                                'message': None if self.updated else 'Você já está na versão mais recente.'})
             else:
                 self._pending = value
-                self._send({'phase': 'ready', 'version': value['version']}); self._schedule()
+                self._send({'phase': 'ready', 'version': value['version'], 'notes': value.get('notes', [])})
+                self._schedule()
         elif kind in ('install', 'flushed'):
             try:
                 if kind == 'install':
@@ -400,7 +433,7 @@ class Updater(QObject):
             except Exception as install_error:
                 LOG.warning('Instalação: %s', install_error)
                 self.on_recover()
-                self._send({'phase': 'error', 'message': 'Instalação adiada. Seu aplicativo continua disponível.'})
+                self._send(dict(self.state, phase='error', message='Não foi possível atualizar. Você pode continuar usando a Bolha.'))
 
     def healthy(self):
         # O chamador já confirmou o primeiro desenho e um ciclo saudável do cérebro.
@@ -409,10 +442,16 @@ class Updater(QObject):
             return
 
         def cleanup():
-            cleaned = cleanup_applied_update(self.data_dir, self.version, self.cache_root)
-            if cleaned:
-                return cleanup_recovery(self.data_dir, Path(sys.executable).parent, self.version)
-            return cleaned
+            try:
+                pending = read_json(self.data_dir / 'pending-update.json')
+            except FileNotFoundError:
+                pending = None
+            applied = (isinstance(pending, dict)
+                       and compare_versions(self.version, pending.get('version')) == 0)
+            if not cleanup_applied_update(self.data_dir, self.version, self.cache_root):
+                return False
+            recovered = cleanup_recovery(self.data_dir, Path(sys.executable).parent, self.version)
+            return ('updated' if applied else True) if recovered else False
         self._background('cleanup', cleanup)
 
     def stop(self):

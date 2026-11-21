@@ -57,10 +57,13 @@ jobs:
         shell: pwsh
         run: |
           $bolhaVersion = python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
+          if ($bolhaVersion -notmatch '^[0-9]{1,6}(?:\.[0-9]{1,6}){3}$') { throw 'Use MAJOR.MINOR.PATCH.REVISION.' }
           $bolhaParts = $bolhaVersion.Split('.')
-          $bolhaNext = $bolhaParts[0] + '.' + $bolhaParts[1] + '.' + ([int]$bolhaParts[2] + 1)
+          $bolhaNext = ($bolhaParts[0..2] -join '.') + '.' + ([int]$bolhaParts[3] + 1)
+          $bolhaLegacy = $bolhaParts[0..2] -join '.'
           "BOLHA_VERSION=$bolhaVersion" >> $env:GITHUB_ENV
           "BOLHA_NEXT_VERSION=$bolhaNext" >> $env:GITHUB_ENV
+          "BOLHA_LEGACY_VERSION=$bolhaLegacy" >> $env:GITHUB_ENV
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$bolhaVersion") { throw 'A tag diverge da versão do código.' }
           if ('${{ inputs.installer_ui_only }}' -eq 'true' -and '${{ inputs.publish_release }}' -eq 'true') { throw 'A fixture do assistente não pode ser publicada.' }
       - name: Assistente rápido com payload descartável
@@ -101,7 +104,10 @@ jobs:
           from bolha.updates import Transport, find_release
           transport = Transport()
           previous = find_release(transport, '0.0.0')
-          if previous is None or compare_versions(previous.version, VERSION) >= 0:
+          if previous is None or compare_versions(previous.version, VERSION) > 0:
+              raise RuntimeError('A versão estável anterior não pode ser superior à candidata.')
+          if (compare_versions(previous.version, VERSION) == 0
+                  and not (previous.version.count('.') == 2 and VERSION.count('.') == 3)):
               raise RuntimeError('A versão estável anterior precisa ser mais antiga que a candidata.')
           target = Path('validation/previous-native') / previous.name
           target.parent.mkdir(parents=True, exist_ok=True)
@@ -118,6 +124,9 @@ jobs:
       - name: Preparar somente o controlador de teste Electron legado
         if: github.ref_type == 'tag' || inputs.legacy_validation || inputs.publish_release
         run: npm install --prefix validation/legacy-runner --no-audit --no-fund --no-save @playwright/test@1.56.1
+      - name: Preparar fixture de três componentes para Electron
+        if: github.ref_type == 'tag' || inputs.legacy_validation || inputs.publish_release
+        run: python scripts/build_native.py --version $env:BOLHA_LEGACY_VERSION --output validation/legacy-native-feed --reuse-bundle "build/$($env:BOLHA_VERSION)/dist/Bolha"
       - name: Validar migração real das versões Electron no runner descartável
         if: github.ref_type == 'tag' || inputs.legacy_validation || inputs.publish_release
         timeout-minutes: 10
@@ -132,7 +141,7 @@ jobs:
             $bolhaFile = "validation/previous/Bolha-Setup-$bolhaOld-x64.exe"
             Invoke-WebRequest "https://github.com/kuky13/bolha/releases/download/v$bolhaOld/Bolha-Setup-$bolhaOld-x64.exe" -OutFile $bolhaFile
             if ((Get-FileHash $bolhaFile -Algorithm SHA256).Hash.ToLower() -ne $bolhaPrevious[$bolhaOld]) { throw "Checksum inválido: $bolhaOld" }
-            python scripts/test_windows_native.py --legacy-installer $bolhaFile --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --playwright-root validation/legacy-runner --output "validation/from-$bolhaOld"
+            python scripts/test_windows_native.py --legacy-installer $bolhaFile --installer "validation/legacy-native-feed/Bolha-Setup-$($env:BOLHA_LEGACY_VERSION)-x64.exe" --playwright-root validation/legacy-runner --output "validation/from-$bolhaOld"
             if ($LASTEXITCODE -ne 0) { throw "Migração $bolhaOld falhou." }
           }
       - uses: actions/upload-artifact@v4
@@ -157,7 +166,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $bolhaCodeVersion = python -c "from bolha import VERSION; print(VERSION)"
-          if ($LASTEXITCODE -ne 0 -or $bolhaCodeVersion -ne $env:BOLHA_VERSION -or $bolhaCodeVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Versão do código divergente.' }
+          if ($LASTEXITCODE -ne 0 -or $bolhaCodeVersion -ne $env:BOLHA_VERSION -or $bolhaCodeVersion -notmatch '^[0-9]{1,6}(?:\.[0-9]{1,6}){3}$') { throw 'Versão do código divergente.' }
           $bolhaTag = 'v' + $env:BOLHA_VERSION
           $bolhaCommit = git rev-parse HEAD
           if ($LASTEXITCODE -ne 0 -or $bolhaCommit -ne $env:GITHUB_SHA) { throw 'O commit compilado diverge do alvo da publicação.' }

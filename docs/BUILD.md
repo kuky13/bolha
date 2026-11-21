@@ -107,3 +107,23 @@ O passo usa somente `github.token` como `GH_TOKEN`. Segundo a [documentação do
 GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow),
 um evento de push produzido por `GITHUB_TOKEN` não dispara outra execução do
 workflow de tags. Assim a publicação manual não recompila o mesmo aplicativo.
+
+## Numeração e transição para quatro componentes
+
+A versão segue `MAJOR.MINOR.PATCH.REVISION`. Major identifica grandes mudanças,
+Minor novas funções, Patch correções e Revision pequenos ajustes. O comparador
+lê versões antigas de três componentes como tendo revisão zero. Por isso,
+`0.5.9` e `0.5.9.0` são equivalentes. A primeira versão superior para um
+atualizador que conhece o novo formato é `0.5.9.1`.
+
+O atualizador embarcado na 0.5.9 anterior valida somente três componentes.
+Faça a transição para o novo atualizador com o instalador manual da 0.5.9.0,
+que preserva o mesmo perfil e a mesma identidade de instalação. O CI valida
+essa transição separadamente da atualização automática 0.5.9.0 → 0.5.9.1.
+O feed de três componentes para Electron é uma fixture de CI. Instalações
+Electron antigas podem passar pela versão nativa publicada 0.5.9 antes da
+transição manual.
+
+No Android, o APK usa o mesmo texto de versão e reserva espaço para a revisão
+no código de versão. A 0.5.9.0 corresponde ao código 5009000, superior ao código
+5006 da 0.5.6. A atualização de um APK requer a mesma chave de assinatura.

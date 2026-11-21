@@ -7,7 +7,7 @@ from types import SimpleNamespace as NS
 import pytest
 from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QLabel, QSystemTrayIcon, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QMenu, QProgressBar, QSystemTrayIcon, QVBoxLayout, QWidget
 
 from bolha.battery_panel import BatteryPanel, panel_position
 from bolha.cursor_finder import locate
@@ -166,7 +166,9 @@ def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_app
         dict(key='a', name='A sleeping', percent=20, asleep=True, kind=['unknown']),
         dict(key='z', name='Z <connected>', percent=80, kind='mouse'),
     ]).encode())
-    panel = BatteryPanel(monitor, QSystemTrayIcon())
+    tray = QSystemTrayIcon()
+    tray.show()
+    panel = BatteryPanel(monitor, tray)
     labels = [label.text() for label in panel.scroll.widget().findChildren(QLabel)]
     assert labels.index('Z <connected>') < labels.index('A sleeping')
     assert [device.kind for device in monitor.devices] == ['other', 'mouse']
@@ -178,8 +180,10 @@ def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_app
     panel.toggle()
     assert panel.isVisible()
     monitor.configure(False, 15, True)
-    assert not panel.isVisible() and not panel.tray.isVisible()
+    assert panel.isVisible() and tray.isVisible()
+    assert not panel.scroll.isVisible()
     panel.close()
+    tray.hide()
     screen = QRect(-960, 0, 960, 680)
     work = QRect(-960, 24, 960, 656)
     pos = panel_position(work, screen, QRect(-42, 0, 20, 20), QSize(300,200))
@@ -205,3 +209,63 @@ def test_raw_mouse_button_down_releases_without_consuming_click():
         hotkeys.user = NS(GetRawInputData=native_packet(flags))
         assert Hotkeys.nativeEventFilter(hotkeys, 'windows_generic_MSG', ctypes.addressof(message)) == (False,0)
     assert events == ['release']
+
+
+def test_battery_popup_renders_worker_snapshot_after_hidden_and_unknown_charge(qt_application, tmp_path):
+    monitor = BatteryMonitor(lambda _: None, tmp_path)
+    monitor.enabled = True
+    tray = QSystemTrayIcon()
+    panel = BatteryPanel(monitor, tray)
+    monitor._status('Nenhum periférico compatível encontrado.')
+    assert not panel.scroll.widget().findChildren(QLabel, 'batteryDeviceIcon')
+
+    rows = [
+        dict(key='usb', name='Fone USB', kind='headset', percent=80, via='HeadsetControl'),
+        dict(key='bt', name='Teclado Bluetooth', kind='keyboard', percent=-1, via='Bluetooth'),
+        dict(key='rf', name='Mouse sem fio', kind='mouse', percent=34, via='Dongle'),
+        dict(key='gone', name='Já desconectado', connected=False, percent=53),
+        'entrada inválida',
+    ]
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(monitor, 'refresh', lambda: None)
+        monitor.devices = parse_devices(json.dumps(rows[:1]).encode())
+        monitor._status('Leitura atualizada.')
+        panel.toggle()
+        qt_application.processEvents()
+        assert panel.scroll.viewport().height() >= 40
+        assert len(panel.scroll.widget().findChildren(QLabel, 'batteryDeviceIcon')) == 1
+
+    monitor.devices = parse_devices(json.dumps(rows).encode())
+    monitor._status('Leitura atualizada.')
+    qt_application.processEvents()
+    viewport = panel.scroll.widget()
+    assert len(viewport.findChildren(QLabel, 'batteryDeviceIcon')) == 3
+    assert sorted(bar.value() for bar in viewport.findChildren(QProgressBar)) == [34, 80]
+    assert 'Carga indisponível' in [item.text() for item in viewport.findChildren(QLabel)]
+    assert tray.toolTip() == 'Bolha · Baterias (3 em uso)'
+    monitor._status('Falha na leitura de bateria. Exibindo a última leitura.')
+    assert panel.scroll.widget() is viewport
+    panel.close()
+
+
+def test_mascot_tray_requires_opt_in_and_can_be_toggled_without_duplicates(qt_application):
+    from bolha.app import NativeApp
+    assert defaults()['mascotTrayIcon'] is False
+    assert sanitize({'mascotTrayIcon': True})['mascotTrayIcon'] is True
+    controller = NativeApp.__new__(NativeApp)
+    controller.qapp = qt_application
+    controller.menu = QMenu()
+    controller.tray = QSystemTrayIcon(controller.qapp)
+    controller.tray.show()
+    controller.mascot_tray = None
+    controller.sync_mascot_tray(False)
+    assert controller.mascot_tray is None and controller.tray.isVisible()
+    controller.sync_mascot_tray(True)
+    first = controller.mascot_tray
+    controller.sync_mascot_tray(True)
+    assert controller.mascot_tray is first and first.isVisible()
+    assert first.contextMenu() is controller.menu
+    controller.sync_mascot_tray(False)
+    assert not first.isVisible() and controller.tray.isVisible()
+    controller.tray.hide()
+    controller.tray.deleteLater()
