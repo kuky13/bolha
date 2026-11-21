@@ -1,15 +1,14 @@
-# Bolha 0.5.6
+# Bolha 0.5.7 para Windows
 
-- Notebook redesenhado e com digitação animada nas edições Qt e Android.
-- Na corrida, a boca acompanha o ritmo das passadas; as transições de movimento
-  ficam mais suaves.
-- README, guias e modelos de Issues e pull requests simplificados para ajudar
-  quem usa e quem contribui. Consulte o [índice de guias](https://github.com/kuky13/bolha/blob/main/docs/README.md).
+- Dois toques rápidos no Alt esquerdo chamam a Bolha para mostrar seu cursor.
+  Se o cursor estiver em um monitor ocupado por tela cheia, a Bolha aponta
+  na direção dele a partir de uma tela livre. Esc fecha a indicação.
+- Ctrl+= pausa ou retoma a sessão atual de mídia. A Bolha pode dançar e
+  comentar a faixa quando o Spotify para Windows começa a tocar.
+- A Central mostra a bateria de periféricos compatíveis e permite ajustar
+  os avisos. Abra **App → Integrações do Windows** para configurar as funções.
+- A leitura de bateria é fornecida pelo BatteryHub. Os créditos completos e
+  as licenças estão em [NOTICE.md](https://github.com/kuky13/bolha/blob/main/NOTICE.md).
 
-No Windows, atualize pela **Central da Bolha → App → Verificar atualizações**
-ou baixe o instalador x64. No Android, instale o APK sobre a versão anterior
-para preservar os dados.
-
-Projeto comunitário baseado no [Pestinha](https://github.com/mille-okws/pestinha),
-de [@mille-okws e colaboradores](https://github.com/mille-okws), sob
-**GPL-3.0-or-later**. Preserve os créditos e avisos de licença.
+A versão [0.5.6 para Android](https://github.com/kuky13/bolha/releases/tag/v0.5.6)
+continua disponível.

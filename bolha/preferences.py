@@ -26,10 +26,14 @@ DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
                 popEnabled=True, popThrowLimit=12,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
-                adaptiveBehavior=True,learnRoutine=True)
+                adaptiveBehavior=True,learnRoutine=True,
+                finderEnabled=True,finderDouble=True,finderKey='Alt esquerdo',finderSeconds=3,
+                mediaEnabled=True,mediaKey='Ctrl+=',spotifyEnabled=True,
+                batteryEnabled=True,batteryAlerts=True,batteryThreshold=15)
 DEFAULTS.update({key: True for _, key, _ in ACTIVITY_SWITCHES})
 BOOLEAN_KEYS = ('roaming','mouthEnabled','cursorPrankEnabled','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
-                'adaptiveBehavior','learnRoutine','popEnabled') + tuple(key for _, key, _ in ACTIVITY_SWITCHES)
+                'adaptiveBehavior','learnRoutine','popEnabled','finderEnabled','finderDouble','mediaEnabled',
+                'spotifyEnabled','batteryEnabled','batteryAlerts') + tuple(key for _, key, _ in ACTIVITY_SWITCHES)
 SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 
 
@@ -55,6 +59,13 @@ def sanitize(patch, previous=None):
         result['objectScales']=scales
     for key,low,high in (('avatarSize',48,200),('mischiefInterval',60,1800),('maxObjects',1,5)):
         if number(patch.get(key)):result[key]=math.floor(max(low,min(high,patch[key]))+.5)
+    for key, low, high in (('finderSeconds', 1, 10), ('batteryThreshold', 1, 50)):
+        if type(patch.get(key)) is int:
+            result[key] = max(low, min(high, patch[key]))
+    for key in ('finderKey', 'mediaKey'):
+        value = patch.get(key)
+        if isinstance(value, str) and 0 < len(value) <= 48 and value.isprintable():
+            result[key] = value
     if type(patch.get('popThrowLimit')) is int:
         result['popThrowLimit']=max(5,min(30,patch['popThrowLimit']))
     if number(patch.get('opacity')): result['opacity']=max(.2,min(1.,patch['opacity']))

@@ -24,3 +24,16 @@ pywin32: Mark Hammond e contribuidores, PSF-2.0.
 PyInstaller: PyInstaller Development Team, GPLv2+ com exceção de bootloader
 que permite distribuir programas segundo suas próprias licenças.
 NSIS: contribuidores do NSIS, zlib/libpng e avisos dos componentes do instalador.
+
+Windows integrations
+Multi-Monitor-Mouse-Finder by inspiringsource (MIT): visual and multi-monitor reference,
+no source code bundled. https://github.com/inspiringsource/Multi-Monitor-Mouse-Finder
+BatteryHub 1.1.0 by krisgfx9 and contributors (GPL-3.0), invoked locally with --json.
+https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/releases/tag/v1.1.0
+HeadsetControl 4.3.0 by Sapd and contributors (GPL-3.0), distributed with BatteryHub.
+https://github.com/Sapd/HeadsetControl/releases/tag/4.3.0
+The original license and notices are in _internal/third_party/batteryhub.
+Corresponding sources accompany the Windows release as BatteryHub-1.1.0-source.tar.gz
+and headsetcontrol-4.3.0.tar.gz.
+Python/WinRT 3.2.1 (MIT): https://github.com/pywinrt/pywinrt/tree/v3.2.1
+See _internal/licenses/PYWINRT-MIT.txt for the notice.

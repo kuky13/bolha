@@ -4,8 +4,8 @@ A Bolha é uma mascote virtual de desktop, open source e feita pela comunidade.
 Ela passeia pela tela, reage a carinho e brinca com um brinquedo e um notebook.
 Seu cérebro e seu aprendizado funcionam localmente.
 
-**Windows x64 e Android.** [Baixar](https://github.com/kuky13/bolha/releases/latest) ·
-[Android: instalação e uso](android/README.md)
+**Windows x64 e Android.** [Baixar para Windows](https://github.com/kuky13/bolha/releases/latest) ·
+[Baixar APK 0.5.6](https://github.com/kuky13/bolha/releases/tag/v0.5.6) · [Guia Android](android/README.md)
 
 ![Bolha perseguindo o brinquedo](docs/images/bolha-brincando.png)
 
@@ -49,6 +49,21 @@ a rede quando ativadas; a busca envia palavras-chave genéricas de humor a
 ReactionGIFs ou Nekos.best, e as imagens ficam em memória durante a exibição.
 Você pode desligar as reações online na Central. Os detalhes estão em
 [dados e rede](docs/USO.md#perfil-privacidade-e-rede).
+
+## Integrações do Windows
+
+Na Central, abra **App → Integrações do Windows**. Toque duas vezes no **Alt
+esquerdo** para chamar a Bolha até o cursor ou pressione **Ctrl+=** para
+pausar ou retomar a sessão atual de mídia. Os atalhos são configuráveis.
+O Spotify para Windows pode fazer a Bolha dançar quando começa outra faixa.
+A Central mostra a bateria dos periféricos compatíveis e permite configurar
+os avisos. Cada opção pode ser desligada separadamente.
+
+O localizador e a dança respeitam telas cheias usando a leitura opcional
+**Janelas abertas**. O controle de mídia, os metadados da música e a leitura
+de bateria são locais. A leitura de bateria no pacote Windows usa o
+[BatteryHub](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor).
+O localizador é inspirado no [Multi-Monitor-Mouse-Finder](https://github.com/inspiringsource/Multi-Monitor-Mouse-Finder).
 
 ## Código, arte e créditos
 

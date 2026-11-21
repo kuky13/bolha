@@ -298,15 +298,24 @@ class SettingsDialog(QDialog):
         maintenance.addWidget(_button('Copiar diagnóstico local', self.copy_diagnostics))
         maintenance.addWidget(_label('O relatório fica local. Você escolhe onde compartilhar.'))
         maintenance.addWidget(_button('Apagar aprendizado…', self.reset_learning))
+        features = getattr(self.controller, 'windows_features', None)
+        self.windows_settings = None
+        if features is not None:
+            from .windows_settings import WindowsSettings
+            self.windows_settings = WindowsSettings(self._details('Integrações do Windows', layout),
+                                                     features, self._dirty)
         layout.addStretch()
 
     def _values(self):
-        return dict({key: control.isChecked() for key, control in self.checks.items()},
+        values = dict({key: control.isChecked() for key, control in self.checks.items()},
                     avatarSize=self.avatar_size.value(), opacity=self.opacity.value()/100,
                     objectScales={key: control.value() for key, control in self.object_scales.items()},
                     toyAppearance=self.toy_appearance.currentData(),
                     mischiefInterval=self.interval.value()*60, maxObjects=self.object_limit.value(),
                     popThrowLimit=self.pop_throw_limit.value())
+        if self.windows_settings is not None:
+            values.update(self.windows_settings.values())
+        return values
 
     def _load(self, preferences, appearance_only=False):
         loading = self._loading
@@ -328,6 +337,8 @@ class SettingsDialog(QDialog):
             self.object_limit.setEnabled(values['mischiefEnabled'])
             self.checks['onlineReactions'].setEnabled(values['mischiefEnabled'])
             self.pop_throw_limit.setEnabled(values['popEnabled'])
+            if self.windows_settings is not None:
+                self.windows_settings.load(values)
         rendered = self._values()
         for key in ('avatarSize', 'opacity') if appearance_only else rendered:
             self.baseline[key] = rendered[key]
@@ -413,6 +424,8 @@ class SettingsDialog(QDialog):
     def refresh_update(self, *_):
         if not self.isVisible():
             return
+        if self.windows_settings is not None:
+            self.windows_settings.refresh_status()
         state = self.controller.updater.state
         phase = state.get('phase', 'idle')
         message = state.get('message')
@@ -441,6 +454,8 @@ class SettingsDialog(QDialog):
         self.update_timer.start()
 
     def hideEvent(self, event):
+        if self.windows_settings is not None:
+            self.windows_settings.finish_capture()
         self.update_timer.stop()
         super().hideEvent(event)
 

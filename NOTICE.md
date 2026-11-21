@@ -37,3 +37,23 @@ nem enviadas ao repositório ou aos releases.
 Qt, PySide6, Shiboken6, CPython, NumPy, psutil, pywin32, PyInstaller e NSIS
 mantêm suas próprias licenças. Consulte
 [packaging/THIRD-PARTY-NOTICES.txt](packaging/THIRD-PARTY-NOTICES.txt).
+
+## Integrações do Windows
+
+- [Multi-Monitor-Mouse-Finder](https://github.com/inspiringsource/Multi-Monitor-Mouse-Finder),
+  de **inspiringsource**, inspirou o halo e a indicação entre monitores. A Bolha usa
+  um desenho e uma implementação próprios em Qt. Referência MIT no commit
+  [4043c59](https://github.com/inspiringsource/Multi-Monitor-Mouse-Finder/tree/4043c59ca702cec8f0853fb93fe31eba3d235f6e).
+- [Wireless Device Battery Monitor (BatteryHub)](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor),
+  de **krisgfx9 e colaboradores**, fornece a leitura nativa de bateria em
+  `BatteryHub.exe --json`. O pacote usa a versão portátil não modificada
+  [1.1.0](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/releases/tag/v1.1.0),
+  GPL-3.0. A Bolha interpreta a saída e apresenta a lista e os alertas.
+- [HeadsetControl](https://github.com/Sapd/HeadsetControl), de **Sapd e
+  colaboradores**, é distribuído com BatteryHub para a leitura de headsets
+  compatíveis. Versão [4.3.0](https://github.com/Sapd/HeadsetControl/releases/tag/4.3.0),
+  GPL-3.0. Os avisos originais acompanham os binários. As fontes correspondentes
+  com instruções de compilação estão nos arquivos `BatteryHub-1.1.0-source.tar.gz`
+  e `headsetcontrol-4.3.0.tar.gz` da mesma publicação Windows.
+- [Python/WinRT](https://github.com/pywinrt/pywinrt/tree/v3.2.1), MIT, dá acesso às
+  sessões locais de mídia do Windows. Veja [a licença](licenses/PYWINRT-MIT.txt).

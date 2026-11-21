@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from bolha import VERSION
 from scripts.release_metadata import generate
+from scripts.fetch_batteryhub import prepare as prepare_batteryhub, verify as verify_batteryhub
 
 
 def collect_licenses(target):
@@ -23,7 +24,7 @@ def collect_licenses(target):
     for name in ('LICENSE','NOTICE.md'):
         shutil.copy2(ROOT/name,target/name)
     shutil.copytree(ROOT/'licenses',target,dirs_exist_ok=True)
-    for name in ('numpy','psutil','PyInstaller','PySide6-Essentials','shiboken6','pywin32'):
+    for name in ('numpy','psutil','PyInstaller','PySide6-Essentials','shiboken6','pywin32','typing_extensions'):
         try: package=distribution(name)
         except Exception:
             if name=='pywin32' and os.name!='nt':continue
@@ -84,6 +85,8 @@ def build(version, output, makensis=None, reuse_bundle=None):
     (resource/'bolha-version.json').write_text(json.dumps({'version':version}),encoding='utf-8')
     collect_licenses(resource/'licenses')
     shutil.copy2(ROOT/'packaging/THIRD-PARTY-NOTICES.txt',resource/'THIRD-PARTY-NOTICES.txt')
+    battery = resource/'batteryhub'
+    prepare_batteryhub(ROOT/'build/tools/batteryhub', None if reuse_bundle else battery, output)
     # O pacote usa a mesma geometria vetorial das expressões atuais.
     icon(resource/'icons')
     args=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--windowed','--onedir','--name','Bolha',
@@ -96,6 +99,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
     for module in ('PySide6.QtQml','PySide6.QtQuick','PySide6.QtWebEngineCore','PySide6.QtWebEngineWidgets',
                    'PySide6.QtNetwork','tkinter','matplotlib','scipy','pytest'):
         args+=['--exclude-module',module]
+    args += ['--add-data', str(battery)+os.pathsep+'third_party/batteryhub']
     args += [str(ROOT/'launcher.py')]
     bundle=work/'dist/Bolha'
     if reuse_bundle:
@@ -104,6 +108,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
         shutil.copy2(resource/'bolha-version.json',bundle/'_internal/bolha-version.json')
     else:
         subprocess.run(args,cwd=ROOT,check=True)
+    verify_batteryhub(bundle/'_internal/third_party/batteryhub')
     prune_optional_qt(bundle)
     subprocess.run([sys.executable,str(ROOT/'scripts/audit_native.py'),str(bundle),'--output-json',str(ROOT/'validation/package-audit.json')],check=True)
     manifest={}
