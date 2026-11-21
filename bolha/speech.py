@@ -119,6 +119,7 @@ class SpeechWindow(QWidget):
         self.thought = False
         self.started = self.until = 0.
         self.counting = False
+        self.external_until = 0.
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -131,18 +132,27 @@ class SpeechWindow(QWidget):
         self.until = self.started + speech_duration(self.text)
         self.setAccessibleDescription(self.text)
 
+    def offer(self, text, now):
+        self.present(text, now=now)
+        self.external_until = self.until
+
+    def clear_external(self):
+        if self.external_until:
+            self.external_until = self.until = 0.
+
     def sync(self, now=None):
         now = time.monotonic() if now is None else now
         game = self.game
         if (not game.prefs.get('speechEnabled', True) or not game.pet_visible(now)
                 or game.panel or now < game.quiet_until or game.mischief.has_note()):
-            self.until = 0.
+            self.until = self.external_until = 0.
             self.hide()
             self.dialogue.previous = None
             self.dialogue.next_ambient = None
             return
         count = game.play.count_text(now)
         if count:
+            self.clear_external()
             self.counting = True
             self.dialogue.next_reaction = max(self.dialogue.next_reaction,now+.65)
             if self.text != count[0]:
@@ -152,9 +162,11 @@ class SpeechWindow(QWidget):
             if self.counting:
                 self.counting = False
                 self.until = 0.
-            result = self.dialogue.update(game, now)
-            if result:
-                self.present(*result, now=now)
+            if now >= self.external_until:
+                self.external_until = 0.
+                result = self.dialogue.update(game, now)
+                if result:
+                    self.present(*result, now=now)
         if not self.text or (not count and now >= self.until):
             self.hide()
             return

@@ -40,6 +40,14 @@ class PetVisual(QWidget):
         scale=radius/49*pose.get('visual_scale',1.)
         angle=game.body.angle+pose['angle_offset']
         squash=pose['squash']
+        if self.pet.dance_started is not None:
+            elapsed = now - self.pet.dance_started
+            strength = max(0., min(elapsed * 6, 1., (2.2 - elapsed) * 4))
+            sway = math.sin(elapsed * 12) * strength
+            angle += 12 * sway
+            squash += .065 * abs(sway)
+            pose = dict(pose, emotion='feliz', face_profile=None, mouth_curve=.65,
+                        ear_tilt=9 * sway, ear_raise=3 * abs(sway))
         cx,cy=self.width()/2,self.height()/2
         if 'corner_peek' in pose:
             inward,depth,emerge=pose['corner_peek']
@@ -113,6 +121,7 @@ class PetWindow(QWidget):
         self.rubs=deque()
         self.motion=ExpressionMotion(time.monotonic())
         self._saved_prank_cursor=None
+        self.dance_started=None
         self.sync()
 
     def floor_pose(self):

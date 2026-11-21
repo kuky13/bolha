@@ -1,0 +1,154 @@
+import asyncio
+import json
+from types import SimpleNamespace as NS
+
+import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QVBoxLayout, QWidget
+
+from bolha.cursor_finder import locate
+from bolha.preferences import defaults, sanitize
+from bolha.windows_battery import BatteryAlerts, BatteryMonitor, parse_devices
+from bolha.windows_hotkeys import DoubleTap, binding
+from bolha.windows_media import SpotifyReaction, session_operation
+from bolha.windows_settings import WindowsSettings
+
+
+def test_double_tap_counts_releases_and_rejects_holds_combinations_and_repeat():
+    tap = DoubleTap()
+    assert not tap.event(True, True, 0)
+    assert not tap.event(True, True, .025)
+    assert not tap.event(True, False, .05)
+    assert not tap.event(True, True, .18)
+    assert tap.event(True, False, .24)
+    assert not tap.event(True, True, 1)
+    assert not tap.event(False, True, 1.025)
+    assert not tap.event(True, False, 1.05)
+    assert not tap.event(True, True, 1.18)
+    assert not tap.event(True, False, 1.22)
+    assert not tap.event(True, True, 2)
+    assert not tap.event(True, False, 2.4)
+    assert not tap.event(True, True, 2.5, modified=True)
+    assert not tap.event(True, False, 2.6)
+
+
+def test_shortcuts_reserve_panic_and_use_layout_to_locate_punctuation():
+    def scan(character):
+        return {ord('='): 0xBB, ord('b'): ord('B'), ord('+'): 0x1BB}.get(character, -1)
+    assert binding('Ctrl+=', scan) == (2, 0xBB)
+    assert binding('Ctrl++', scan) == (6, 0xBB)
+    assert binding('Alt esquerdo', scan, double=True) == (0, 0xA4)
+    for value in ('Ctrl+Alt+Shift+B', 'Esc', 'F12', 'Q'):
+        with pytest.raises(ValueError):
+            binding(value, scan)
+    assert binding('Ctrl+=', lambda _: 0xA5) == (2, 0xA5)
+    with pytest.raises(ValueError):
+        binding('Ctrl++', scan, double=True)
+
+
+def test_cursor_detects_negative_screen_taskbar_gap_and_fullscreen():
+    areas = [(-1920, 60, -640, 740), (0, 0, 1920, 1040), (1920, -500, 2880, 200)]
+    monitors = [(-1920, 60, -640, 780), (0, 0, 1920, 1080), (1920, -500, 2880, 220)]
+    assert locate((-1890, 766), areas, monitors, set()) == (0, (-1890, 766), None)
+    index, _, arrow = locate((-1200, 210), areas, monitors, {0})
+    assert index == 1 and abs(arrow) > 2.9
+    index, _, arrow = locate((-400, 380), areas, monitors, set())
+    assert index == 0 and abs(arrow) < .1
+    assert locate((10, 400), areas, monitors, {0, 1, 2}) is None
+    assert locate((-1200, 210), areas[1:], monitors[1:], set())[0] == 0
+
+
+class Status:
+    PLAYING, PAUSED, STOPPED, OPENED = range(4)
+
+
+class Session:
+    def __init__(self, source, status):
+        self.source_app_user_model_id = source
+        self.status = status
+        self.commands = []
+
+    def get_playback_info(self):
+        return NS(playback_status=self.status, controls=NS(is_pause_enabled=True, is_play_enabled=True))
+
+    async def try_get_media_properties_async(self):
+        return NS(title='  Lua\n Cheia ', artist='Banda Coração')
+
+    async def try_pause_async(self):
+        self.commands.append('pause')
+        return True
+
+    async def try_play_async(self):
+        self.commands.append('play')
+        return True
+
+
+def test_media_uses_current_session_and_spotify_requires_desktop_playing():
+    browser = Session('browser.spotify.exe', Status.PAUSED)
+    store = Session('SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify', Status.PLAYING)
+    client = Session('Spotify.exe', Status.PAUSED)
+
+    class Manager:
+        @classmethod
+        async def request_async(cls):
+            return NS(get_current_session=lambda: browser, get_sessions=lambda: [browser, client, store])
+    assert asyncio.run(session_operation(Manager, Status, 'toggle'))
+    assert browser.commands == ['play'] and not client.commands and not store.commands
+    assert asyncio.run(session_operation(Manager, Status, 'spotify')) == ('Lua Cheia', 'Banda Coração')
+    store.status = Status.PAUSED
+    browser.status = Status.PLAYING
+    assert asyncio.run(session_operation(Manager, Status, 'spotify')) is None
+    assert asyncio.run(session_operation(Manager, Status, 'toggle'))
+    assert browser.commands == ['play', 'pause']
+
+
+def test_spotify_reactions_have_cooldown_and_dont_repeat_on_pause_resume():
+    policy = SpotifyReaction()
+    assert 'Lua' in policy.observe(('Lua', 'Banda'), 2, True)
+    assert policy.observe(None, 320, True) is None
+    assert policy.observe(('Lua', 'BANDA'), 350, True) is None
+    assert policy.observe(('Outra', 'Banda'), 360, False) is None
+    assert policy.observe(('Outra', 'Banda'), 380, True) is None
+    assert 'Orelha' in policy.observe(('Orelha', ''), 381, True)
+    assert policy.observe(('Breve', ''), 385, True) is None
+
+
+def test_battery_parses_utf8_suppresses_initial_alert_and_requires_recovery():
+    def readings(percent, **fields):
+        data = [dict(key='a', name='Fone Pêssego', percent=percent, **fields)]
+        return parse_devices(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+    alerts = BatteryAlerts()
+    assert 'Indisponível' in readings(-1)[0].display
+    assert 'Média' in readings(-1, level='Média')[0].display
+    assert 'repouso' in readings(-1, asleep=True, connected=False)[0].display
+    assert not readings(12, connected=False)
+    assert not alerts.observe(readings(7), 15, True)
+    assert not alerts.observe(readings(28), 15, True)
+    assert not alerts.observe(readings(7, asleep=True), 15, True)
+    assert alerts.observe(readings(15), 15, True)[0].display == 'Fone Pêssego · 15%'
+    assert not alerts.observe([], 15, True)
+    assert not alerts.observe(readings(14), 15, True)
+    assert not alerts.observe(readings(28), 15, True)
+    assert not alerts.observe(readings(11), 15, False)
+    with pytest.raises(ValueError):
+        parse_devices(b'"corrupt"')
+
+
+def test_settings_capture_and_individual_values(qt_application, tmp_path):
+    shell = QWidget()
+    battery = BatteryMonitor(lambda _: None, tmp_path)
+    features = NS(battery=battery, shortcut_status='', media=NS(status=''), capture_shortcut=lambda _: None)
+    settings = WindowsSettings(QVBoxLayout(shell), features, lambda: None)
+    settings.load(defaults())
+    assert settings.values()['finderKey'] == 'Alt esquerdo'
+    settings.finder_key.begin()
+    QTest.keyClick(settings.finder_key, Qt.Key_F8)
+    settings.media_key.begin()
+    QTest.keyClick(settings.media_key, Qt.Key_Equal, Qt.ControlModifier)
+    assert settings.values()['finderKey'] == 'F8'
+    assert settings.values()['mediaKey'] == 'Ctrl+='
+    prefs = sanitize(dict(settings.values(), finderSeconds=999, batteryThreshold=-9))
+    assert prefs['finderSeconds'] == 10 and prefs['batteryThreshold'] == 1
+    assert prefs['batteryEnabled'] and prefs['spotifyEnabled']
+    shell.close()

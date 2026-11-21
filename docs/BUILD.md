@@ -18,6 +18,12 @@ coleta licenças, rejeita bibliotecas web e cria instalador, `latest.yml` e
 `SHA256SUMS.txt`. A versão do aplicativo fica em `bolha/__init__.py` e
 `pyproject.toml`; uma versão de teste pode ser passada por `--version`.
 
+O script também baixa a edição portátil fixa do BatteryHub 1.1.0 e as fontes
+correspondentes do BatteryHub e do HeadsetControl 4.3.0, conferindo SHA-256.
+Os executáveis e os avisos vão em `_internal/third_party/batteryhub`. Mantenha
+os dois arquivos de código-fonte `.tar.gz` junto dos demais assets ao publicar
+uma distribuição. Veja os [créditos e avisos de licença](../NOTICE.md).
+
 ## Isolamento para testes no Windows
 
 Nunca teste instaladores antigos da Bolha no computador de uso diário: eles

@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt,QTimer,QLockFile
 from PySide6.QtGui import QIcon,QPixmap,QPainter,QCursor,QPalette,QColor
 from PySide6.QtWidgets import QApplication,QMenu,QSystemTrayIcon,QMessageBox,QDialog,QVBoxLayout,QLabel,QPushButton
 from . import VERSION
-from .preferences import PreferencesStore
+from .preferences import PreferencesStore, sanitize
 from .persistence import PersistenceWriter
 from .platform import desktop_layout,keep_pet_above,PanicHotkey
 from .pet import PetWindow
@@ -89,6 +89,11 @@ class NativeApp:
         self.tray.activated.connect(self._tray_activated)
         self.menu=self.make_menu();self.tray.setContextMenu(self.menu);self.tray.show()
         self.hotkey=PanicHotkey(lambda:self.interact('panic'));qapp.installNativeEventFilter(self.hotkey)
+        self.windows_features = None
+        if sys.platform == 'win32' and qapp.platformName() == 'windows' and (
+                os.getenv('BOLHA_TEST') != '1' or os.getenv('BOLHA_TEST_WINDOWS_INTEGRATIONS') == '1'):
+            from .windows_features import WindowsFeatures
+            self.windows_features = WindowsFeatures(self)
         qapp.screenAdded.connect(self._screens_changed);qapp.screenRemoved.connect(self._screens_changed)
         for screen in qapp.screens():self._connect_screen(screen)
         self.refresh_desktop()
@@ -132,6 +137,8 @@ class NativeApp:
         QTimer.singleShot(100,self.refresh_desktop)
     def refresh_desktop(self,*_):
         exclude=[int(self.pet.winId()),int(self.pet.visual.winId())]+self.scene.ids()+[int(d.winId()) for d in self.dialogs]
+        if self.windows_features is not None:
+            exclude.append(int(self.windows_features.finder.winId()))
         if self.pingpong_view.isVisible():
             exclude.append(int(self.pingpong_view.winId()))
         self.game.desktop(desktop_layout(self.qapp,exclude));self.game.last_native=0;self.game.read_context(time.monotonic());self.pet.sync();self.scene.sync()
@@ -145,7 +152,10 @@ class NativeApp:
             if getattr(self.game, 'prefs', self.store.preferences).get('senseCursor',True):
                 point=QCursor.pos();self.game.interact(dict(type='cursor',x=point.x(),y=point.y()), now=now)
             else:self.game.cursor=(self.game.body.x,self.game.body.y)
-            self.game.tick(dt,now);self.pet.sync();self.scene.sync()
+            self.game.tick(dt,now)
+            if getattr(self, 'windows_features', None) is not None:
+                self.windows_features.tick(now)
+            self.pet.sync();self.scene.sync()
             self.sync_pingpong()
             self.game.excluded.update(self.scene.ids())
         except Exception as error:
@@ -157,6 +167,8 @@ class NativeApp:
             log('[erro]',repr(error))
     def cancel_interactions(self):
         self.pet.cancel_interaction();self.scene.cancel_interactions()
+        if getattr(self, 'windows_features', None) is not None:
+            self.windows_features.cancel()
     def _application_state_changed(self,state):
         self.suspended=state==Qt.ApplicationSuspended
         if self.suspended:
@@ -178,6 +190,8 @@ class NativeApp:
             except FileNotFoundError:pass
             except OSError as error:self.warn('Não foi possível remover o pedido de parada do teste: '+str(error))
             else:self.quit();return
+        if getattr(self, 'windows_features', None) is not None:
+            self.windows_features.poll()
         while True:
             try:path,error=self.writer.errors.get_nowait()
             except queue.Empty:break
@@ -367,7 +381,18 @@ class NativeApp:
     def save_preferences(self,patch):
         if self.activity_test is not None:
             self.stop_activity_test()
-        result=self.store.save(patch);self.game.configure(result);self.pet.sync();self.scene.sync();return result
+        features = getattr(self, 'windows_features', None)
+        previous = self.store.preferences
+        if features is not None:
+            features.configure(sanitize(patch, previous))
+        try:
+            result = self.store.save(patch)
+        except (OSError, ValueError):
+            if features is not None:
+                features.configure(previous, strict=False)
+            raise
+        self.game.configure(result);self.pet.sync();self.scene.sync()
+        return result
     def reset_appearance(self):
         result=self.store.reset_appearance();self.game.configure(result);return result
     def startup_enabled(self):
@@ -454,6 +479,8 @@ class NativeApp:
             self.frame.stop();self.status_timer.stop();self.profile_timer.stop()
             if self.updater:self.updater.stop()
             self.hotkey.stop()
+            if self.windows_features is not None:
+                self.windows_features.stop()
             try:self.game.save()
             except (OSError,ValueError) as error:self.warn('Não foi possível salvar ao sair: '+str(error))
             if not self.writer.close():self.warn('Alguns dados não puderam ser gravados. Os arquivos anteriores foram preservados.')

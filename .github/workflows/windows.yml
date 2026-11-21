@@ -147,6 +147,7 @@ jobs:
             release/latest.yml
             release/SHA256SUMS.txt
             release/THIRD-PARTY-NOTICES.txt
+            release/*.tar.gz
       - name: Publicar a versão validada
         if: success() && (github.ref_type == 'tag' || inputs.publish_release)
         env:
@@ -174,5 +175,5 @@ jobs:
           $bolhaReleaseTags = gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name'
           if ($LASTEXITCODE -ne 0) { throw 'Não consegui verificar as releases existentes.' }
           if ($bolhaReleaseTags -contains $bolhaTag) { throw 'A release já existe. Nenhum arquivo será sobrescrito.' }
-          gh release create $bolhaTag release/*.exe release/latest.yml release/SHA256SUMS.txt release/THIRD-PARTY-NOTICES.txt --target $env:GITHUB_SHA --title "Bolha $env:BOLHA_VERSION" --notes-file docs/RELEASE.md
+          gh release create $bolhaTag release/*.exe release/latest.yml release/SHA256SUMS.txt release/THIRD-PARTY-NOTICES.txt release/*.tar.gz --target $env:GITHUB_SHA --title "Bolha $env:BOLHA_VERSION" --notes-file docs/RELEASE.md
           if ($LASTEXITCODE -ne 0) { throw 'A criação da release falhou; não será feita sobrescrita ou retag.' }
