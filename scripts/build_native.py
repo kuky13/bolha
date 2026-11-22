@@ -16,7 +16,7 @@ sys.path.insert(0,str(ROOT))
 from bolha import VERSION
 from bolha.versioning import windows_version
 from scripts.release_metadata import generate
-from scripts.fetch_batteryhub import prepare as prepare_batteryhub, verify as verify_batteryhub
+from scripts.package_batteryhub import prepare as prepare_batteryhub, verify as verify_batteryhub
 
 
 def collect_licenses(target):
@@ -86,7 +86,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
     collect_licenses(resource/'licenses')
     shutil.copy2(ROOT/'packaging/THIRD-PARTY-NOTICES.txt',resource/'THIRD-PARTY-NOTICES.txt')
     battery = resource/'batteryhub'
-    prepare_batteryhub(ROOT/'build/tools/batteryhub', None if reuse_bundle else battery, output)
+    prepare_batteryhub(None if reuse_bundle else battery, output)
     # O pacote usa a mesma geometria vetorial das expressões atuais.
     icon(resource/'icons')
     args=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--windowed','--onedir','--name','Bolha',

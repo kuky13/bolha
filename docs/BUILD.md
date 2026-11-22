@@ -18,8 +18,10 @@ coleta licenças, rejeita bibliotecas web e cria instalador, `latest.yml` e
 `SHA256SUMS.txt`. A versão do aplicativo fica em `bolha/__init__.py` e
 `pyproject.toml`; uma versão de teste pode ser passada por `--version`.
 
-O script também baixa a edição portátil fixa do BatteryHub 1.1.0 e as fontes
-correspondentes do BatteryHub e do HeadsetControl 4.3.0, conferindo SHA-256.
+O script confere o SHA-256 da edição portátil do BatteryHub 1.1.0 e das fontes
+correspondentes do BatteryHub e do HeadsetControl 4.3.0. As cópias originais são
+arquivadas em [third_party/batteryhub](../third_party/batteryhub) para a compilação
+continuar quando o repositório de origem estiver fora do ar.
 Os executáveis e os avisos vão em `_internal/third_party/batteryhub`. Mantenha
 os dois arquivos de código-fonte `.tar.gz` junto dos demais assets ao publicar
 uma distribuição. Veja os [créditos e avisos de licença](../NOTICE.md).

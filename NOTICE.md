@@ -49,6 +49,8 @@ mantêm suas próprias licenças. Consulte
   `BatteryHub.exe --json`. O pacote usa a versão portátil não modificada
   [1.1.0](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/releases/tag/v1.1.0),
   GPL-3.0. A Bolha interpreta a saída e apresenta a lista e os alertas.
+  O pacote original e as fontes estão espelhados em
+  [third_party/batteryhub](third_party/batteryhub).
 - [HeadsetControl](https://github.com/Sapd/HeadsetControl), de **Sapd e
   colaboradores**, é distribuído com BatteryHub para a leitura de headsets
   compatíveis. Versão [4.3.0](https://github.com/Sapd/HeadsetControl/releases/tag/4.3.0),
