@@ -43,6 +43,12 @@ desligada. Mover ou clicar restaura o cursor imediatamente.
 Em **Central → Testar**, as prévias de expressão e os ensaios de atividade usam
 uma cópia temporária do perfil. Eles não gravam aprendizado na memória original.
 
+Na seção **Central → App → Integrações do Windows**, use a lista **Mostrar na
+bandeja** para escolher os ícones dos periféricos. Aparelhos novos aparecem
+automaticamente. Passe o ponteiro sobre um ícone para ver o nome e a carga e
+clique para abrir o painel de baterias. O Windows controla quais ícones ficam
+visíveis perto do relógio ou na área de ícones ocultos.
+
 ## Perfil, privacidade e rede
 
 No Windows, configurações e dados ficam em `%APPDATA%\bolha`; no Linux, em

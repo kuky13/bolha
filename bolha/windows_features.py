@@ -42,6 +42,7 @@ class WindowsFeatures:
             self.controller.scene.speech.clear_external()
         if not prefs['mediaEnabled']:
             self.media.toggle_pending = False
+        self.battery_panel.set_hidden_devices(prefs['batteryHiddenTrayDevices'])
         self.battery.configure(prefs['batteryEnabled'], prefs['batteryThreshold'], prefs['batteryAlerts'])
         self.prefs = dict(prefs)
 

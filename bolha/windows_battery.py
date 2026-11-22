@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
 import sys
 
 from PySide6.QtCore import QObject, QProcess, QTimer, Signal
@@ -19,12 +20,37 @@ class DeviceBattery:
     charging: bool
     asleep: bool
     kind: str = 'other'
+    connected: bool = True
 
     @property
     def display(self):
         level = f'{self.percent}%' if self.percent is not None else self.level or 'Indisponível'
         state = ' · carregando' if self.charging else ' · em repouso' if self.asleep else ''
         return f'{self.name} · {level}{state}'
+
+    def tray_tooltip(self, stale=False):
+        charge = f'{self.percent}%' if self.percent is not None else 'Carga indisponível'
+        detail = f'\n{charge}'
+        if stale:
+            detail += ' · Última leitura'
+        # A dica nativa reserva uma posição UTF-16 para o terminador.
+        budget = 254 - len(detail.encode('utf-16-le'))
+        name = self.name.encode('utf-16-le')
+        if len(name) > budget:
+            return name[:budget - 2].decode('utf-16-le', errors='ignore').rstrip() + '…' + detail
+        return self.name + detail
+
+
+def device_kind(kind, name):
+    if kind == 'headset':
+        if re.search(r'\bheadset\b', name, re.IGNORECASE):
+            return 'headset'
+        if re.search(r'\b(?:earbuds?|buds|airpods(?!\s+max\b)|tws)\b', name, re.IGNORECASE):
+            return 'earbuds'
+        return 'headphones'
+    if kind in ('mouse', 'headphones', 'earbuds', 'keyboard', 'gamepad', 'phone'):
+        return kind
+    return 'other'
 
 
 def parse_devices(raw):
@@ -45,13 +71,13 @@ def parse_devices(raw):
         if item.get('connected') is False and item.get('asleep') is not True:
             continue
         level = item.get('level')
-        kind = item.get('kind')
+        name = clean_label(name, 512) or 'Dispositivo sem nome'
         devices[key] = DeviceBattery(
-            key, clean_label(name, 512) or 'Dispositivo sem nome',
+            key, name,
             percent if type(percent) is int and 0 <= percent <= 100 else None,
             clean_label(level, 40) if isinstance(level, str) else '',
             item.get('charging') is True, item.get('asleep') is True,
-            kind if kind in ('mouse', 'headset', 'keyboard', 'gamepad', 'phone') else 'other',
+            device_kind(item.get('kind'), name), item.get('connected') is not False,
         )
     if data and not valid:
         raise ValueError('Nenhum dispositivo válido na resposta de bateria')
@@ -89,6 +115,7 @@ class BatteryMonitor(QObject):
         self.warn_low = True
         self.status = 'Leitura desativada.'
         self.success = False
+        self.stale = False
         self.timed_out = False
         self.cancelled_read = False
         self.process = QProcess(self)
@@ -121,6 +148,7 @@ class BatteryMonitor(QObject):
             self.process.kill()
             self.devices = []
             self.success = False
+            self.stale = False
             self.alerts = BatteryAlerts()
             self._status('Leitura desativada.')
 
@@ -133,6 +161,7 @@ class BatteryMonitor(QObject):
             return
         executable = self.folder / 'BatteryHub.exe'
         if not executable.is_file() or not (self.folder/'headsetcontrol.exe').is_file():
+            self.stale = self.success
             self._status('BatteryHub ausente neste pacote.')
             return
         self.timed_out = False
@@ -149,6 +178,7 @@ class BatteryMonitor(QObject):
     def _failed(self):
         self.deadline.stop()
         if self.enabled:
+            self.stale = self.success
             text = 'Tempo de leitura esgotado.' if self.timed_out else 'Falha na leitura de bateria.'
             if self.success:
                 text += ' Exibindo a última leitura.'
@@ -175,6 +205,7 @@ class BatteryMonitor(QObject):
             self._failed()
             return
         self.success = True
+        self.stale = False
         changes = self.alerts.observe(self.devices, self.threshold, self.warn_low)
         self._status('Leitura atualizada.' if self.devices else 'Nenhum periférico compatível encontrado.')
         if changes:

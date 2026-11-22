@@ -93,9 +93,7 @@ class NativeApp:
         self.windows_features = None
         if sys.platform == 'win32' and qapp.platformName() == 'windows' and (
                 os.getenv('BOLHA_TEST') != '1' or os.getenv('BOLHA_TEST_WINDOWS_INTEGRATIONS') == '1'):
-            from .battery_panel import battery_icon
             from .windows_features import WindowsFeatures
-            self.tray.setIcon(battery_icon())
             self.windows_features = WindowsFeatures(self)
             self.sync_mascot_tray(self.store.preferences['mascotTrayIcon'])
         self.tray.show()
@@ -480,9 +478,6 @@ class NativeApp:
     def on_recover(self):self.updating=False;self.last_tick=time.monotonic();self.pet.sync();self.scene.sync()
     def update_changed(self,state):
         phase=state.get('phase')
-        if phase != 'ready':
-            features = self.windows_features
-            self.tray.setToolTip(features.battery_panel.tray_text() if features else 'Bolha '+VERSION)
         if phase=='ready' and state.get('installAt') and state.get('version') != getattr(self,'update_notified',None):
             self.update_notified=state.get('version')
             remaining=max(0,round((state['installAt']-time.time()*1000)/1000))

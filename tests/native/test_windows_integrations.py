@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QLabel, QMenu, QProgressBar, QSystemTrayIcon, QVBo
 
 from bolha.battery_panel import BatteryPanel, panel_position
 from bolha.cursor_finder import locate
-from bolha.preferences import defaults, sanitize
+from bolha.preferences import PreferencesStore, defaults, sanitize
 from bolha.windows_battery import BatteryAlerts, BatteryMonitor, parse_devices
 from bolha.windows_hotkeys import DoubleTap, Hotkeys, RawHeader, binding
 from bolha.windows_media import SpotifyReaction, session_operation
@@ -242,10 +242,111 @@ def test_battery_popup_renders_worker_snapshot_after_hidden_and_unknown_charge(q
     assert len(viewport.findChildren(QLabel, 'batteryDeviceIcon')) == 3
     assert sorted(bar.value() for bar in viewport.findChildren(QProgressBar)) == [34, 80]
     assert 'Carga indisponível' in [item.text() for item in viewport.findChildren(QLabel)]
-    assert tray.toolTip() == 'Bolha · Baterias (3 em uso)'
+    assert tray.toolTip() == 'Fone USB\n80%'
     monitor._status('Falha na leitura de bateria. Exibindo a última leitura.')
     assert panel.scroll.widget() is viewport
     panel.close()
+
+
+def test_tray_uses_distinct_device_icons_and_respects_connection_and_preferences(qt_application, tmp_path):
+    monitor = BatteryMonitor(lambda _: None, tmp_path)
+    tray, menu = QSystemTrayIcon(), QMenu()
+    tray.setContextMenu(menu)
+    panel = BatteryPanel(monitor, tray)
+    fallback_icon = tray.icon().cacheKey()
+    assert tray.toolTip() == 'Bolha · Baterias'
+    if qt_application.platformName() == 'windows':
+        assert QSystemTrayIcon.isSystemTrayAvailable()
+    tray.show()
+    monitor.enabled = True
+    rows = [
+        dict(key='mouse', name='Mouse Claro', kind='mouse', percent=80),
+        dict(key='phone', name='Celular', kind='phone', percent=-1),
+        dict(key='headset', name='Headset Bluetooth', kind='headset', percent=40),
+        dict(key='buds', name='Galaxy Buds', kind='headset', percent=55),
+        dict(key='normal', name='AirPods Max', kind='headset', percent=50),
+        dict(key='duplicate', name='Mouse Claro', kind='mouse', percent=50),
+        dict(key='old', name='Teclado', kind='keyboard', asleep=True, connected=False),
+    ]
+    devices = parse_devices(json.dumps(rows).encode())
+    assert [device.kind for device in devices] == [
+        'mouse', 'phone', 'headset', 'earbuds', 'headphones', 'mouse', 'keyboard']
+    monitor.devices = devices[:1]
+    monitor.changed.emit()
+    assert tray.icon().cacheKey() != fallback_icon
+    assert tray.toolTip() == 'Mouse Claro\n80%'
+    assert not panel._device_trays
+
+    monitor.devices = devices[::-1]
+    monitor.changed.emit()
+    assert panel._primary_key == 'mouse'
+    assert set(panel._device_trays) == {'phone', 'headset', 'buds', 'normal', 'duplicate'}
+    phone = panel._device_trays['phone']
+    assert phone.toolTip() == 'Celular\nCarga indisponível'
+    assert phone.contextMenu() is menu
+    assert len({entry.icon().cacheKey() for entry in panel._device_trays.values()}) == 5
+    monitor.changed.emit()
+    assert panel._device_trays['phone'] is phone
+    monitor.devices = [device for device in devices if device.key != 'phone']
+    monitor.changed.emit()
+    assert 'phone' not in panel._device_trays and not phone.isVisible()
+    monitor.devices = devices
+    monitor.changed.emit()
+    phone = panel._device_trays['phone']
+    monitor.success = True
+    monitor._failed()
+    assert tray.toolTip().endswith('80% · Última leitura')
+    phone.activated.emit(QSystemTrayIcon.Trigger)
+    qt_application.processEvents()
+    assert panel.isVisible() and panel._anchor is phone
+
+    panel.set_hidden_devices(['mouse', 'phone', 'headset', 'buds', 'normal', 'duplicate'])
+    assert not panel._device_trays and panel._anchor is tray
+    assert not phone.isVisible()
+    assert tray.icon().cacheKey() == fallback_icon
+    panel.set_hidden_devices(['phone'])
+    assert 'phone' not in panel._device_trays and panel._primary_key != 'phone'
+    monitor.configure(False, 15, True)
+    assert not panel._device_trays and tray.toolTip() == 'Bolha · Baterias'
+    panel.close()
+    tray.hide()
+
+
+def test_windows_settings_retains_hidden_device_keys_when_device_reconnects(qt_application, tmp_path):
+    store = PreferencesStore(tmp_path)
+    assert store.preferences['batteryHiddenTrayDevices'] == []
+    shell = QWidget()
+    battery = BatteryMonitor(lambda _: None, tmp_path)
+    features = NS(battery=battery, battery_panel=NS(toggle=lambda: None),
+                  shortcut_status='', media=NS(status=''), capture_shortcut=lambda _: None)
+    changes = []
+    settings = WindowsSettings(QVBoxLayout(shell), features, lambda *args: changes.append(args))
+    settings.load(store.preferences)
+    device = parse_devices(b'[{"key":"phone:1","name":"Celular","kind":"phone","percent":40}]')[0]
+    battery.devices = [device]
+    battery.changed.emit()
+    item = settings.devices.item(0)
+    assert item.text() == 'Celular · 40%' and item.checkState() == Qt.Checked
+    changes.clear()
+    item.setCheckState(Qt.Unchecked)
+    assert len(changes) == 1
+    store.save(settings.values())
+    battery.devices = []
+    battery.changed.emit()
+    assert settings.devices.count() == 0
+    settings.load(PreferencesStore(tmp_path).preferences)
+    battery.devices = [device]
+    battery.changed.emit()
+    assert settings.devices.item(0).checkState() == Qt.Unchecked
+    assert settings.values()['batteryHiddenTrayDevices'] == ['phone:1']
+    shell.close()
+
+
+def test_tray_tooltip_keeps_charge_visible_with_a_long_unicode_name():
+    raw = json.dumps([dict(key='test', name='🎧' * 170, percent=0)]).encode()
+    tooltip = parse_devices(raw)[0].tray_tooltip(stale=True)
+    assert len(tooltip.encode('utf-16-le')) <= 254
+    assert tooltip.endswith('…\n0% · Última leitura')
 
 
 def test_mascot_tray_requires_opt_in_and_can_be_toggled_without_duplicates(qt_application):

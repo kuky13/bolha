@@ -1,8 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Controles da Central para as integrações locais do Windows."""
-from PySide6.QtCore import QEvent, Qt, Signal
-from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QCheckBox, QLabel, QPushButton, QSpinBox
+from html import escape
+
+from PySide6.QtCore import QEvent, QSignalBlocker, Qt, Signal
+from PySide6.QtGui import QIcon, QKeySequence
+from PySide6.QtWidgets import QCheckBox, QLabel, QListWidget, QListWidgetItem, QPushButton, QSpinBox
+
+from .battery_panel import device_icon, ordered_devices
 
 
 class ShortcutButton(QPushButton):
@@ -85,7 +89,14 @@ class WindowsSettings:
         self.battery_status = plain_label()
         self.shortcut_status = plain_label()
         self.media_status = plain_label()
-        self.devices = plain_label()
+        self._hidden_devices = set()
+        self._device_snapshot = ()
+        self.devices = QListWidget(accessibleName='Periféricos para mostrar na bandeja')
+        self.devices.setMaximumHeight(132)
+        self.devices.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.devices_header = plain_label('Mostrar na bandeja')
+        self.devices.itemChanged.connect(self._device_changed)
+        self.devices.itemChanged.connect(dirty)
         self.open_panel = QPushButton('Abrir painel da bandeja')
         self.open_panel.clicked.connect(features.battery_panel.toggle)
         self.refresh = QPushButton('Atualizar baterias agora')
@@ -104,7 +115,8 @@ class WindowsSettings:
                        self.media, self.media_key, self.spotify,
                        plain_label('Funciona com o aplicativo Spotify para Windows. O localizador e a dança dependem de “Janelas abertas” para respeitar a tela cheia.'),
                        self.shortcut_status, self.media_status, self.mascot_tray, self.battery, self.alert, plain_label('Limite de bateria fraca'),
-                       self.threshold, self.open_panel, self.refresh, self.battery_status, self.devices):
+                       self.threshold, self.open_panel, self.refresh, self.battery_status,
+                       self.devices_header, self.devices):
             layout.addWidget(widget)
         self.refresh.clicked.connect(features.battery.refresh)
         features.battery.changed.connect(self.refresh_status)
@@ -114,6 +126,11 @@ class WindowsSettings:
         self.finder_key.double = double
 
     def load(self, prefs):
+        self._hidden_devices = set(prefs['batteryHiddenTrayDevices'])
+        with QSignalBlocker(self.devices):
+            for row in range(self.devices.count()):
+                item = self.devices.item(row)
+                item.setCheckState(self._device_check_state(item.data(Qt.UserRole)))
         for key, control in self.checks.items():
             control.setChecked(prefs[key])
         self.finder_key.load(prefs['finderKey'])
@@ -124,7 +141,18 @@ class WindowsSettings:
     def values(self):
         return dict({key: control.isChecked() for key, control in self.checks.items()},
                     finderKey=self.finder_key.value, mediaKey=self.media_key.value,
-                    batteryThreshold=self.threshold.value())
+                    batteryThreshold=self.threshold.value(),
+                    batteryHiddenTrayDevices=sorted(self._hidden_devices))
+
+    def _device_check_state(self, key):
+        return Qt.Unchecked if key in self._hidden_devices else Qt.Checked
+
+    def _device_changed(self, item):
+        key = item.data(Qt.UserRole)
+        if item.checkState() == Qt.Checked:
+            self._hidden_devices.discard(key)
+        else:
+            self._hidden_devices.add(key)
 
     def finish_capture(self):
         self.finder_key.finish()
@@ -134,6 +162,23 @@ class WindowsSettings:
         battery = self.features.battery
         self.refresh.setEnabled(battery.enabled)
         self.battery_status.setText(battery.status)
-        self.devices.setText('\n'.join(device.display for device in battery.devices))
+        devices = tuple(ordered_devices(battery.devices))
+        if devices != self._device_snapshot:
+            self._device_snapshot = devices
+            current = self.devices.currentItem()
+            selected = current.data(Qt.UserRole) if current is not None else None
+            with QSignalBlocker(self.devices):
+                self.devices.clear()
+                for device in devices:
+                    item = QListWidgetItem(QIcon(device_icon(device.kind)), device.display)
+                    item.setData(Qt.UserRole, device.key)
+                    item.setToolTip(f'<b>{escape(device.name)}</b>')
+                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                    item.setCheckState(self._device_check_state(device.key))
+                    self.devices.addItem(item)
+                    if device.key == selected:
+                        self.devices.setCurrentItem(item)
+        self.devices_header.setVisible(bool(devices))
+        self.devices.setVisible(bool(devices))
         self.shortcut_status.setText(self.features.shortcut_status)
         self.media_status.setText(self.features.media.status)

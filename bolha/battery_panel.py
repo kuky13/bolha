@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Painel de bateria da Bolha, ancorado na bandeja do Windows."""
+from functools import partial
 import getpass
 from html import escape
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
-    QVBoxLayout, QWidget,
+    QSystemTrayIcon, QVBoxLayout, QWidget,
 )
 
 
@@ -57,21 +58,27 @@ def battery_icon():
     return icon
 
 
-def device_icon(kind):
-    size = 22
-    pixmap = QPixmap(size*2, size*2)
+def device_icon(kind, size=22, scale=2):
+    pixmap = QPixmap(size * scale, size * scale)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
-    painter.scale(2, 2)
-    painter.setPen(QPen(QColor('#e5d4ff'), 1.55, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+    painter.scale(size * scale / 22, size * scale / 22)
+    painter.setPen(QPen(QColor('#e5d4ff'), 2 if size == 16 else 1.55,
+                        Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
     if kind == 'mouse':
         painter.drawRoundedRect(QRectF(5.1, 2.8, 11.8, 16.4), 5, 5)
         painter.drawLine(QPointF(11, 5.4), QPointF(11, 8.4))
-    elif kind == 'headset':
+    elif kind in ('headset', 'headphones'):
         painter.drawArc(QRectF(3.1, 3.9, 15.8, 16), 0, 180*16)
         painter.drawRoundedRect(QRectF(2.4, 11.5, 4.1, 6), 1.35, 1.35)
         painter.drawRoundedRect(QRectF(15.5, 11.5, 4.1, 6), 1.35, 1.35)
+        if kind == 'headset':
+            painter.drawArc(QRectF(9, 14.5, 9, 5.3), 180*16, 180*16)
+    elif kind == 'earbuds':
+        for x, y in ((4, 5), (13, 8)):
+            painter.drawRoundedRect(QRectF(x, y, 5.5, 5.5), 2, 2)
+            painter.drawLine(QPointF(x + 4, y + 5.5), QPointF(x + 4, y + 10.5))
     elif kind == 'keyboard':
         painter.drawRoundedRect(QRectF(2, 5.4, 18, 11.2), 2, 2)
         for y in (9, 12):
@@ -98,7 +105,7 @@ def device_icon(kind):
         painter.drawRoundedRect(QRectF(4, 4, 14, 14), 3, 3)
         painter.drawEllipse(QPointF(11, 11), 2, 2)
     painter.end()
-    pixmap.setDevicePixelRatio(2)
+    pixmap.setDevicePixelRatio(scale)
     return pixmap
 
 
@@ -114,6 +121,11 @@ class BatteryPanel(QFrame):
         super().__init__(None, Qt.Popup | Qt.FramelessWindowHint)
         self.monitor = monitor
         self.tray = tray
+        self._anchor = tray
+        self._primary_key = None
+        self._device_trays = {}
+        self._hidden_devices = set()
+        self._tray_icons = {None: battery_icon()}
         self._rendered = None
         try:
             self.local_user = clean_label(getpass.getuser(), 90)
@@ -159,10 +171,11 @@ class BatteryPanel(QFrame):
         monitor.changed.connect(self.sync)
         self.sync()
 
-    def toggle(self):
+    def toggle(self, *, anchor=None):
         if self.isVisible():
             self.hide()
             return
+        self._anchor = anchor if anchor in self._device_trays.values() else self.tray
         self.sync()
         self.show()
         self._place()
@@ -172,7 +185,9 @@ class BatteryPanel(QFrame):
             self.monitor.refresh()
 
     def _place(self):
-        anchor = self.tray.geometry()
+        anchor = self._anchor.geometry()
+        if not anchor.isValid():
+            anchor = self.tray.geometry()
         screen = QGuiApplication.screenAt(anchor.center()) if anchor.isValid() else None
         screen = screen or QGuiApplication.primaryScreen()
         if screen is not None:
@@ -185,9 +200,53 @@ class BatteryPanel(QFrame):
             self.adjustSize()
             self.move(panel_position(area, screen.geometry(), anchor, self.size()))
 
-    def tray_text(self):
-        active = sum(not device.asleep for device in self.monitor.devices)
-        return f'Bolha · Baterias ({active} em uso)' if active else 'Bolha · Baterias'
+    def set_hidden_devices(self, keys):
+        hidden = set(keys)
+        if hidden != self._hidden_devices:
+            self._hidden_devices = hidden
+            self.sync()
+
+    def _set_tray_device(self, tray, device):
+        kind = device.kind if device else None
+        if kind not in self._tray_icons:
+            icon = QIcon()
+            for size in (16, 24, 32):
+                icon.addPixmap(device_icon(kind, size, 1))
+            self._tray_icons[kind] = icon
+        icon = self._tray_icons[kind]
+        if tray.icon().cacheKey() != icon.cacheKey():
+            tray.setIcon(icon)
+        tooltip = device.tray_tooltip(self.monitor.stale) if device else 'Bolha · Baterias'
+        if tray.toolTip() != tooltip:
+            tray.setToolTip(tooltip)
+
+    def _activate_device_tray(self, tray, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            QTimer.singleShot(0, partial(self.toggle, anchor=tray))
+
+    def _sync_trays(self, devices):
+        visible = {device.key: device for device in devices
+                   if self.monitor.enabled and device.connected and device.key not in self._hidden_devices}
+        if self._primary_key not in visible:
+            self._primary_key = next(iter(visible), None)
+        primary = visible.pop(self._primary_key, None)
+        for key in self._device_trays.keys() - visible.keys():
+            tray = self._device_trays.pop(key)
+            if self._anchor is tray:
+                self._anchor = self.tray
+            tray.hide()
+            tray.deleteLater()
+        self._set_tray_device(self.tray, primary)
+        for key, device in visible.items():
+            tray = self._device_trays.get(key)
+            if tray is None:
+                tray = QSystemTrayIcon(self)
+                tray.setContextMenu(self.tray.contextMenu())
+                tray.activated.connect(partial(self._activate_device_tray, tray))
+                self._device_trays[key] = tray
+            self._set_tray_device(tray, device)
+            if not tray.isVisible():
+                tray.show()
 
     def sync(self):
         self.status.setText(self.monitor.status)
@@ -217,7 +276,7 @@ class BatteryPanel(QFrame):
                 # QScrollArea ignora o sizeHint do filho. Dê ao viewport espaço
                 # explícito, inclusive quando a primeira leitura chega oculto.
                 rows.setMinimumHeight(self.rows_height - 2)
-        self.tray.setToolTip(self.tray_text())
+        self._sync_trays(devices)
         if self.isVisible():
             self._place()
 

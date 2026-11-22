@@ -53,6 +53,11 @@ jobs:
           }
         env:
           QT_QPA_PLATFORM: offscreen
+      - name: Bandeja e painel com Qt nativo no Windows
+        if: ${{ !inputs.installer_ui_only }}
+        run: python -m pytest -q tests/native/test_windows_integrations.py -k "tray or windows_settings or battery_popup"
+        env:
+          QT_QPA_PLATFORM: windows
       - name: Versão e fixture seguinte
         shell: pwsh
         run: |
