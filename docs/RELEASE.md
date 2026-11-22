@@ -1,14 +1,11 @@
-## O que mudou
+## O que mudou no Windows
 
-- O painel de baterias do Windows atualiza os periféricos automaticamente e mostra ícones por tipo, barra de carga, porcentagem e nome ao passar o mouse.
-- O ícone de bateria abre o menu da Bolha na bandeja. O ícone separado da mascote pode ser ativado na Central.
-- O atualizador mostra em português a versão instalada e a disponível, o progresso e as novidades da versão.
-- Windows e Android usam quatro componentes no número da versão. O APK mantém a assinatura usada na versão Android anterior.
+- Veja um ícone por periférico conectado na bandeja. Ao passar o mouse, aparece o nome do dispositivo e a carga, quando disponível.
+- Escolha os ícones em **Central → App → Integrações do Windows**. A Bolha lembra suas escolhas quando os dispositivos reconectam.
+- Clique no ícone para abrir o painel de baterias. O botão direito abre o menu da Bolha.
 
 ## Como instalar
 
-**Windows x64.** Baixe e abra `Bolha-Setup-0.5.9.0-x64.exe`. Se já usa a `0.5.9`, abra o instalador manualmente. As duas versões são numericamente equivalentes e o atualizador anterior só lê três componentes. A instalação preserva as preferências e o aprendizado. O novo atualizador reconhece revisões superiores a partir de `0.5.9.1`, quando publicadas.
+**Windows x64.** Se você já usa a Bolha 0.5.9.0, a atualização aparece pelo próprio aplicativo. Para instalar manualmente, baixe `Bolha-Setup-0.5.9.1-x64.exe`. O instalador preserva suas preferências e o aprendizado da mascote. Use `SHA256SUMS.txt` para conferir o download.
 
-**Android.** Baixe `Bolha-0.5.9.0-Android.apk`. Se já tem a Bolha `0.5.6` oficial instalada, abra o APK por cima dela para preservar os dados. [Guia do Android](https://github.com/kuky13/bolha/blob/v0.5.9.0/android/README.md)
-
-Os arquivos `SHA256SUMS.txt` e `ANDROID-SHA256SUMS.txt` permitem conferir a integridade dos downloads. O [roadmap de Rust](https://github.com/kuky13/bolha/blob/v0.5.9.0/docs/ROADMAP-RUST.md) registra propostas para uma versão futura.
+**Android.** A versão disponível para Android é a [0.5.9.0](https://github.com/kuky13/bolha/releases/download/v0.5.9.0/Bolha-0.5.9.0-Android.apk).
