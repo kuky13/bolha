@@ -35,7 +35,9 @@ class DeviceBattery:
     def tray_tooltip(self, stale=False):
         charge = f'{self.percent}%' if self.percent is not None else 'Carga indisponível'
         detail = f'\n{charge}'
-        if stale:
+        if self.is_charging(stale):
+            detail += ' · Carregando'
+        elif stale:
             detail += ' · Última leitura'
         # A dica nativa reserva uma posição UTF-16 para o terminador.
         budget = 254 - len(detail.encode('utf-16-le'))
@@ -43,6 +45,9 @@ class DeviceBattery:
         if len(name) > budget:
             return name[:budget - 2].decode('utf-16-le', errors='ignore').rstrip() + '…' + detail
         return self.name + detail
+
+    def is_charging(self, stale=False):
+        return self.charging and self.connected and not self.asleep and not stale
 
 
 def device_kind(kind, name, key=''):

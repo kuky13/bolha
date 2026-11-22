@@ -52,6 +52,8 @@ visíveis perto do relógio ou na área de ícones ocultos.
 No painel de baterias, use **Ocultar** ao lado de um dispositivo para tirá-lo
 da lista. Para recuperar o item, abra **Ocultos** e clique em **Mostrar**.
 Essa escolha fica salva e é independente da seleção de ícones da bandeja.
+Um raio no ícone do dispositivo, no painel ou na bandeja, indica que o
+periférico informou que a bateria está carregando.
 
 ## Perfil, privacidade e rede
 

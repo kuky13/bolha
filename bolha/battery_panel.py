@@ -63,7 +63,7 @@ def battery_icon():
     return icon
 
 
-def device_icon(kind, size=22, scale=2):
+def device_icon(kind, size=22, scale=2, *, charging=False):
     pixmap = QPixmap(size * scale, size * scale)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
@@ -109,6 +109,16 @@ def device_icon(kind, size=22, scale=2):
     else:
         painter.drawRoundedRect(QRectF(4, 4, 14, 14), 3, 3)
         painter.drawEllipse(QPointF(11, 11), 2, 2)
+    if charging:
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor('#25382e'))
+        painter.drawEllipse(QPointF(16.7, 16.7), 5.0, 5.0)
+        bolt = QPainterPath(QPointF(17.2, 12.7))
+        for x, y in ((14.0, 17.2), (16.5, 17.2), (15.6, 20.6),
+                     (19.4, 15.7), (17, 15.7)):
+            bolt.lineTo(x, y)
+        bolt.closeSubpath()
+        painter.fillPath(bolt, QColor('#adffd0'))
     painter.end()
     pixmap.setDevicePixelRatio(scale)
     return pixmap
@@ -133,7 +143,7 @@ class BatteryPanel(QFrame):
         self._hidden_panel_devices = set()
         self._show_hidden = False
         self._save_panel_visibility = save_panel_visibility
-        self._tray_icons = {None: battery_icon()}
+        self._tray_icons = {(None, False): battery_icon()}
         self._rendered = None
         try:
             self.local_user = clean_label(getpass.getuser(), 90)
@@ -247,12 +257,14 @@ class BatteryPanel(QFrame):
 
     def _set_tray_device(self, tray, device):
         kind = device.kind if device else None
-        if kind not in self._tray_icons:
+        charging = device.is_charging(self.monitor.stale) if device else False
+        visual = (kind, charging)
+        if visual not in self._tray_icons:
             icon = QIcon()
             for size in (16, 24, 32):
-                icon.addPixmap(device_icon(kind, size, 1))
-            self._tray_icons[kind] = icon
-        icon = self._tray_icons[kind]
+                icon.addPixmap(device_icon(kind, size, 1, charging=charging))
+            self._tray_icons[visual] = icon
+        icon = self._tray_icons[visual]
         if tray.icon().cacheKey() != icon.cacheKey():
             tray.setIcon(icon)
         tooltip = device.tray_tooltip(self.monitor.stale) if device else 'Bolha · Baterias'
@@ -297,7 +309,8 @@ class BatteryPanel(QFrame):
             self._show_hidden = False
         self.hidden_button.setVisible(bool(hidden))
         self.hidden_button.setText('Fechar ocultos' if self._show_hidden else f'Ocultos ({len(hidden)})')
-        snapshot = (tuple(shown), tuple(hidden) if self._show_hidden else (), bool(hidden), self.monitor.threshold)
+        snapshot = (tuple(shown), tuple(hidden) if self._show_hidden else (),
+                    bool(hidden), self.monitor.threshold, self.monitor.stale)
         # O sinal de progresso/erro pode mudar apenas a mensagem. Nesse caso,
         # conserva o viewport e os widgets de dispositivo já exibidos.
         if snapshot != self._rendered:
@@ -334,6 +347,7 @@ class BatteryPanel(QFrame):
 
     def _row(self, device):
         row = QFrame(objectName='batteryRow')
+        charging = device.is_charging(self.monitor.stale)
         tooltip = f'<b>{escape(device.name)}</b>'
         identification = ' · '.join(filter(None, (DEVICE_LABELS.get(device.kind), device.connection)))
         if identification:
@@ -355,7 +369,7 @@ class BatteryPanel(QFrame):
         icon = QLabel(objectName='batteryDeviceIcon')
         icon.setAlignment(Qt.AlignCenter)
         icon.setFixedSize(22, 22)
-        icon.setPixmap(device_icon(device.kind))
+        icon.setPixmap(device_icon(device.kind, charging=charging))
         icon.setToolTip(tooltip)
         top.addWidget(icon)
         percent = label(f'{device.percent}%' if device.percent is not None else '—')
@@ -370,7 +384,7 @@ class BatteryPanel(QFrame):
             meter.setTextVisible(False)
             meter.setFixedHeight(5)
             meter.setProperty('lowBattery', device.percent <= self.monitor.threshold)
-            meter.setProperty('charging', device.charging)
+            meter.setProperty('charging', charging)
             tile_layout.addWidget(meter)
         details = QVBoxLayout()
         details.setSpacing(3)
@@ -385,7 +399,7 @@ class BatteryPanel(QFrame):
             if device.level:
                 reason += ' · ' + device.level
             details.addWidget(label(reason, 'batteryStatus'))
-        if device.charging:
+        if charging:
             details.addWidget(label('Carregando', 'batteryStatus'))
         hidden = device.key in self._hidden_panel_devices
         action = QPushButton('Mostrar' if hidden else 'Ocultar', objectName='batteryRowAction')

@@ -314,7 +314,38 @@ def test_battery_popup_keeps_device_visible_if_saving_fails(qt_application, tmp_
     panel.close()
 
 
-def test_tray_uses_distinct_device_icons_and_respects_connection_and_preferences(qt_application, tmp_path):
+def test_battery_tray_and_panel_update_charging_badge(qt_application, tmp_path):
+    monitor = BatteryMonitor(lambda _: None, tmp_path)
+    monitor.enabled = True
+    tray = QSystemTrayIcon()
+    panel = BatteryPanel(monitor, tray)
+    raw = dict(key='phone', name='Celular', kind='phone', percent=40)
+    monitor.devices = parse_devices(json.dumps([raw]).encode())
+    monitor.changed.emit()
+    plain_icon = tray.icon().cacheKey()
+    icon = panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
+    plain_pixmap = icon.pixmap().toImage()
+    monitor.devices = parse_devices(json.dumps([dict(raw, charging=True)]).encode())
+    monitor.changed.emit()
+    assert tray.icon().cacheKey() != plain_icon
+    assert tray.toolTip() == 'Celular\n40% · Carregando'
+    icon = panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
+    assert icon.pixmap().toImage() != plain_pixmap
+    assert panel.scroll.widget().findChild(QProgressBar).property('charging') is True
+    monitor.success = True
+    monitor._failed()
+    assert tray.icon().cacheKey() == plain_icon
+    assert tray.toolTip() == 'Celular\n40% · Última leitura'
+    assert panel.scroll.widget().findChild(QProgressBar).property('charging') is False
+    monitor.stale = False
+    monitor.devices = parse_devices(json.dumps([dict(raw, charging=False)]).encode())
+    monitor.changed.emit()
+    assert tray.icon().cacheKey() == plain_icon
+    assert tray.toolTip() == 'Celular\n40%'
+    panel.close()
+
+
+def test_tray_uses_distinct_device_icons_and_respects_connection_and_preferences(qt_application, tmp_path, monkeypatch):
     monitor = BatteryMonitor(lambda _: None, tmp_path)
     tray, menu = QSystemTrayIcon(), QMenu()
     tray.setContextMenu(menu)
@@ -362,9 +393,19 @@ def test_tray_uses_distinct_device_icons_and_respects_connection_and_preferences
     monitor.success = True
     monitor._failed()
     assert tray.toolTip().endswith('80% · Última leitura')
+    show = panel.show
+    shown = []
+
+    def record_show():
+        show()
+        shown.append(True)
+
+    monkeypatch.setattr(panel, 'show', record_show)
     phone.activated.emit(QSystemTrayIcon.Trigger)
-    qt_application.processEvents()
-    assert panel.isVisible() and panel._anchor is phone
+    QTest.qWait(25)
+    # Ao simular o clique sem ativar o Explorer, o Windows pode dispensar o
+    # popup ao transferir o foco. O callback ainda deve abri-lo no ícone certo.
+    assert shown == [True] and panel._anchor is phone
 
     panel.set_hidden_devices(['mouse', 'phone', 'headset', 'buds', 'normal', 'duplicate'])
     assert not panel._device_trays and panel._anchor is tray
