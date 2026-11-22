@@ -17,6 +17,9 @@ def validate(installer, output, check_running=False):
     import win32process
     import pywintypes
     from test_windows_native import test_environment, registry_fingerprint, installer_version, wait_for, read_json
+    if check_running:
+        from PySide6.QtGui import QGuiApplication
+        visual = QGuiApplication([])
     root=Path(tempfile.mkdtemp(prefix='bolha-wizard-'))
     parent=root/'Meus aplicativos ç'
     parent.mkdir()
@@ -85,10 +88,17 @@ def validate(installer, output, check_running=False):
                         if not set_directory and time.monotonic()>=directory_ready_at:
                             raise AssertionError(f'Instalar desabilitado para {str(selected)!r}; controles={last_page!r}')
                     elif not set_directory:
+                        if check_running and any(caption == 'Vamos instalar a Bolha' for _, _, caption in last_page):
+                            output.parent.mkdir(parents=True,exist_ok=True)
+                            visual.primaryScreen().grabWindow(hwnd).save(str(output.with_name('boas-vindas.png')))
                         click(hwnd,1)  # boas-vindas e licença
                     elif any(caption == 'Estourar!' for _, _, caption in last_page):
                         assert running, 'O instalador ofereceu fechar outro processo.'
-                        asked_to_close=click(hwnd,1) or asked_to_close
+                        if not asked_to_close:
+                            output.parent.mkdir(parents=True,exist_ok=True)
+                            visual.primaryScreen().grabWindow(hwnd).save(str(output.with_name('estourar.png')))
+                            # BM_CLICK não aciona o botão do diálogo customizado quando ele está sem foco.
+                            asked_to_close=click(hwnd,1,finish=True)
                     elif not finished and (expected/'Bolha.exe').is_file():
                         run_checkbox=next((h for h in controls if wg.GetDlgCtrlID(h)==1203
                                            and wg.GetClassName(h)=='Button'),None)
