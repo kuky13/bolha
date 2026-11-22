@@ -393,20 +393,13 @@ def test_tray_uses_distinct_device_icons_and_respects_connection_and_preferences
     monitor.success = True
     monitor._failed()
     assert tray.toolTip().endswith('80% · Última leitura')
-    show = panel.show
-    shown = []
-
-    def record_show():
-        show()
-        shown.append(True)
-
-    monkeypatch.setattr(panel, 'show', record_show)
+    activations = []
+    monkeypatch.setattr(panel, 'toggle', lambda *, anchor: activations.append(anchor))
     phone.activated.emit(QSystemTrayIcon.Trigger)
-    QTest.qWait(25)
-    # Ao simular o clique sem ativar o Explorer, o Windows pode dispensar o
-    # popup ao transferir o foco. O callback ainda deve abri-lo no ícone certo.
-    assert shown == [True] and panel._anchor is phone
+    qt_application.processEvents()
+    assert activations == [phone]
 
+    panel._anchor = phone
     panel.set_hidden_devices(['mouse', 'phone', 'headset', 'buds', 'normal', 'duplicate'])
     assert not panel._device_trays and panel._anchor is tray
     assert not phone.isVisible()
