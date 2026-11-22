@@ -29,7 +29,8 @@ DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 adaptiveBehavior=True,learnRoutine=True,
                 finderEnabled=True,finderDouble=True,finderKey='Alt esquerdo',
                 mediaEnabled=True,mediaKey='Ctrl+=',spotifyEnabled=True,
-                batteryEnabled=True,batteryAlerts=True,batteryThreshold=15,batteryHiddenTrayDevices=[],mascotTrayIcon=False)
+                batteryEnabled=True,batteryAlerts=True,batteryThreshold=15,
+                batteryHiddenTrayDevices=[],batteryHiddenPanelDevices=[],mascotTrayIcon=False)
 DEFAULTS.update({key: True for _, key, _ in ACTIVITY_SWITCHES})
 BOOLEAN_KEYS = ('roaming','mouthEnabled','cursorPrankEnabled','mischiefEnabled','onlineReactions','senseApp','senseIdle','senseCursor','senseWindows',
                 'adaptiveBehavior','learnRoutine','popEnabled','finderEnabled','finderDouble','mediaEnabled',
@@ -61,10 +62,9 @@ def sanitize(patch, previous=None):
         if number(patch.get(key)):result[key]=math.floor(max(low,min(high,patch[key]))+.5)
     if type(patch.get('batteryThreshold')) is int:
         result['batteryThreshold'] = max(1, min(50, patch['batteryThreshold']))
-    if isinstance(patch.get('batteryHiddenTrayDevices'), list):
-        result['batteryHiddenTrayDevices'] = sorted({
-            key for key in patch['batteryHiddenTrayDevices'] if isinstance(key, str) and key
-        })
+    for setting in ('batteryHiddenTrayDevices', 'batteryHiddenPanelDevices'):
+        if isinstance(patch.get(setting), list):
+            result[setting] = sorted({key for key in patch[setting] if isinstance(key, str) and key})
     for key in ('finderKey', 'mediaKey'):
         value = patch.get(key)
         if isinstance(value, str) and 0 < len(value) <= 48 and value.isprintable():

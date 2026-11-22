@@ -14,6 +14,11 @@ from PySide6.QtWidgets import (
 
 from .windows_media import clean_label
 
+DEVICE_LABELS = {
+    'mouse': 'Mouse', 'headset': 'Headset com microfone', 'headphones': 'Fone de ouvido',
+    'earbuds': 'Fones intra-auriculares', 'keyboard': 'Teclado', 'gamepad': 'Controle', 'phone': 'Celular',
+}
+
 
 def panel_position(area, monitor, anchor, size):
     """Posiciona dentro da área útil, acima ou ao lado da bandeja."""
@@ -117,7 +122,7 @@ def label(text='', name=''):
 
 
 class BatteryPanel(QFrame):
-    def __init__(self, monitor, tray):
+    def __init__(self, monitor, tray, save_panel_visibility=None):
         super().__init__(None, Qt.Popup | Qt.FramelessWindowHint)
         self.monitor = monitor
         self.tray = tray
@@ -125,6 +130,9 @@ class BatteryPanel(QFrame):
         self._primary_key = None
         self._device_trays = {}
         self._hidden_devices = set()
+        self._hidden_panel_devices = set()
+        self._show_hidden = False
+        self._save_panel_visibility = save_panel_visibility
         self._tray_icons = {None: battery_icon()}
         self._rendered = None
         try:
@@ -134,7 +142,7 @@ class BatteryPanel(QFrame):
         self.setObjectName('batteryPanel')
         self.setWindowTitle('Baterias da Bolha')
         self.setAccessibleName('Baterias dos periféricos')
-        self.setFixedWidth(310)
+        self.setFixedWidth(330)
         self.rows_height = 0
         self.setStyleSheet("""
             QFrame#batteryPanel { background: #211d2c; border: 1px solid #65557e; }
@@ -144,10 +152,15 @@ class BatteryPanel(QFrame):
             QFrame#batteryRow { background: #30293e; border-radius: 9px; }
             QFrame#batteryTile { background: #453857; border-radius: 8px; }
             QScrollArea { border: none; background: #211d2c; }
+            QScrollBar:vertical { background: transparent; width: 7px; margin: 0 0 0 2px; }
+            QScrollBar::handle:vertical { background: #65557e; border-radius: 2px; min-height: 22px; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
             QWidget#batteryRows { background: #211d2c; }
             QPushButton { background: #3e3354; color: #f7f2ff; padding: 6px 9px;
                           border: 1px solid #66547f; border-radius: 7px; }
             QPushButton:focus, QPushButton:hover { border-color: #e2ceff; }
+            QPushButton#batteryRowAction { font-size: 11px; padding: 4px 5px; }
             QProgressBar { background: #171321; border: none; border-radius: 3px; height: 6px; }
             QProgressBar::chunk { background: #cab6f7; border-radius: 3px; }
             QProgressBar[lowBattery=true]::chunk { background: #ffa3a8; }
@@ -168,6 +181,9 @@ class BatteryPanel(QFrame):
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         layout.addWidget(self.scroll)
+        self.hidden_button = QPushButton()
+        self.hidden_button.clicked.connect(self._toggle_hidden)
+        layout.addWidget(self.hidden_button, 0, Qt.AlignLeft)
         monitor.changed.connect(self.sync)
         self.sync()
 
@@ -175,6 +191,7 @@ class BatteryPanel(QFrame):
         if self.isVisible():
             self.hide()
             return
+        self._show_hidden = False
         self._anchor = anchor if anchor in self._device_trays.values() else self.tray
         self.sync()
         self.show()
@@ -205,6 +222,28 @@ class BatteryPanel(QFrame):
         if hidden != self._hidden_devices:
             self._hidden_devices = hidden
             self.sync()
+
+    def set_hidden_panel_devices(self, keys):
+        hidden = set(keys)
+        if hidden != self._hidden_panel_devices:
+            self._hidden_panel_devices = hidden
+            self.sync()
+
+    def _toggle_hidden(self):
+        self._show_hidden = not self._show_hidden
+        self.sync()
+
+    def _set_panel_visibility(self, key, hidden):
+        keys = self._hidden_panel_devices | {key} if hidden else self._hidden_panel_devices - {key}
+        try:
+            if self._save_panel_visibility is not None:
+                self._save_panel_visibility(sorted(keys))
+        except (OSError, ValueError):
+            self.status.setText('Não foi possível salvar a escolha.')
+            return
+        self.set_hidden_panel_devices(keys)
+        focus_target = self.hidden_button if self.hidden_button.isVisible() else self.refresh
+        focus_target.setFocus(Qt.OtherFocusReason)
 
     def _set_tray_device(self, tray, device):
         kind = device.kind if device else None
@@ -252,7 +291,13 @@ class BatteryPanel(QFrame):
         self.status.setText(self.monitor.status)
         self.refresh.setEnabled(self.monitor.enabled)
         devices = ordered_devices(self.monitor.devices)
-        snapshot = (tuple(devices), self.monitor.threshold)
+        shown = [device for device in devices if device.key not in self._hidden_panel_devices]
+        hidden = [device for device in devices if device.key in self._hidden_panel_devices]
+        if not hidden:
+            self._show_hidden = False
+        self.hidden_button.setVisible(bool(hidden))
+        self.hidden_button.setText('Fechar ocultos' if self._show_hidden else f'Ocultos ({len(hidden)})')
+        snapshot = (tuple(shown), tuple(hidden) if self._show_hidden else (), bool(hidden), self.monitor.threshold)
         # O sinal de progresso/erro pode mudar apenas a mensagem. Nesse caso,
         # conserva o viewport e os widgets de dispositivo já exibidos.
         if snapshot != self._rendered:
@@ -261,16 +306,23 @@ class BatteryPanel(QFrame):
             column = QVBoxLayout(rows)
             column.setContentsMargins(0, 0, 0, 0)
             column.setSpacing(6)
-            for asleep, title in ((False, 'Em uso'), (True, 'Em repouso')):
-                group = [device for device in devices if device.asleep == asleep]
+            groups = (
+                ('Em uso', [device for device in shown if not device.asleep]),
+                ('Em repouso', [device for device in shown if device.asleep]),
+                ('Ocultos', hidden if self._show_hidden else []),
+            )
+            for title, group in groups:
                 if group:
                     column.addWidget(label(title, 'batteryGroup'))
                 for device in group:
                     column.addWidget(self._row(device))
+            if hidden and not shown and not self._show_hidden:
+                column.addWidget(label('Todos os dispositivos estão ocultos.', 'batteryStatus'))
             self.scroll.setWidget(rows)
             rows.ensurePolished()
-            column.activate()
-            self.rows_height = rows.sizeHint().height() + 2
+            margins = self.layout().contentsMargins()
+            width = self.width() - margins.left() - margins.right()
+            self.rows_height = max(rows.sizeHint().height(), column.totalHeightForWidth(width)) + 2
             self.scroll.setVisible(bool(devices))
             if devices:
                 # QScrollArea ignora o sizeHint do filho. Dê ao viewport espaço
@@ -283,6 +335,9 @@ class BatteryPanel(QFrame):
     def _row(self, device):
         row = QFrame(objectName='batteryRow')
         tooltip = f'<b>{escape(device.name)}</b>'
+        identification = ' · '.join(filter(None, (DEVICE_LABELS.get(device.kind), device.connection)))
+        if identification:
+            tooltip += f'<br>{escape(identification)}'
         if self.local_user:
             tooltip += f'<br>Usuário do Windows: {escape(self.local_user)}'
         row.setToolTip(tooltip)
@@ -323,6 +378,8 @@ class BatteryPanel(QFrame):
         name = label(device.name)
         name.setToolTip(tooltip)
         details.addWidget(name)
+        if device.connection:
+            details.addWidget(label(device.connection, 'batteryStatus'))
         if device.percent is None:
             reason = 'Carga indisponível'
             if device.level:
@@ -330,4 +387,11 @@ class BatteryPanel(QFrame):
             details.addWidget(label(reason, 'batteryStatus'))
         if device.charging:
             details.addWidget(label('Carregando', 'batteryStatus'))
+        hidden = device.key in self._hidden_panel_devices
+        action = QPushButton('Mostrar' if hidden else 'Ocultar', objectName='batteryRowAction')
+        hint = f'{action.text()} {device.name} ' + ('no painel' if hidden else 'do painel')
+        action.setAccessibleName(hint)
+        action.setToolTip(hint)
+        action.clicked.connect(partial(self._set_panel_visibility, device.key, not hidden))
+        content.addWidget(action, 0, Qt.AlignVCenter)
         return row

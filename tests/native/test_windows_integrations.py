@@ -7,7 +7,7 @@ from types import SimpleNamespace as NS
 import pytest
 from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QLabel, QMenu, QProgressBar, QSystemTrayIcon, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QMenu, QProgressBar, QPushButton, QSystemTrayIcon, QVBoxLayout, QWidget
 
 from bolha.battery_panel import BatteryPanel, panel_position
 from bolha.cursor_finder import locate
@@ -245,6 +245,72 @@ def test_battery_popup_renders_worker_snapshot_after_hidden_and_unknown_charge(q
     assert tray.toolTip() == 'Fone USB\n80%'
     monitor._status('Falha na leitura de bateria. Exibindo a última leitura.')
     assert panel.scroll.widget() is viewport
+    panel.close()
+
+
+def test_battery_identifies_headsets_using_usb_metadata():
+    devices = parse_devices(json.dumps([
+        dict(key='hsc:291D:385D', name='MCHOSE V9 Pro Wireless', via='HeadsetControl', kind='headset', percent=80),
+        dict(key='mchose:v9pro2', name='Periférico USB', via='2.4 GHz receiver', kind='headset'),
+        dict(key='hsc:1234:5678', name='Áudio USB', via='USB cable', kind='headset'),
+        dict(key='bt:1', name='AirPods Max', via='Bluetooth', kind='headset'),
+        dict(key='bt:2', name='Galaxy Buds', via='Bluetooth', kind='headset'),
+        dict(key='mchose:3837:3033', name='MCHOSE G75', via='2.4 GHz receiver', kind='keyboard'),
+    ]).encode())
+    assert [(device.kind, device.connection) for device in devices] == [
+        ('headset', 'Receptor USB (2,4 GHz)'), ('headset', 'Receptor USB (2,4 GHz)'),
+        ('headset', 'Cabo USB'), ('headphones', 'Bluetooth'), ('earbuds', 'Bluetooth'),
+        ('keyboard', 'Receptor USB (2,4 GHz)'),
+    ]
+
+
+def test_battery_popup_hides_and_restores_peripheral_without_changing_tray(qt_application, tmp_path):
+    store = PreferencesStore(tmp_path)
+    rows = [dict(key='phone', name='Celular', kind='phone', percent=40)]
+    monitor = BatteryMonitor(lambda _: None, tmp_path)
+    monitor.enabled = True
+    tray = QSystemTrayIcon()
+    panel = BatteryPanel(monitor, tray, lambda keys: store.save({'batteryHiddenPanelDevices': keys}))
+    panel.show()
+    monitor.devices = parse_devices(json.dumps(rows).encode())
+    monitor.changed.emit()
+    hide = panel.scroll.widget().findChild(QPushButton, 'batteryRowAction')
+    assert hide.text() == 'Ocultar'
+    QTest.mouseClick(hide, Qt.LeftButton)
+    assert PreferencesStore(tmp_path).preferences['batteryHiddenPanelDevices'] == ['phone']
+    assert store.preferences['batteryHiddenTrayDevices'] == []
+    assert tray.toolTip() == 'Celular\n40%'
+    assert panel.hidden_button.text() == 'Ocultos (1)'
+    assert not panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
+    monitor.devices = []
+    monitor.changed.emit()
+    assert panel.hidden_button.isHidden()
+    monitor.devices = parse_devices(json.dumps(rows).encode())
+    monitor.changed.emit()
+    assert 'Todos os dispositivos estão ocultos.' in [child.text() for child in panel.scroll.widget().findChildren(QLabel)]
+    QTest.mouseClick(panel.hidden_button, Qt.LeftButton)
+    restore = panel.scroll.widget().findChild(QPushButton, 'batteryRowAction')
+    assert restore.text() == 'Mostrar'
+    QTest.mouseClick(restore, Qt.LeftButton)
+    assert PreferencesStore(tmp_path).preferences['batteryHiddenPanelDevices'] == []
+    assert panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
+    assert panel.hidden_button.isHidden()
+    panel.close()
+
+
+def test_battery_popup_keeps_device_visible_if_saving_fails(qt_application, tmp_path):
+    monitor = BatteryMonitor(lambda _: None, tmp_path)
+    monitor.devices = parse_devices(b'[{"key":"test","name":"Mouse","kind":"mouse"}]')
+
+    def fail(_):
+        raise OSError('write failed')
+
+    panel = BatteryPanel(monitor, QSystemTrayIcon(), fail)
+    action = panel.scroll.widget().findChild(QPushButton, 'batteryRowAction')
+    action.click()
+    assert panel.status.text() == 'Não foi possível salvar a escolha.'
+    assert panel.scroll.widget().findChild(QPushButton, 'batteryRowAction') is action
+    assert panel.hidden_button.isHidden()
     panel.close()
 
 

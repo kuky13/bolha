@@ -49,6 +49,10 @@ automaticamente. Passe o ponteiro sobre um ícone para ver o nome e a carga e
 clique para abrir o painel de baterias. O Windows controla quais ícones ficam
 visíveis perto do relógio ou na área de ícones ocultos.
 
+No painel de baterias, use **Ocultar** ao lado de um dispositivo para tirá-lo
+da lista. Para recuperar o item, abra **Ocultos** e clique em **Mostrar**.
+Essa escolha fica salva e é independente da seleção de ícones da bandeja.
+
 ## Perfil, privacidade e rede
 
 No Windows, configurações e dados ficam em `%APPDATA%\bolha`; no Linux, em

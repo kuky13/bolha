@@ -10,6 +10,9 @@ from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 
 from .windows_media import clean_label
 
+# Receptores MCHOSE V9 Pro e V9 Pro 2 identificados pelo HeadsetControl e pelo BatteryHub.
+USB_HEADSET_RECEIVERS = frozenset({'hsc:291d:385d', 'hsc:3837:6011', 'mchose:v9pro2'})
+
 
 @dataclass(frozen=True)
 class DeviceBattery:
@@ -21,6 +24,7 @@ class DeviceBattery:
     asleep: bool
     kind: str = 'other'
     connected: bool = True
+    connection: str = ''
 
     @property
     def display(self):
@@ -41,16 +45,32 @@ class DeviceBattery:
         return self.name + detail
 
 
-def device_kind(kind, name):
+def device_kind(kind, name, key=''):
+    if key in USB_HEADSET_RECEIVERS:
+        return 'headset'
     if kind == 'headset':
-        if re.search(r'\bheadset\b', name, re.IGNORECASE):
-            return 'headset'
         if re.search(r'\b(?:earbuds?|buds|airpods(?!\s+max\b)|tws)\b', name, re.IGNORECASE):
             return 'earbuds'
+        if re.fullmatch(r'hsc:[0-9a-f]{4}:[0-9a-f]{4}', key) or re.search(r'\bheadset\b', name, re.IGNORECASE):
+            return 'headset'
         return 'headphones'
     if kind in ('mouse', 'headphones', 'earbuds', 'keyboard', 'gamepad', 'phone'):
         return kind
     return 'other'
+
+
+def device_connection(key, via):
+    if key in USB_HEADSET_RECEIVERS or via in ('2.4 ghz receiver', '2.4 ghz dongle'):
+        return 'Receptor USB (2,4 GHz)'
+    if via in ('usb', 'usb cable'):
+        return 'Cabo USB'
+    if via == 'usb dongle':
+        return 'Receptor USB'
+    if via.startswith('bluetooth'):
+        return 'Bluetooth'
+    if via == 'phone link':
+        return 'Vincular ao Celular'
+    return ''
 
 
 def parse_devices(raw):
@@ -71,13 +91,17 @@ def parse_devices(raw):
         if item.get('connected') is False and item.get('asleep') is not True:
             continue
         level = item.get('level')
+        hardware_key = key.casefold()
+        via = item.get('via')
+        via = via.strip().casefold() if isinstance(via, str) else ''
         name = clean_label(name, 512) or 'Dispositivo sem nome'
         devices[key] = DeviceBattery(
             key, name,
             percent if type(percent) is int and 0 <= percent <= 100 else None,
             clean_label(level, 40) if isinstance(level, str) else '',
             item.get('charging') is True, item.get('asleep') is True,
-            device_kind(item.get('kind'), name), item.get('connected') is not False,
+            device_kind(item.get('kind'), name, hardware_key), item.get('connected') is not False,
+            device_connection(hardware_key, via),
         )
     if data and not valid:
         raise ValueError('Nenhum dispositivo válido na resposta de bateria')

@@ -19,7 +19,7 @@ class WindowsFeatures:
         self.media = Media()
         self.reaction = SpotifyReaction()
         self.battery = BatteryMonitor(self.low_battery)
-        self.battery_panel = BatteryPanel(self.battery, controller.tray)
+        self.battery_panel = BatteryPanel(self.battery, controller.tray, self._save_panel_visibility)
         self.capture = False
         self.shortcut_status = ''
         self.last_layout = None
@@ -43,8 +43,12 @@ class WindowsFeatures:
         if not prefs['mediaEnabled']:
             self.media.toggle_pending = False
         self.battery_panel.set_hidden_devices(prefs['batteryHiddenTrayDevices'])
+        self.battery_panel.set_hidden_panel_devices(prefs['batteryHiddenPanelDevices'])
         self.battery.configure(prefs['batteryEnabled'], prefs['batteryThreshold'], prefs['batteryAlerts'])
         self.prefs = dict(prefs)
+
+    def _save_panel_visibility(self, keys):
+        self.controller.store.save({'batteryHiddenPanelDevices': keys})
 
     def _bind(self, prefs, *, strict):
         self.last_layout = self.hotkeys.keyboard_layout()
