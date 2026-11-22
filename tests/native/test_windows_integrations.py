@@ -12,7 +12,9 @@ from PySide6.QtWidgets import QLabel, QMenu, QProgressBar, QPushButton, QSystemT
 from bolha.battery_panel import BatteryPanel, panel_position
 from bolha.cursor_finder import locate
 from bolha.preferences import PreferencesStore, defaults, sanitize
-from bolha.windows_battery import BatteryAlerts, BatteryMonitor, parse_devices
+from bolha.windows_battery import (
+    BACKGROUND_POLL_MS, PANEL_POLL_MS, BatteryAlerts, BatteryMonitor, keep_present_headsets, parse_devices,
+)
 from bolha.windows_hotkeys import DoubleTap, Hotkeys, RawHeader, binding
 from bolha.windows_media import SpotifyReaction, session_operation
 from bolha.windows_settings import WindowsSettings
@@ -264,7 +266,7 @@ def test_battery_identifies_headsets_using_usb_metadata():
     ]
 
 
-def test_battery_popup_hides_and_restores_peripheral_without_changing_tray(qt_application, tmp_path):
+def test_battery_popup_hides_and_restores_peripheral_in_panel_and_tray(qt_application, tmp_path):
     store = PreferencesStore(tmp_path)
     rows = [dict(key='phone', name='Celular', kind='phone', percent=40)]
     monitor = BatteryMonitor(lambda _: None, tmp_path)
@@ -272,6 +274,7 @@ def test_battery_popup_hides_and_restores_peripheral_without_changing_tray(qt_ap
     tray = QSystemTrayIcon()
     panel = BatteryPanel(monitor, tray, lambda keys: store.save({'batteryHiddenPanelDevices': keys}))
     panel.show()
+    assert monitor.period.interval() == PANEL_POLL_MS
     monitor.devices = parse_devices(json.dumps(rows).encode())
     monitor.changed.emit()
     hide = panel.scroll.widget().findChild(QPushButton, 'batteryRowAction')
@@ -279,7 +282,7 @@ def test_battery_popup_hides_and_restores_peripheral_without_changing_tray(qt_ap
     QTest.mouseClick(hide, Qt.LeftButton)
     assert PreferencesStore(tmp_path).preferences['batteryHiddenPanelDevices'] == ['phone']
     assert store.preferences['batteryHiddenTrayDevices'] == []
-    assert tray.toolTip() == 'Celular\n40%'
+    assert tray.toolTip() == 'Bolha · Baterias'
     assert panel.hidden_button.text() == 'Ocultos (1)'
     assert not panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
     monitor.devices = []
@@ -294,8 +297,35 @@ def test_battery_popup_hides_and_restores_peripheral_without_changing_tray(qt_ap
     QTest.mouseClick(restore, Qt.LeftButton)
     assert PreferencesStore(tmp_path).preferences['batteryHiddenPanelDevices'] == []
     assert panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
+    assert tray.toolTip() == 'Celular\n40%'
     assert panel.hidden_button.isHidden()
+    panel.set_hidden_devices(['phone'])
+    assert tray.toolTip() == 'Bolha · Baterias'
+    assert panel.scroll.widget().findChild(QLabel, 'batteryDeviceIcon')
     panel.close()
+    assert monitor.period.interval() == BACKGROUND_POLL_MS
+
+
+def test_battery_keeps_usb_headset_visible_when_receiver_stops_reporting_charge():
+    row = dict(key='hsc:291D:385D', name='MCHOSE V9 Pro Wireless', kind='headset', percent=80)
+    present = {'291d:385d'}
+    previous = parse_devices(json.dumps([row]).encode())
+    pending = keep_present_headsets([], previous, present)
+    assert pending[0].key == row['key'] and pending[0].connected
+    assert pending[0].percent is None and not pending[0].is_charging()
+    assert 'Aguardando' in pending[0].level
+    assert keep_present_headsets([], pending, set()) == []
+    ready = parse_devices(json.dumps([dict(row, charging=True)]).encode())
+    assert keep_present_headsets(ready, pending, present) == ready
+    assert ready[0].is_charging()
+
+
+def test_usb_change_requests_refresh_without_consuming_windows_event():
+    changes = []
+    msg = wintypes.MSG(message=0x0219, wParam=7)
+    hotkeys = NS(hardware_changed=lambda: changes.append('USB'))
+    assert Hotkeys.nativeEventFilter(hotkeys, 'windows_generic_MSG', ctypes.addressof(msg)) == (False, 0)
+    assert changes == ['USB']
 
 
 def test_battery_popup_keeps_device_visible_if_saving_fails(qt_application, tmp_path):

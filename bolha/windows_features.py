@@ -27,6 +27,7 @@ class WindowsFeatures:
         self.hotkeys = Hotkeys(controller.qapp, int(self.raw_receiver.winId()),
                                {'finder': self.show_cursor, 'media': self.toggle_media},
                                self.cancel_finder, lambda: self.capture)
+        self.hotkeys.hardware_changed = self.battery.hardware_changed
         self.prefs = {}
         self.configure(controller.store.preferences, strict=False)
 

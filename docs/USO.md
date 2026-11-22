@@ -51,9 +51,14 @@ visíveis perto do relógio ou na área de ícones ocultos.
 
 No painel de baterias, use **Ocultar** ao lado de um dispositivo para tirá-lo
 da lista. Para recuperar o item, abra **Ocultos** e clique em **Mostrar**.
-Essa escolha fica salva e é independente da seleção de ícones da bandeja.
+**Ocultar** também remove o ícone correspondente da bandeja. A Central permite
+retirar só o ícone e manter o dispositivo no painel.
 Um raio no ícone do dispositivo, no painel ou na bandeja, indica que o
 periférico informou que a bateria está carregando.
+Com o painel aberto, a Bolha consulta os dispositivos a cada quatro segundos,
+respeitando o tempo de resposta de cada um. Se um headset MCHOSE compatível
+parar de enviar a carga com o receptor USB conectado, ele aparece como
+indisponível até voltar a responder.
 
 ## Perfil, privacidade e rede
 

@@ -182,7 +182,7 @@ class BatteryPanel(QFrame):
         header.addWidget(label('Baterias', 'batteryTitle'), 1)
         self.refresh = QPushButton('Atualizar')
         self.refresh.setAccessibleName('Atualizar leituras de bateria')
-        self.refresh.clicked.connect(monitor.refresh)
+        self.refresh.clicked.connect(monitor.request_refresh)
         header.addWidget(self.refresh)
         layout.addLayout(header)
         self.status = label('', 'batteryStatus')
@@ -209,7 +209,14 @@ class BatteryPanel(QFrame):
         self.raise_()
         if self.monitor.enabled:
             self.refresh.setFocus(Qt.OtherFocusReason)
-            self.monitor.refresh()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.monitor.set_panel_visible(True)
+
+    def hideEvent(self, event):
+        self.monitor.set_panel_visible(False)
+        super().hideEvent(event)
 
     def _place(self):
         anchor = self._anchor.geometry()
@@ -276,8 +283,9 @@ class BatteryPanel(QFrame):
             QTimer.singleShot(0, partial(self.toggle, anchor=tray))
 
     def _sync_trays(self, devices):
+        hidden = self._hidden_devices | self._hidden_panel_devices
         visible = {device.key: device for device in devices
-                   if self.monitor.enabled and device.connected and device.key not in self._hidden_devices}
+                   if self.monitor.enabled and device.connected and device.key not in hidden}
         if self._primary_key not in visible:
             self._primary_key = next(iter(visible), None)
         primary = visible.pop(self._primary_key, None)
@@ -403,7 +411,7 @@ class BatteryPanel(QFrame):
             details.addWidget(label('Carregando', 'batteryStatus'))
         hidden = device.key in self._hidden_panel_devices
         action = QPushButton('Mostrar' if hidden else 'Ocultar', objectName='batteryRowAction')
-        hint = f'{action.text()} {device.name} ' + ('no painel' if hidden else 'do painel')
+        hint = f'{action.text()} {device.name} ' + ('na exibição' if hidden else 'do painel e da bandeja')
         action.setAccessibleName(hint)
         action.setToolTip(hint)
         action.clicked.connect(partial(self._set_panel_visibility, device.key, not hidden))

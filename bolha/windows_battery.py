@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Leitura local via BatteryHub --json. Origem e licença em NOTICE.md."""
+import ctypes
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -11,7 +12,12 @@ from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 from .windows_media import clean_label
 
 # Receptores MCHOSE V9 Pro e V9 Pro 2 identificados pelo HeadsetControl e pelo BatteryHub.
-USB_HEADSET_RECEIVERS = frozenset({'hsc:291d:385d', 'hsc:3837:6011', 'mchose:v9pro2'})
+USB_HEADSET_RECEIVERS = {
+    'hsc:291d:385d': '291d:385d', 'hsc:3837:6011': '3837:6011', 'mchose:v9pro2': '3837:6011',
+}
+USB_HEADSET_NAMES = {'291d:385d': 'MCHOSE V9 Pro Wireless', '3837:6011': 'MCHOSE V9 Pro 2'}
+PANEL_POLL_MS = 4000
+BACKGROUND_POLL_MS = 15000
 
 
 @dataclass(frozen=True)
@@ -113,6 +119,40 @@ def parse_devices(raw):
     return list(devices.values())
 
 
+def present_usb_receivers():
+    if sys.platform != 'win32':
+        return set()
+    try:
+        config = ctypes.WinDLL('cfgmgr32')
+        size = ctypes.c_ulong()
+        present_only = 0x100
+        if config.CM_Get_Device_ID_List_SizeW(ctypes.byref(size), None, present_only):
+            return set()
+        ids = ctypes.create_unicode_buffer(size.value)
+        if config.CM_Get_Device_ID_ListW(None, ids, size, present_only):
+            return set()
+    except OSError:
+        return set()
+    return {f'{vid}:{pid}' for vid, pid in re.findall(
+        r'(?i)(?:^|\x00)USB\\VID_([0-9a-f]{4})&PID_([0-9a-f]{4})(?=\\|&)', ids[:].lower()
+    )} & USB_HEADSET_NAMES.keys()
+
+
+def keep_present_headsets(devices, previous, present):
+    devices = [device for device in devices
+               if device.connected or USB_HEADSET_RECEIVERS.get(device.key.casefold()) not in present]
+    readings = {USB_HEADSET_RECEIVERS.get(device.key.casefold()) for device in devices}
+    for hardware_id in sorted(present - readings):
+        old = next((device for device in previous
+                    if USB_HEADSET_RECEIVERS.get(device.key.casefold()) == hardware_id), None)
+        key = old.key if old else ('hsc:291D:385D' if hardware_id == '291d:385d' else 'mchose:v9pro2')
+        devices.append(DeviceBattery(
+            key, old.name if old else USB_HEADSET_NAMES[hardware_id], None,
+            'Aguardando resposta do headset', False, False, 'headset', True, 'Receptor USB (2,4 GHz)',
+        ))
+    return devices
+
+
 class BatteryAlerts:
     def __init__(self):
         self.above = {}
@@ -151,8 +191,11 @@ class BatteryMonitor(QObject):
         self.process.finished.connect(self._finish)
         self.process.errorOccurred.connect(self._process_error)
         self.process.setStandardErrorFile(QProcess.nullDevice())
-        self.period = QTimer(self, interval=60000)
+        self.period = QTimer(self, interval=BACKGROUND_POLL_MS)
         self.period.timeout.connect(self.refresh)
+        self.hardware_refresh = QTimer(self, interval=750, singleShot=True)
+        self.hardware_refresh.timeout.connect(self.request_refresh)
+        self.refresh_pending = False
         self.deadline = QTimer(self, interval=15000, singleShot=True)
         self.deadline.timeout.connect(self._timeout)
 
@@ -172,7 +215,9 @@ class BatteryMonitor(QObject):
             self.refresh()
         else:
             self.period.stop()
+            self.hardware_refresh.stop()
             self.deadline.stop()
+            self.refresh_pending = False
             self.cancelled_read = True
             self.process.kill()
             self.devices = []
@@ -184,6 +229,21 @@ class BatteryMonitor(QObject):
     def _status(self, text):
         self.status = text
         self.changed.emit()
+
+    def set_panel_visible(self, visible):
+        self.period.setInterval(PANEL_POLL_MS if visible else BACKGROUND_POLL_MS)
+        if visible:
+            self.request_refresh()
+
+    def hardware_changed(self):
+        if self.enabled:
+            self.hardware_refresh.start()
+
+    def request_refresh(self):
+        if self.enabled and self.process.state() != QProcess.NotRunning:
+            self.refresh_pending = True
+        else:
+            self.refresh()
 
     def refresh(self):
         if not self.enabled or self.process.state() != QProcess.NotRunning:
@@ -213,9 +273,15 @@ class BatteryMonitor(QObject):
                 text += ' Exibindo a última leitura.'
             self._status(text)
 
+    def _refresh_pending(self):
+        if self.refresh_pending:
+            self.refresh_pending = False
+            QTimer.singleShot(0, self.refresh)
+
     def _process_error(self, error):
         if error == QProcess.FailedToStart:
             self._failed()
+            self._refresh_pending()
 
     def _finish(self, code, exit_status):
         self.deadline.stop()
@@ -223,13 +289,15 @@ class BatteryMonitor(QObject):
         if not self.enabled:
             return
         if self.cancelled_read:
+            self.refresh_pending = False
             self.refresh()
             return
+        self._refresh_pending()
         if code or exit_status != QProcess.NormalExit or self.timed_out:
             self._failed()
             return
         try:
-            self.devices = parse_devices(raw)
+            self.devices = keep_present_headsets(parse_devices(raw), self.devices, present_usb_receivers())
         except ValueError:
             self._failed()
             return

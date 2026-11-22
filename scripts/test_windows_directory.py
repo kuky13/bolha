@@ -10,13 +10,13 @@ import tempfile
 import time
 
 
-def validate(installer, output):
+def validate(installer, output, check_running=False):
     import psutil
     import win32con as wc
     import win32gui as wg
     import win32process
     import pywintypes
-    from test_windows_native import test_environment, registry_fingerprint, installer_version
+    from test_windows_native import test_environment, registry_fingerprint, installer_version, wait_for, read_json
     root=Path(tempfile.mkdtemp(prefix='bolha-wizard-'))
     parent=root/'Meus aplicativos ç'
     parent.mkdir()
@@ -24,7 +24,7 @@ def validate(installer, output):
     original_registry=registry_fingerprint()
     records=[]
 
-    def wizard(selected, expected, allow_alternative):
+    def wizard(selected, expected, allow_alternative, running=False):
         env=test_environment(root/'data',selected,root/'runtime.json')
         process=subprocess.Popen([str(installer),'/TEST','/D='+str(selected)],env=env)
         transaction=expected.with_name(expected.name+'.transaction.ini')
@@ -34,6 +34,7 @@ def validate(installer, output):
         directory_ready_at=None
         confirmed=False
         finished=False
+        asked_to_close=False
         deadline=time.monotonic()+75
         last_page=[]
         def children(hwnd):
@@ -85,6 +86,9 @@ def validate(installer, output):
                             raise AssertionError(f'Instalar desabilitado para {str(selected)!r}; controles={last_page!r}')
                     elif not set_directory:
                         click(hwnd,1)  # boas-vindas e licença
+                    elif any(caption == 'Estourar!' for _, _, caption in last_page):
+                        assert running, 'O instalador ofereceu fechar outro processo.'
+                        asked_to_close=click(hwnd,1) or asked_to_close
                     elif not finished and (expected/'Bolha.exe').is_file():
                         run_checkbox=next((h for h in controls if wg.GetDlgCtrlID(h)==1203
                                            and wg.GetClassName(h)=='Button'),None)
@@ -98,18 +102,35 @@ def validate(installer, output):
             assert process.returncode==0, f'Código do instalador: {process.returncode}; controles={last_page!r}'
             assert set_directory
             assert confirmed==allow_alternative
+            assert asked_to_close==running
             assert (expected/'bolha-native-installation.flag').is_file()
             assert transaction.read_bytes()!=previous
             assert 'state=committed' in transaction.read_text(encoding='utf-16')
             assert sentinel.read_bytes()==b'nao alterar'
             assert registry_fingerprint()==original_registry
-            records.append(dict(selected=str(selected),installed=str(expected),alternative=confirmed,passed=True))
+            records.append(dict(selected=str(selected),installed=str(expected),alternative=confirmed,
+                                closed_running_app=asked_to_close,passed=True))
         finally:
             if process.poll() is None:
                 process.terminate();process.wait(timeout=10)
     try:
         new=root/'Nova instalação'/'Bolha'
         wizard(new,new,False)
+        if check_running:
+            data = root/'data'
+            report_path = root/'closed-normally.json'
+            record = test_environment(data, new, report_path)
+            app = subprocess.Popen([str(new/'Bolha.exe')], cwd=new, env=record)
+            try:
+                wait_for('Bolha pronta antes de testar o instalador', lambda:
+                         (read_json(data/'health.json') or {}).get('ready') is True, timeout=45)
+                wizard(new,new,False,running=True)
+                assert app.wait(timeout=15) == 0
+                assert (read_json(report_path) or {}).get('pid') == app.pid, 'A Bolha não concluiu a saída normal.'
+            finally:
+                if app.poll() is None:
+                    app.terminate()
+                    app.wait(timeout=10)
         wizard(parent,parent/'Bolha',True)
         wizard(parent/'Bolha',parent/'Bolha',False)
         unknown=root/'Instalação antiga'/'Bolha'
@@ -131,6 +152,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--installer',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--check-running',action='store_true')
     args=parser.parse_args()
     if os.name!='nt':parser.error('Somente Windows executa o assistente real.')
-    validate(args.installer.resolve(),args.output.resolve())
+    validate(args.installer.resolve(),args.output.resolve(),args.check_running)

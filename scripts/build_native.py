@@ -41,8 +41,8 @@ def collect_licenses(target):
     shutil.copy2(python_license,target/'PYTHON-LICENSE.txt')
 
 
-def icon(output):
-    from PySide6.QtGui import QGuiApplication, QImage, QPainter
+def icon(output, wizard):
+    from PySide6.QtGui import QColor, QGuiApplication, QImage, QLinearGradient, QPainter
     from PySide6.QtCore import Qt
     from bolha.character import draw_character
     app=QGuiApplication.instance() or QGuiApplication([])
@@ -52,6 +52,22 @@ def icon(output):
     output.mkdir(parents=True,exist_ok=True)
     for name in ('icon.png','tray.png','icon.ico'):
         if not picture.save(str(output/name)):raise OSError('Falha ao gravar '+name)
+    wizard.mkdir(parents=True, exist_ok=True)
+    for name, width, height, center, scale, colors in (
+        ('wizard.bmp', 164, 314, (82, 145), .9, ('#282138', '#15111e')),
+        ('header.bmp', 150, 57, (111, 29), .34, ('#ffffff', '#eee6fb')),
+    ):
+        bitmap = QImage(width, height, QImage.Format_RGB888)
+        painter = QPainter(bitmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        gradient = QLinearGradient(0, 0, width, height)
+        for stop, color in enumerate(colors):
+            gradient.setColorAt(stop, QColor(color))
+        painter.fillRect(bitmap.rect(), gradient)
+        draw_character(painter, *center, scale=scale, emotion='observando')
+        painter.end()
+        if not bitmap.save(str(wizard/name)):
+            raise OSError('Falha ao gravar '+name)
 
 
 def prune_optional_qt(bundle):
@@ -88,7 +104,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
     battery = resource/'batteryhub'
     prepare_batteryhub(None if reuse_bundle else battery, output)
     # O pacote usa a mesma geometria vetorial das expressões atuais.
-    icon(resource/'icons')
+    icon(resource/'icons', resource/'wizard')
     args=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--windowed','--onedir','--name','Bolha',
           '--distpath',str(work/'dist'),'--workpath',str(work/'pyinstaller'),'--specpath',str(work),
           '--paths',str(ROOT/'brain'),'--icon',str(resource/'icons/icon.ico')]
@@ -132,6 +148,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
     # /D before script: paths stay separate arguments, no shell interpolation.
     subprocess.run([compiler,'/V2','/WX','/INPUTCHARSET','UTF8','/DVERSION='+version,'/DNUMERIC_VERSION='+numeric_version,'/DBUNDLE='+str(bundle),
                     '/DOUTPUT='+str(output),'/DICON='+str(resource/'icons/icon.ico'),'/DFILELIST='+str(filelist),
+                    '/DWIZARDART='+str(resource/'wizard'),
                     str(ROOT/'packaging/bolha.nsi')],check=True,cwd=ROOT)
     shutil.copy2(ROOT/'packaging/THIRD-PARTY-NOTICES.txt',output/'THIRD-PARTY-NOTICES.txt')
     generate(output,version)

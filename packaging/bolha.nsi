@@ -8,6 +8,7 @@ SetCompressor /SOLID lzma
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 !include "StrFunc.nsh"
+!include "nsDialogs.nsh"
 ${StrStr}
 !ifndef VERSION
 !error "Informe VERSION, BUNDLE, OUTPUT e ICON."
@@ -20,24 +21,40 @@ VIAddVersionKey /LANG=1046 "ProductVersion" "${VERSION}"
 VIAddVersionKey /LANG=1046 "FileVersion" "${VERSION}"
 VIAddVersionKey /LANG=1046 "FileDescription" "Instalador da Bolha"
 Name "Bolha ${VERSION}"
+Caption "Instalação da Bolha ${VERSION}"
 OutFile "${OUTPUT}\Bolha-Setup-${VERSION}-x64.exe"
 InstallDir "$LOCALAPPDATA\Programs\Bolha"
 Icon "${ICON}"
 UninstallIcon "${ICON}"
-ShowInstDetails show
+ShowInstDetails hide
 ShowUninstDetails show
-BrandingText "Bolha — companhia local"
+BrandingText "Bolha | Companhia de desktop"
+!define MUI_ICON "${ICON}"
+!define MUI_UNICON "${ICON}"
+!ifdef WIZARDART
+  !define MUI_WELCOMEFINISHPAGE_BITMAP "${WIZARDART}\wizard.bmp"
+  !define MUI_HEADERIMAGE
+  !define MUI_HEADERIMAGE_RIGHT
+  !define MUI_HEADERIMAGE_BITMAP "${WIZARDART}\header.bmp"
+!endif
 !define MUI_ABORTWARNING
+!define MUI_ABORTWARNING_TEXT "Cancelar a instalação da Bolha?"
 !define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "Abrir a Bolha"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_FINISHPAGE_RUN_FUNCTION FinishOpenBolha
+!define MUI_WELCOMEPAGE_TITLE "Vamos instalar a Bolha"
+!define MUI_WELCOMEPAGE_TEXT "Sua companhia de desktop está quase pronta.$\r$\n$\r$\nSe a Bolha já mora aqui, suas preferências e o que ela aprendeu serão preservados."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
-!define MUI_DIRECTORYPAGE_TEXT_TOP "Escolha uma pasta exclusiva para a Bolha. Ao clicar Instalar, a pasta será verificada e qualquer impedimento será explicado."
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Escolha onde a Bolha vai ficar. Se ela já está instalada, use a pasta dela."
 !define MUI_DIRECTORYPAGE_VERIFYONLEAVE
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE PrepareInstallDirectory
 !insertmacro MUI_PAGE_DIRECTORY
+Page custom CloseBolhaPage CloseBolhaLeave
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_FINISHPAGE_TITLE "A Bolha está pronta"
+!define MUI_FINISHPAGE_TEXT "A instalação terminou. Você pode abrir a Bolha agora ou pelo menu Iniciar."
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -62,6 +79,10 @@ Var PreviousQuietUninstall
 Var PreviousIcon
 Var InstallerMutex
 Var ConfirmedInstallDirectory
+Var CloseWindow
+Var CloseThread
+Var CloseProcess
+Var CloseStatus
 
 Function .onInit
   ${IfNot} ${RunningX64}
@@ -120,6 +141,74 @@ Function .onInit
   ${GetOptions} $0 "--force-run" $1
   ${IfNot} ${Errors}
     StrCpy $ForceRun "1"
+  ${EndIf}
+FunctionEnd
+
+Function FindRunningBolha
+  ; Só aceita a janela do executável da pasta validada pelo assistente.
+  StrCpy $CloseWindow 0
+  StrCpy $CloseProcess 0
+  StrCpy $CloseThread 0
+  findNextBolha:
+    System::Call 'user32::FindWindowExW(p0,p $CloseWindow,p0,w "Bolha")p.r0'
+    StrCpy $CloseWindow $0
+    ${If} $CloseWindow == 0
+      Return
+    ${EndIf}
+    System::Call 'user32::GetWindowThreadProcessId(p $CloseWindow,*i.r1)i.r2'
+    ; SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, sem direito de finalizar à força.
+    System::Call 'kernel32::OpenProcess(i0x101000,i0,i r1)p.r0'
+    ${If} $0 != 0
+      System::Call 'kernel32::QueryFullProcessImageNameW(p r0,i0,w.r3,*i ${NSIS_MAX_STRLEN})i.r4'
+      ${If} $4 != 0
+      ${AndIf} $3 == "$ConfirmedInstallDirectory\Bolha.exe"
+        StrCpy $CloseProcess $0
+        StrCpy $CloseThread $2
+        Return
+      ${EndIf}
+      System::Call 'kernel32::CloseHandle(p r0)'
+    ${EndIf}
+    Goto findNextBolha
+FunctionEnd
+
+Function CloseBolhaPage
+  Call FindRunningBolha
+  ${If} $CloseProcess == 0
+    Abort
+  ${EndIf}
+  System::Call 'kernel32::CloseHandle(p $CloseProcess)'
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+  !insertmacro MUI_HEADER_TEXT "A Bolha está aberta" "Ela precisa fazer uma pausa para a instalação."
+  ${NSD_CreateLabel} 0 6u 100% 35u "Que tal estourar a Bolha por um instante? O instalador vai pedir que ela feche normalmente para guardar suas preferências e o que aprendeu."
+  Pop $0
+  ${NSD_CreateLabel} 0 50u 100% 35u "Se preferir, cancele e continue com a versão que você já usa."
+  Pop $CloseStatus
+  GetDlgItem $0 $HWNDPARENT 1
+  ${NSD_SetText} $0 "Estourar!"
+  nsDialogs::Show
+FunctionEnd
+
+Function CloseBolhaLeave
+  Call FindRunningBolha
+  ${If} $CloseProcess == 0
+    Return
+  ${EndIf}
+  ${NSD_SetText} $CloseStatus "Aguardando a Bolha guardar suas coisas..."
+  ; WM_QUIT é processada pelo Qt e chama o fluxo normal de saída da Bolha.
+  System::Call 'user32::PostThreadMessageW(i $CloseThread,i 0x0012,p0,p0)i.r0'
+  ${If} $0 != 0
+    System::Call 'kernel32::WaitForSingleObject(p $CloseProcess,i12000)i.r0'
+  ${Else}
+    StrCpy $0 1
+  ${EndIf}
+  System::Call 'kernel32::CloseHandle(p $CloseProcess)'
+  ${If} $0 != 0
+    ${NSD_SetText} $CloseStatus "Ainda não consegui fechar a Bolha. Escolha Sair no ícone dela, perto do relógio, e tente de novo."
+    Abort
   ${EndIf}
 FunctionEnd
 
@@ -413,7 +502,7 @@ Section "Bolha" SEC_MAIN
             Sleep 500
             Goto waitOld
           ${EndIf}
-          MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Os arquivos da Bolha estão em uso ou bloqueados.$\r$\n$\r$\nFeche a Bolha pelo ícone perto do relógio, escolhendo Sair. Depois clique em Repetir para continuar.$\r$\n$\r$\nCancelar preserva a versão instalada e seus dados." IDRETRY retryOld
+          MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Ainda há arquivos da Bolha em uso.$\r$\n$\r$\nSe ela estiver aberta, escolha Sair no ícone dela, perto do relógio. Depois clique em Repetir. Você também pode cancelar e continuar com a versão instalada." IDRETRY retryOld
         ${EndIf}
         RMDir /r "$Stage"
         Delete "$Transaction"

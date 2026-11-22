@@ -85,7 +85,7 @@ jobs:
         if: ${{ !inputs.installer_ui_only }}
         timeout-minutes: 8
         shell: pwsh
-        run: python scripts/test_windows_directory.py --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --output validation/windows-directory/report.json
+        run: python scripts/test_windows_directory.py --installer "release/Bolha-Setup-$($env:BOLHA_VERSION)-x64.exe" --output validation/windows-directory/report.json --check-running
       - name: Empacotar fixture de atualização sem recompilar o aplicativo
         if: ${{ !inputs.installer_ui_only }}
         shell: pwsh

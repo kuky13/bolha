@@ -129,6 +129,7 @@ class Hotkeys(QAbstractNativeEventFilter):
         self.tap = DoubleTap()
         self.raw = False
         self.mouse_callback = None
+        self.hardware_changed = None
         self.input_buffer = ctypes.create_string_buffer(ctypes.sizeof(RawHeader) + 24)
         self.next_id = 0xB10
         self.app.installNativeEventFilter(self)
@@ -191,6 +192,10 @@ class Hotkeys(QAbstractNativeEventFilter):
 
     def nativeEventFilter(self, kind, message):
         msg = wintypes.MSG.from_address(int(message))
+        if msg.message == 0x0219 and msg.wParam in (0x0007, 0x8000, 0x8004):
+            if self.hardware_changed is not None:
+                self.hardware_changed()
+            return False, 0
         if msg.message == 0x312 and msg.wParam in self.active:
             if not self.editing():
                 self.callbacks[self.active[msg.wParam][0]]()
