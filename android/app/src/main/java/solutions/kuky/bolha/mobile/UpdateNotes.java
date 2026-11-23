@@ -7,6 +7,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,8 +32,18 @@ public final class UpdateNotes extends BroadcastReceiver {
 
     static void showPending(Activity activity) {
         SharedPreferences prefs = state(activity);
-        if (BuildConfig.VERSION_NAME.equals(prefs.getString("pending", ""))) {
-            prefs.edit().remove("pending").apply();
+        String version = BuildConfig.VERSION_NAME;
+        if (version.equals(prefs.getString("seen", ""))) return;
+        boolean replaced = version.equals(prefs.getString("pending", ""));
+        try {
+            PackageInfo info = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
+            // O Android pode adiar o broadcast se o APK anterior foi parado.
+            replaced |= info.lastUpdateTime > info.firstInstallTime;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            // O marcador do broadcast ainda pode confirmar a instalação.
+        }
+        if (replaced) {
+            prefs.edit().remove("pending").putString("seen", version).apply();
             show(activity);
         }
     }
