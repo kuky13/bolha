@@ -5,7 +5,7 @@ from threading import Thread
 from uuid import uuid4
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices, QPalette
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLineEdit,
     QListWidget, QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget,
@@ -26,6 +26,9 @@ class ReportDialog(QDialog):
         self.submission_key = uuid4().hex
         self.sending = False
         self.setWindowTitle('Relatar problema')
+        colors = self.palette()
+        colors.setColor(QPalette.PlaceholderText, QColor('#c4b9ce'))
+        self.setPalette(colors)
         outer = QVBoxLayout(self)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -33,6 +36,9 @@ class ReportDialog(QDialog):
         scroll.setWidget(body)
         outer.addWidget(scroll)
         layout = QVBoxLayout(body)
+        title = _label('Relatar problema')
+        title.setStyleSheet('font-size: 21px; font-weight: 700; color: #ead5ff;')
+        layout.addWidget(title)
         layout.addWidget(_label('O relato inclui a versão da Bolha e a plataforma. Você escolhe os demais dados.'))
         self.subject = QLineEdit(placeholderText='Título do problema', maxLength=180)
         self.subject.setAccessibleName('Título do problema')
@@ -68,7 +74,8 @@ class ReportDialog(QDialog):
         privacy = _label()
         privacy.setTextFormat(Qt.RichText)
         privacy.setOpenExternalLinks(True)
-        privacy.setText(f'O relato será recebido em um painel privado. <a href="{PRIVACY_URL}">Política de privacidade</a>')
+        privacy.setText(f'O relato será recebido em um painel privado. '
+                        f'<a style="color: #ffd364;" href="{PRIVACY_URL}">Política de privacidade</a>')
         layout.addWidget(privacy)
         self.consent = QCheckBox('Revisei o relato e autorizo o envio dos dados selecionados')
         layout.addWidget(self.consent)

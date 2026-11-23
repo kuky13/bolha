@@ -170,6 +170,7 @@ class SettingsDialog(QDialog):
                                 self._choose_prank))
         steps.addWidget(_button('Escolher se ela inicia com o Windows',
                                 lambda: self._go_to('App', self.autostart)))
+        self.details_toggles['Primeiros passos'].setChecked(True)
         layout.addWidget(_button('O que mudou na Bolha', self._release_notes))
         layout.addWidget(_button('Relatar problema', self._report_problem))
         support = self._details('Apoiar a Bolha', layout)
