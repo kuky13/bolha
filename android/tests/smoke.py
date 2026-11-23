@@ -397,6 +397,7 @@ def smoke(apk, output, previous_apk=None):
         wait_for('atividade da Bolha em primeiro plano', lambda: foreground_app(PACKAGE))
         if previous_memory is not None:
             control('O que mudou na Bolha', exact=True, scroll=False)
+            screenshot(output, 'novidades.png')
             confirm = wait_for('botão de confirmar as novidades', lambda: next(
                 (node for node in hierarchy() if node.get('package') == PACKAGE
                  and node.get('resource-id') == 'android:id/button1'), None))
@@ -423,7 +424,7 @@ def smoke(apk, output, previous_apk=None):
         passed.append('APK instalado; sessão e 470 neurônios ativos; carinho, sono e brinquedo exercitados')
 
         tap(control('Central da Bolha', exact=True, kind='Button', scroll=False))
-        control('Primeiros passos', exact=True, scroll=False)
+        control('Primeiros passos', kind='Button', description=True, scroll=False)
         screenshot(output, 'inicio.png')
         tap(control('Relatar problema', exact=True, kind='Button', scroll=False))
         control('Título do problema', exact=True, description=True, scroll=False)
