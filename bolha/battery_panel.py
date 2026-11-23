@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Painel de bateria da Bolha, ancorado na bandeja do Windows."""
 from functools import partial
-import getpass
 from html import escape
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, QTimer
@@ -11,8 +10,6 @@ from PySide6.QtWidgets import (
     QSystemTrayIcon, QVBoxLayout, QWidget,
 )
 
-
-from .windows_media import clean_label
 
 DEVICE_LABELS = {
     'mouse': 'Mouse', 'headset': 'Headset com microfone', 'headphones': 'Fone de ouvido',
@@ -145,10 +142,6 @@ class BatteryPanel(QFrame):
         self._save_panel_visibility = save_panel_visibility
         self._tray_icons = {(None, False): battery_icon()}
         self._rendered = None
-        try:
-            self.local_user = clean_label(getpass.getuser(), 90)
-        except (ImportError, KeyError, OSError):
-            self.local_user = ''
         self.setObjectName('batteryPanel')
         self.setWindowTitle('Baterias da Bolha')
         self.setAccessibleName('Baterias dos periféricos')
@@ -360,8 +353,6 @@ class BatteryPanel(QFrame):
         identification = ' · '.join(filter(None, (DEVICE_LABELS.get(device.kind), device.connection)))
         if identification:
             tooltip += f'<br>{escape(identification)}'
-        if self.local_user:
-            tooltip += f'<br>Usuário do Windows: {escape(self.local_user)}'
         row.setToolTip(tooltip)
         content = QHBoxLayout(row)
         content.setContentsMargins(9,8,10,8)
@@ -403,10 +394,10 @@ class BatteryPanel(QFrame):
         if device.connection:
             details.addWidget(label(device.connection, 'batteryStatus'))
         if device.percent is None:
-            reason = 'Carga indisponível'
-            if device.level:
-                reason += ' · ' + device.level
+            reason = device.level or 'Carga indisponível'
             details.addWidget(label(reason, 'batteryStatus'))
+            if reason == 'Carga não informada pelo headset':
+                details.addWidget(label('Ele pode estar carregando.', 'batteryStatus'))
         if charging:
             details.addWidget(label('Carregando', 'batteryStatus'))
         hidden = device.key in self._hidden_panel_devices

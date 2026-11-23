@@ -60,7 +60,7 @@ def test_size_adjustment_preserves_other_types_and_avatar():
     app=SimpleNamespace(store=SimpleNamespace(preferences=prefs),save_preferences=save)
     result=NativeApp.adjust_object_scale(app,'toy',.7)
     assert result['objectScales']['toy']==.7
-    assert result['objectScales']['notebook']==1.
-    assert result['avatarSize']==136
-    assert prefs['objectScales']['toy']==1.
+    assert result['objectScales']['notebook']==1.2
+    assert result['avatarSize']==90
+    assert prefs['objectScales']['toy']==1.3
     assert NativeApp.adjust_object_scale(app,'toy',reset=True)['objectScales']['toy']==1.

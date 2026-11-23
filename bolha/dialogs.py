@@ -14,8 +14,8 @@ reset_learning() True confirma a solicitação de backup/reinício, cuja conclus
 import math
 import time
 
-from PySide6.QtCore import Qt, QTimer, QRectF, QPointF
-from PySide6.QtGui import QColor, QPainter, QPalette
+from PySide6.QtCore import Qt, QTimer, QRectF, QPointF, QUrl
+from PySide6.QtGui import QColor, QPainter, QPalette, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
 )
 from . import VERSION
 from .preferences import DEFAULTS, OBJECT_SCALE_TYPES, ACTIVITY_SWITCHES
+from .reports import SUPPORT_URL
+from .welcome import current_notes
 
 
 def _label(text=''):
@@ -63,12 +65,14 @@ class SettingsDialog(QDialog):
         self.setAccessibleName('Central da Bolha')
         self._loading = True
         self.checks = {}
+        self.details_toggles = {}
         self.baseline = {}
         self.startup = False
         self.tabs = QTabWidget()
         self.tabs.setAccessibleName('Áreas da central da Bolha')
         layout = QVBoxLayout(self)
         layout.addWidget(self.tabs, 1)
+        self._home_tab()
         self._appearance_tab()
         self._behavior_tab()
         self._test_tab()
@@ -130,6 +134,7 @@ class SettingsDialog(QDialog):
         toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         toggle.setArrowType(Qt.RightArrow)
         toggle.setCheckable(True)
+        self.details_toggles[title] = toggle
         body = QWidget()
         inner = QVBoxLayout(body)
         inner.setContentsMargins(16, 8, 0, 4)
@@ -140,6 +145,55 @@ class SettingsDialog(QDialog):
         layout.addWidget(toggle)
         layout.addWidget(body)
         return inner
+
+    def _go_to(self, title, control=None):
+        for index in range(self.tabs.count()):
+            if self.tabs.tabText(index) == title:
+                self.tabs.setCurrentIndex(index)
+                if control is not None:
+                    page = self.tabs.widget(index)
+                    page.ensureWidgetVisible(control)
+                    control.setFocus(Qt.OtherFocusReason)
+                return
+
+    def _home_tab(self):
+        layout = self._tab('Início')
+        title = _label('Oi, eu sou a Bolha!')
+        title.setStyleSheet('font-size: 23px; font-weight: 700; color: #ead5ff;')
+        layout.addWidget(title)
+        layout.addWidget(_label('Passe o ponteiro sobre mim para fazer carinho. Segure e solte para brincar.'))
+        steps = self._details('Primeiros passos', layout)
+        steps.addWidget(_label('Use o botão direito na Bolha ou no ícone perto do relógio para voltar à Central. '
+                                'No Windows, um clique no ícone de bateria abre a lista de periféricos.'))
+        steps.addWidget(_button('Escolher as brincadeiras', lambda: self._go_to('Bolha')))
+        steps.addWidget(_button('Configurar travessura do cursor',
+                                self._choose_prank))
+        steps.addWidget(_button('Escolher se ela inicia com o Windows',
+                                lambda: self._go_to('App', self.autostart)))
+        layout.addWidget(_button('O que mudou na Bolha', self._release_notes))
+        layout.addWidget(_button('Relatar problema', self._report_problem))
+        support = self._details('Apoiar a Bolha', layout)
+        support.addWidget(_label('A Bolha é gratuita e de código aberto. Testar, relatar falhas, '
+                                  'divulgar e contribuir no GitHub ajuda a manter o projeto ativo.'))
+        support.addWidget(_button('Bugs e correções', lambda: QDesktopServices.openUrl(QUrl(SUPPORT_URL))))
+        support.addWidget(_button('Contribuir no GitHub', lambda: QDesktopServices.openUrl(
+            QUrl('https://github.com/kuky13/bolha/blob/main/CONTRIBUTING.md'))))
+        layout.addStretch()
+
+    def _choose_prank(self):
+        self.details_toggles['Comportamento e aprendizado'].setChecked(True)
+        self._go_to('Bolha', self.checks['cursorPrankEnabled'])
+
+    def _release_notes(self):
+        dialog = ReleaseNotesDialog(self.controller)
+        dialog.setParent(self, Qt.Dialog)
+        dialog.exec()
+
+    def _report_problem(self):
+        from .report_dialog import ReportDialog
+        dialog = ReportDialog(self.controller)
+        dialog.setParent(self, Qt.Dialog)
+        dialog.exec()
 
     def _spin(self, low, high, suffix, name):
         control = QSpinBox()
@@ -296,6 +350,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(_label('Consulta ao abrir e a cada seis horas.'))
         maintenance = self._details('Diagnóstico e manutenção', layout)
         maintenance.addWidget(_button('Copiar diagnóstico local', self.copy_diagnostics))
+        maintenance.addWidget(_button('Relatar problema', self._report_problem))
         maintenance.addWidget(_label('O relatório fica local. Você escolhe onde compartilhar.'))
         maintenance.addWidget(_button('Apagar aprendizado…', self.reset_learning))
         features = getattr(self.controller, 'windows_features', None)
@@ -997,3 +1052,23 @@ class ActivityTestDialog(QDialog):
             return
         self.stopped = True
         self.on_stop()
+
+
+class ReleaseNotesDialog(QDialog):
+    def __init__(self, controller):
+        super().__init__()
+        self.setWindowTitle('O que mudou na Bolha')
+        self.setAccessibleName('Novidades da Bolha')
+        layout = QVBoxLayout(self)
+        title = _label('O que mudou na Bolha')
+        title.setStyleSheet('font-size: 23px; font-weight: 700; color: #ead5ff;')
+        layout.addWidget(title)
+        layout.addWidget(_label(f'Versão {VERSION}'))
+        for note in current_notes(VERSION):
+            card = _label(note)
+            card.setStyleSheet('background: #353040; border-radius: 8px; padding: 10px;')
+            layout.addWidget(card)
+        layout.addStretch(1)
+        layout.addWidget(_button('Ver bugs e correções', lambda: QDesktopServices.openUrl(QUrl(SUPPORT_URL))))
+        layout.addWidget(_button('Entendi', self.accept))
+        self.resize(450, 310)

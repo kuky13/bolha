@@ -160,9 +160,9 @@ def test_aplicar_preserva_sensores_desligados_e_valores_nao_editados(app):
 def test_central_pausa_a_previa_ao_trocar_de_area(app):
     dialog = SettingsDialog(ControllerStub())
     dialog.show()
-    assert [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]==['Bolha','Testar','Privacidade','App']
+    assert [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]==['Início','Bolha','Testar','Privacidade','App']
     assert not dialog.lab.timer.isActive()
-    dialog.tabs.setCurrentIndex(1)
+    dialog._go_to('Testar')
     app.processEvents()
     assert dialog.lab.timer.isActive()
     dialog.tabs.setCurrentIndex(0)
@@ -203,7 +203,7 @@ def test_controles_de_retorno_sao_ptbr_editaveis_e_salvos_sem_afetar_outros_camp
     controller = ControllerStub()
     dialog = SettingsDialog(controller)
     assert dialog.checks['popEnabled'].isChecked()
-    assert dialog.pop_throw_limit.value() == 12
+    assert dialog.pop_throw_limit.value() == 5
     assert dialog.pop_throw_limit.minimum() == 5 and dialog.pop_throw_limit.maximum() == 30
     assert dialog.checks['popEnabled'].text() == 'Estourar após muitos arremessos fortes'
     assert '1 minuto' in dialog.checks['popEnabled'].toolTip()
@@ -290,7 +290,7 @@ def test_diagnostico_unicode_e_adiamento_em_milissegundos(app):
     controller = ControllerStub()
     dialog = SettingsDialog(controller)
     dialog.show()
-    dialog.tabs.setCurrentIndex(3)
+    dialog._go_to('App')
     dialog.copy_diagnostics()
     assert QApplication.clipboard().text() == controller.diagnostics_text()
     controller.updater.state = dict(phase='ready', version='0.3.1', installAt=time.time()*1000+29000)
@@ -336,7 +336,7 @@ def test_teclado_fechamento_e_controles_cabem_em_tela_pequena(app):
     QTest.keyClick(dialog.avatar_size, Qt.Key_Tab)
     assert dialog.avatar_size.value() == 172
     assert QApplication.focusWidget() is not None
-    dialog.tabs.setCurrentIndex(3)
+    dialog._go_to('App')
     app.processEvents()
     assert dialog.apply_button.isVisible()
     assert dialog.apply_button.mapTo(dialog, dialog.apply_button.rect().bottomRight()).y() < dialog.height()
@@ -411,10 +411,10 @@ def test_ajuste_de_tamanho_do_avatar_e_objetos_e_editavel_sem_alcas(app):
     dialog = SettingsDialog(controller)
     assert dialog.avatar_size.minimum() == 48
     assert not hasattr(dialog, 'resize_handles')
-    dialog.object_scales['toy'].setValue(1.3)
+    dialog.object_scales['toy'].setValue(1.4)
     assert dialog.apply_button.isEnabled()
     dialog.apply_button.click()
-    assert controller.store.preferences['objectScales']['toy'] == pytest.approx(1.3)
+    assert controller.store.preferences['objectScales']['toy'] == pytest.approx(1.4)
 
 
 def test_canvas_decisao_e_reacao_usa_game_e_matriz_viva_sem_fixture_neural(app, tmp_path):

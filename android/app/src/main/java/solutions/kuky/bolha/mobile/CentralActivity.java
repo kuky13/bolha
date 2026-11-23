@@ -36,7 +36,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public final class CentralActivity extends Activity implements Engine.Listener {
-    private static final String[] SECTIONS={"Aparência","Comportamento","Cérebro","Atividades","Privacidade","App"};
+    private static final int HOME=6;
+    private static final int[] DISPLAY_ORDER={HOME,0,1,2,3,4,5};
+    private static final String[] SECTIONS={"Aparência","Comportamento","Cérebro","Atividades","Privacidade","App","Início"};
     private final Map<String,Switch> toggles=new LinkedHashMap<>();
     private final Map<String,SeekBar> sliders=new LinkedHashMap<>();
     private final Map<String,TextView> values=new HashMap<>();
@@ -62,7 +64,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         engine=Engine.get(this);
-        section=saved==null?0:saved.getInt("section",0);
+        section=saved==null?HOME:saved.getInt("section",HOME);
         waitingUsage=saved!=null && saved.getBoolean("waitingUsage");
         LinearLayout page=MobileUi.column(this);
         MobileUi.applyWindow(this,page);
@@ -81,9 +83,8 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         page.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout nav=wide?MobileUi.column(this):MobileUi.row(this);
         nav.setPadding(dp(8),dp(2),dp(8),dp(8));
-        for (int index=0;index<SECTIONS.length;index++) {
-            final int target=index;
-            Button button=MobileUi.button(this,SECTIONS[index],() -> showSection(target));
+        for (int target : DISPLAY_ORDER) {
+            Button button=MobileUi.button(this,SECTIONS[target],() -> showSection(target));
             navigation.add(button);
             nav.addView(button,new LinearLayout.LayoutParams(wide?dp(175):-2,-2));
         }
@@ -146,9 +147,10 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         content.removeAllViews();
         for (int index=0;index<navigation.size();index++) {
             Button button=navigation.get(index);
-            button.setTextColor(index==section?MobileUi.BACKGROUND:MobileUi.TEXT);
-            button.setBackgroundTintList(ColorStateList.valueOf(index==section?MobileUi.GOLD:MobileUi.SURFACE));
-            button.setSelected(index==section);
+            boolean selected = DISPLAY_ORDER[index] == section;
+            button.setTextColor(selected?MobileUi.BACKGROUND:MobileUi.TEXT);
+            button.setBackgroundTintList(ColorStateList.valueOf(selected?MobileUi.GOLD:MobileUi.SURFACE));
+            button.setSelected(selected);
         }
         JSONObject current=engine.state().optJSONObject("preferences");
         if (current!=null) preferences=current;
@@ -159,6 +161,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
             case 2: brain();break;
             case 3: activities();break;
             case 4: privacy();break;
+            case HOME: home();break;
             default: application();break;
         }
         loading=false;
@@ -167,6 +170,28 @@ public final class CentralActivity extends Activity implements Engine.Listener {
     }
 
     private void heading(String label) { content.addView(MobileUi.title(this,label)); }
+
+    private void home() {
+        heading("Oi, eu sou a Bolha!");
+        description("Toque para dar carinho. Segure, arraste e solte para brincar.");
+        details("Primeiros passos", () -> {
+            description("Para a Bolha fazer companhia sobre outros aplicativos, toque em Flutuar e conceda a permissão na tela do Android.");
+            button("Escolher brincadeiras", () -> showSection(3));
+            button("Configurar modo flutuante", () -> showSection(5));
+        });
+        button("O que mudou na Bolha", () -> UpdateNotes.show(this));
+        button("Relatar problema", this::reportProblem);
+        details("Apoiar a Bolha", () -> {
+            description("A Bolha é gratuita e de código aberto. Testar, relatar falhas, divulgar e contribuir ajuda a mantê-la ativa.");
+            button("Bugs e correções", () -> startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(UpdateNotes.SUPPORT))));
+            button("Contribuir no GitHub", () -> startActivity(new Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/kuky13/bolha/blob/main/CONTRIBUTING.md"))));
+        });
+    }
+
+    private void reportProblem() {
+        startActivity(new Intent(this, ReportActivity.class));
+    }
 
     private TextView description(String label) {
         TextView text=MobileUi.text(this,label,14,MobileUi.MUTED);
@@ -440,6 +465,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         button("Abrir versões no GitHub",() -> startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/kuky13/bolha/releases/latest"))));
         divider("Diagnóstico e dados");
         button("Copiar diagnóstico local",this::copyDiagnostics);
+        button("Relatar problema",this::reportProblem);
         button("Apagar aprendizado…",() -> new AlertDialog.Builder(this)
             .setTitle("Reiniciar o aprendizado?")
             .setMessage("A Bolha vai guardar uma cópia de segurança e reiniciar as associações aprendidas neste aparelho.")

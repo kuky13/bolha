@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from .versioning import version_tuple
 
-VERSION = '0.5.9.3'
+VERSION = '0.5.9.4'
 if getattr(sys, 'frozen', False):
     value = json.loads((Path(sys._MEIPASS) / 'bolha-version.json').read_text(encoding='utf-8'))
     try:

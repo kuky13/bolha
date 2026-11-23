@@ -19,12 +19,12 @@ def test_type_scale_and_collision_geometry():
 
 def test_scale_preferences_are_finite_bounded_and_independent():
     first=defaults();first['objectScales']['toy']=.6
-    assert defaults()['objectScales']['toy']==1.
+    assert defaults()['objectScales']['toy']==1.3
     values=sanitize({'objectScales':{'toy':float('inf'),'note':3,'reaction':.8}})
-    assert values['objectScales']['toy']==1.
+    assert values['objectScales']['toy']==1.3
     assert values['objectScales']['note']==1.8
     assert values['objectScales']['reaction']==.8
-    assert values['avatarSize']==136
+    assert values['avatarSize']==90
 
 
 def test_pequeno_brinquedo_mantem_raio_legivel_e_padrao_original():

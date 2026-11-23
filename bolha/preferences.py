@@ -19,12 +19,12 @@ ACTIVITY_SWITCHES = (
     ('Protestos e revolução', 'signsEnabled', 'Segurar cartazes'),
     ('Protestos e revolução', 'revolutionEnabled', 'Lançar brinquedos na revolução'),
 )
-DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
+DEFAULTS = dict(avatarSize=90, opacity=1., roaming=True, position=None,
                 mouthEnabled=True, cursorPrankEnabled=False,
-                objectScales={key:1. for key in OBJECT_SCALE_TYPES},
+                objectScales=dict.fromkeys(OBJECT_SCALE_TYPES, 1.) | {'toy': 1.3, 'notebook': 1.2},
                 toyAppearance='ball',
-                mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
-                popEnabled=True, popThrowLimit=12,
+                mischiefEnabled=True, onlineReactions=True, mischiefInterval=120, maxObjects=3,
+                popEnabled=True, popThrowLimit=5,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True,
                 finderEnabled=True,finderDouble=True,finderKey='Alt esquerdo',
@@ -40,6 +40,13 @@ SENSOR_KEYS = ('senseApp','senseIdle','senseCursor','senseWindows')
 
 def defaults():
     return copy.deepcopy(DEFAULTS)
+
+
+def previous_install_defaults(*, mobile=False):
+    values = defaults()
+    values.update(avatarSize=120 if mobile else 136, mischiefInterval=300, popThrowLimit=12,
+                  objectScales=dict.fromkeys(OBJECT_SCALE_TYPES, 1.))
+    return values
 
 
 def number(value):
@@ -98,7 +105,7 @@ class PreferencesStore:
             self.preferences=defaults()
             for key in SENSOR_KEYS:self.preferences[key]=False
             return
-        self.preferences=sanitize(saved.get('preferences'))
+        self.preferences=sanitize(saved.get('preferences'), previous_install_defaults() if saved else None)
         if saved and saved.get('schemaVersion')!=1:
             self.save({})
 

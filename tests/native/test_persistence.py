@@ -31,10 +31,10 @@ def test_migration_preserves_memory_optouts_and_backup(tmp_path):
 def test_preferencias_de_arremesso_padrao_sanitizacao_e_migracao(tmp_path):
     from bolha.preferences import defaults, sanitize
     assert defaults()['popEnabled'] is True
-    assert defaults()['popThrowLimit'] == 12
+    assert defaults()['popThrowLimit'] == 5
     assert sanitize({'popThrowLimit': 4, 'popEnabled': False})['popThrowLimit'] == 5
     assert sanitize({'popThrowLimit': 31})['popThrowLimit'] == 30
-    assert sanitize({'popThrowLimit': 12.0})['popThrowLimit'] == 12
+    assert sanitize({'popThrowLimit': 12.0})['popThrowLimit'] == 5
     old = {'schemaVersion': 1, 'preferences': {'senseCursor': False}}
     (tmp_path/'config.json').write_text(json.dumps(old), encoding='utf-8')
     migrated = PreferencesStore(tmp_path)

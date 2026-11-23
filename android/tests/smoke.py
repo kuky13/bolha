@@ -395,6 +395,10 @@ def smoke(apk, output, previous_apk=None):
         adb('install', '-r', str(apk))
         activity()
         wait_for('atividade da Bolha em primeiro plano', lambda: foreground_app(PACKAGE))
+        if previous_memory is not None:
+            control('O que mudou na Bolha', exact=True, scroll=False)
+            tap(control('Entendi', exact=True, kind='Button', scroll=False))
+            screenshot(output, 'novidades-confirmadas.png')
         control('470 neurônios', scroll=False)
         if previous_memory is not None:
             wait_for('vibração antiga migrada para as preferências do cérebro',
@@ -416,6 +420,14 @@ def smoke(apk, output, previous_apk=None):
         passed.append('APK instalado; sessão e 470 neurônios ativos; carinho, sono e brinquedo exercitados')
 
         tap(control('Central da Bolha', exact=True, kind='Button', scroll=False))
+        control('Primeiros passos', exact=True, scroll=False)
+        screenshot(output, 'inicio.png')
+        tap(control('Relatar problema', exact=True, kind='Button', scroll=False))
+        control('Título do problema', exact=True, description=True, scroll=False)
+        consent = control('Revisei o relato e autorizo o envio dos dados selecionados', exact=True)
+        assert consent.get('checked') == 'false'
+        screenshot(output, 'relato.png')
+        adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         section('Aparência')
         screenshot(output, 'central.png')
         set_slider('Tamanho da Bolha', .72)

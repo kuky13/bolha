@@ -20,6 +20,7 @@ from .pet import PetWindow
 from .pingpong_view import PingPongView
 from .scene import NativeScene
 from .character import draw_character
+from .welcome import WelcomeState
 from game import Game
 from pestinha import store as brain_store
 from pestinha.log import setup as setup_log,log,capturar_erros
@@ -67,6 +68,9 @@ class NativeApp:
         self.dialogs=[];self.updater=None;self.connected_screens=set();self.update_dialog=None;self.reset_pending=False
         self.activity_test = None
         self.activity_test_dialog = None
+        install_dir = Path(sys.executable).parent if getattr(sys, 'frozen', False) else None
+        self.welcome = WelcomeState(self.data_dir, VERSION, install_dir)
+        self.notes_waiting = self.welcome.needs_notes()
         self._health(False)
         self.store=PreferencesStore(self.data_dir)
         content=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parents[1]))/'assets'/'bolha'/'content'
@@ -207,6 +211,12 @@ class NativeApp:
             except OSError as error:self.warn('Confirmação local falhou: '+str(error));return
             self.healthy=True
             if self.updater:self.updater.healthy()
+            self._visit_welcome()
+        if getattr(self, 'notes_waiting', False) and self.healthy and not self.game.blocked:
+            self.show_release_notes()
+            self.notes_waiting = False
+            try:self.welcome.record(notesSeen=VERSION)
+            except OSError as error:self.warn('Não foi possível guardar o aviso de novidades: '+str(error))
         if self.updater and self.updater.state.get('phase')=='ready':
             deadline=self.updater.state.get('installAt')
             remaining=max(0,round((deadline-time.time()*1000)/1000)) if deadline else None
@@ -339,6 +349,23 @@ class NativeApp:
     def show_settings(self):
         from .dialogs import SettingsDialog
         self._show_dialog(SettingsDialog)
+    def show_release_notes(self):
+        from .dialogs import ReleaseNotesDialog
+        self._show_dialog(ReleaseNotesDialog)
+    def _visit_welcome(self):
+        try:
+            state = {'openedVersion': VERSION}
+            if self.notes_waiting:
+                state['notesPending'] = VERSION
+            crash = self.data_dir / 'startup-error.log'
+            if crash.is_file():
+                stamp = crash.stat().st_mtime_ns
+                if stamp != self.welcome.state.get('crashNotice'):
+                    state['crashNotice'] = stamp
+                    self.tray.showMessage('Bolha', 'Uma falha ficou registrada. Se quiser, abra Relatar problema na Central.')
+            self.welcome.record(**state)
+        except OSError as error:
+            self.warn('Não foi possível guardar o estado dos primeiros passos: '+str(error))
     def show_neural(self):
         from .dialogs import NeuralDialog
         self._show_dialog(NeuralDialog)

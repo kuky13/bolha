@@ -148,7 +148,7 @@ def keep_present_headsets(devices, previous, present):
         key = old.key if old else ('hsc:291D:385D' if hardware_id == '291d:385d' else 'mchose:v9pro2')
         devices.append(DeviceBattery(
             key, old.name if old else USB_HEADSET_NAMES[hardware_id], None,
-            'Aguardando resposta do headset', False, False, 'headset', True, 'Receptor USB (2,4 GHz)',
+            'Carga não informada pelo headset', False, False, 'headset', True, 'Receptor USB (2,4 GHz)',
         ))
     return devices
 
@@ -256,7 +256,8 @@ class BatteryMonitor(QObject):
         self.timed_out = False
         self.cancelled_read = False
         self.process.setWorkingDirectory(str(self.folder))
-        self._status('Consultando periféricos…')
+        if not self.success:
+            self._status('Consultando periféricos…')
         self.deadline.start()
         self.process.start(str(executable), ['--json'], QProcess.ReadOnly)
 

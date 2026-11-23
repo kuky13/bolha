@@ -1,0 +1,28 @@
+services:
+  bugpin:
+    image: registry.arantic.cloud/bugpin/bugpin:1.3.0@sha256:2ab2d7186a7851bdf4dfd08b40ffce3b663345791c4b90f038cff6721b9c4fb1
+    volumes:
+      - bugpin-data:/data
+    ports:
+      - 127.0.0.1:17300:7300
+    mem_limit: 768m
+    cpus: 1
+  reports:
+    build:
+      context: ..
+      dockerfile: service/Dockerfile
+    environment:
+      BUGPIN_PROJECT_KEY: ${BUGPIN_PROJECT_KEY:-}
+      BUGPIN_URL: http://bugpin:7300
+      BUGPIN_STORAGE: /bugpin-data
+    volumes:
+      - bugpin-data:/bugpin-data:ro
+    ports:
+      - 127.0.0.1:17301:8080
+    mem_limit: 256m
+    cpus: 0.75
+    depends_on:
+      - bugpin
+
+volumes:
+  bugpin-data:

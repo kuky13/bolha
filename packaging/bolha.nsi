@@ -480,6 +480,7 @@ Section "Bolha" SEC_MAIN
   FileClose $0
   WriteINIStr "$Transaction" "recovery" "backup" "$Backup"
   WriteINIStr "$Transaction" "recovery" "version" "${VERSION}"
+  WriteINIStr "$Transaction" "recovery" "previousVersion" "$PreviousVersion"
   WriteINIStr "$Transaction" "recovery" "state" "active"
   StrCpy $OldExists "0"
   ${If} ${FileExists} "$INSTDIR\Bolha.exe"

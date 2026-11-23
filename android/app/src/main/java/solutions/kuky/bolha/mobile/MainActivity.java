@@ -26,6 +26,7 @@ public final class MainActivity extends Activity implements Engine.Listener {
     private TextView status;
     private Button overlay;
     private boolean waitingPermission;
+    private boolean checkedWelcome;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -161,6 +162,10 @@ public final class MainActivity extends Activity implements Engine.Listener {
         if (!reaction.isEmpty() && !reaction.equals("Reação pronta.")) label+="\n"+reaction;
         if (!label.contentEquals(status.getText())) status.setText(label);
         if (error!=null) return;
+        if (!checkedWelcome && state.optInt("neurons") == 470) {
+            checkedWelcome = true;
+            UpdateNotes.showPending(this);
+        }
         if (!FloatingBolha.active) Haptics.frame(this,state);
         stage.frame(state);
     }

@@ -16,7 +16,7 @@ from bolha.dialogue import Dialogue, speech_duration
 from bolha.desk import typing_frame
 from bolha.migration import atomic_json, read_json
 from bolha.motion import ExpressionMotion, animation_pose, QUIRK_SECONDS
-from bolha.preferences import defaults, sanitize, number
+from bolha.preferences import defaults, previous_install_defaults, sanitize, number
 from bolha.reactions import OnlineReactionFetcher, MAX_TOTAL_MEDIA_BYTES, validate_media_signature
 
 EXPRESSION_NAMES = [
@@ -70,12 +70,15 @@ def start(data, content):
     if game is not None:
         return
     settings_path = Path(data) / 'config.json'
-    initial = dict(defaults(), avatarSize=120, senseApp=False, senseWindows=False,
+    initial = dict(defaults(), senseApp=False, senseWindows=False,
                    senseIdle=True, onlineReactions=False)
     try:
         saved = read_json(settings_path)
         if not isinstance(saved, dict) or not isinstance(saved.get('preferences'), dict):
             raise ValueError('Estrutura de preferências inválida.')
+        legacy = previous_install_defaults(mobile=True)
+        for key in ('avatarSize', 'objectScales', 'mischiefInterval', 'popThrowLimit'):
+            initial[key] = legacy[key]
         initial.update(saved['preferences'])
     except FileNotFoundError:
         pass
@@ -213,7 +216,7 @@ def control(value):
         game.last_monitor_snapshot = -1.
         return
     if kind == 'reset-appearance':
-        configure(dict(avatarSize=120, opacity=1., objectScales=defaults()['objectScales']))
+        configure(dict(avatarSize=defaults()['avatarSize'], opacity=1., objectScales=defaults()['objectScales']))
         return
     if kind == 'stop-pingpong':
         game.stop_pingpong()

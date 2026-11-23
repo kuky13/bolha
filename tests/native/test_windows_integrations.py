@@ -160,8 +160,7 @@ def test_settings_capture_and_individual_values(qt_application, tmp_path):
     shell.close()
 
 
-def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_application, tmp_path, monkeypatch):
-    monkeypatch.setattr('bolha.battery_panel.getpass.getuser', lambda: 'Conta <local>')
+def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_application, tmp_path):
     monitor = BatteryMonitor(lambda _: None, tmp_path)
     monitor.enabled = True
     monitor.devices = parse_devices(json.dumps([
@@ -178,7 +177,7 @@ def test_battery_popup_pins_awake_devices_and_stays_inside_taskbar_screen(qt_app
     assert len(icons) == 2 and all(not icon.pixmap().isNull() for icon in icons)
     assert icons[0].pixmap().toImage() != icons[1].pixmap().toImage()
     assert 'Z &lt;connected&gt;' in icons[0].toolTip()
-    assert 'Conta &lt;local&gt;' in icons[0].toolTip()
+    assert 'Usuário do Windows' not in icons[0].toolTip()
     panel.toggle()
     assert panel.isVisible()
     monitor.configure(False, 15, True)
@@ -313,7 +312,7 @@ def test_battery_keeps_usb_headset_visible_when_receiver_stops_reporting_charge(
     pending = keep_present_headsets([], previous, present)
     assert pending[0].key == row['key'] and pending[0].connected
     assert pending[0].percent is None and not pending[0].is_charging()
-    assert 'Aguardando' in pending[0].level
+    assert pending[0].level == 'Carga não informada pelo headset'
     assert keep_present_headsets([], pending, set()) == []
     ready = parse_devices(json.dumps([dict(row, charging=True)]).encode())
     assert keep_present_headsets(ready, pending, present) == ready
