@@ -70,7 +70,7 @@ async def submit(request: Request):
     key = os.environ.get('BUGPIN_PROJECT_KEY')
     target = os.environ.get('BUGPIN_URL', '').rstrip('/')
     storage = Path(os.environ.get('BUGPIN_STORAGE', '/bugpin-data'))
-    if not key or not target or not storage.is_dir() or shutil.disk_usage(storage).free < 512 * MIB:
+    if not key or not target or not storage.is_dir() or shutil.disk_usage(storage).free < 3072 * MIB:
         raise HTTPException(503, 'Serviço de relatos indisponível.')
     async with active:
         async with request.form(max_files=3, max_fields=1, max_part_size=64 * 1024) as form:
