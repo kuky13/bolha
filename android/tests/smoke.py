@@ -397,7 +397,10 @@ def smoke(apk, output, previous_apk=None):
         wait_for('atividade da Bolha em primeiro plano', lambda: foreground_app(PACKAGE))
         if previous_memory is not None:
             control('O que mudou na Bolha', exact=True, scroll=False)
-            tap(control('Entendi', exact=True, kind='Button', scroll=False))
+            confirm = wait_for('botão de confirmar as novidades', lambda: next(
+                (node for node in hierarchy() if node.get('package') == PACKAGE
+                 and node.get('resource-id') == 'android:id/button1'), None))
+            tap(confirm)
             screenshot(output, 'novidades-confirmadas.png')
         control('470 neurônios', scroll=False)
         if previous_memory is not None:
