@@ -45,6 +45,13 @@ public final class MainActivity extends Activity implements Engine.Listener {
         status = MobileUi.text(this,"Abrindo a Bolha…",14,MobileUi.MUTED);
         status.setPadding(dp(20),0,dp(20),dp(8));
         page.addView(status);
+        SharedPreferences notices = getSharedPreferences("welcome", MODE_PRIVATE);
+        long failure = notices.getLong("engineFailure", 0);
+        if (failure > notices.getLong("offeredFailure", 0)) {
+            page.addView(MobileUi.button(this, "Relatar uma falha registrada", () ->
+                startActivity(new Intent(this, ReportActivity.class))));
+            notices.edit().putLong("offeredFailure", failure).apply();
+        }
         stage = new Stage(this,engine,"");
         page.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
         TextView help = MobileUi.text(this,"Toque para dar carinho. Arraste e solte para brincar.",13,MobileUi.MUTED);

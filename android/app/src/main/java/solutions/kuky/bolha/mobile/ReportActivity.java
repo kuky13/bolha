@@ -72,8 +72,8 @@ public final class ReportActivity extends Activity {
         errors.setOnCheckedChangeListener((button, checked) -> {
             errorsPreview.setVisibility(checked ? View.VISIBLE : View.GONE);
             if (checked) {
-                String error = Engine.get(this).state().optString("error", "");
-                errorsPreview.setText(error.isEmpty() ? "" : "Falha registrada pelo motor da Bolha.");
+                long failure = getSharedPreferences("welcome", MODE_PRIVATE).getLong("engineFailure", 0);
+                errorsPreview.setText(failure == 0 ? "" : "Falha registrada pelo motor da Bolha.");
             }
         });
         form.addView(MobileUi.button(this, "Escolher imagens ou vídeos", this::choose));

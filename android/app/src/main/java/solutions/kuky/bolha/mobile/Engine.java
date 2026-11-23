@@ -40,6 +40,7 @@ final class Engine {
     private long previous, lastContext;
     private volatile long lastInteraction = SystemClock.uptimeMillis();
     private volatile JSONObject state = new JSONObject();
+    private boolean recordedFailure;
 
     private Engine(Context context) {
         this.context = context;
@@ -234,7 +235,14 @@ final class Engine {
     };
 
     private void report(JSONObject value, Exception error) {
-        if (error != null) android.util.Log.e("Bolha", "Motor", error);
+        if (error != null) {
+            android.util.Log.e("Bolha", "Motor", error);
+            if (!recordedFailure) {
+                recordedFailure = true;
+                context.getSharedPreferences("welcome", Context.MODE_PRIVATE).edit()
+                    .putLong("engineFailure", System.currentTimeMillis()).apply();
+            }
+        }
         main.post(() -> {
             JSONObject preferences=state.optJSONObject("preferences");
             phoneMotion.update(error == null && !listeners.isEmpty() && screenAwake,
