@@ -12,6 +12,8 @@ from service import report_gateway as gateway
 @pytest.fixture
 def client(monkeypatch, tmp_path):
     gateway.windows.clear()
+    gateway.hourly.clear()
+    monkeypatch.setattr(gateway, 'hourly_bytes', 0)
     monkeypatch.setenv('BUGPIN_PROJECT_KEY', 'staging')
     monkeypatch.setenv('BUGPIN_URL', 'http://private')
     monkeypatch.setenv('BUGPIN_STORAGE', str(tmp_path))
@@ -66,3 +68,23 @@ def test_unsupported_files_and_retries(client):
     assert submit(http, payload(), png).json() == {'protocol': 'rpt_stage123'}
     assert upstream[0][2][0][1][0].startswith('anexo-')
     assert upstream[0][1]['submissionId'] == upstream[1][1]['submissionId']
+
+
+def test_browser_preflight_and_post_only_accept_the_public_site(client):
+    http, upstream = client
+    origin = 'https://bolha.kuky.solutions'
+    headers = {'Origin': origin, 'Access-Control-Request-Method': 'POST'}
+    assert http.options('/v1/reports', headers=headers).headers['Access-Control-Allow-Origin'] == origin
+    files = {'data': (None, json.dumps(payload()))}
+    refused = http.post('/v1/reports', files=files, headers={'Origin': 'https://example.org'})
+    assert refused.status_code == 403 and 'Access-Control-Allow-Origin' not in refused.headers
+    result = http.post('/v1/reports', files=files, headers={'Origin': origin})
+    assert result.status_code == 201 and result.headers['Access-Control-Allow-Origin'] == origin
+    assert len(upstream) == 1
+
+
+def test_global_budget_rejects_before_contacting_bugpin(client, monkeypatch):
+    http, upstream = client
+    monkeypatch.setattr(gateway, 'hourly_bytes', 512 * gateway.MIB)
+    assert submit(http, payload()).status_code == 429
+    assert not upstream

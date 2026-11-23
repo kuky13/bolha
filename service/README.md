@@ -22,13 +22,17 @@ Repita o mesmo ID de envio ao tentar novamente.
 
 ## Ativação pública
 
-Publique somente o endpoint `/v1/reports` em
-`https://relatos.kuky.solutions`, com TLS, limite de corpo de 21 MiB,
-timeout, limitação de requisições e sem registrar corpo, endereço IP ou
-cabeçalho de autorização no log de acesso. O proxy deve ser o único caminho
-para o gateway, e o gateway deve confiar apenas no endereço desse proxy para
-o cabeçalho de encaminhamento. O painel do BugPin permanece no loopback ou
-em acesso administrativo privado.
+O caminho público é `https://api.kuky.solutions/bolha/v1/reports`, encaminhado
+internamente para `/v1/reports`. O Caddy encaminha somente `POST` e `OPTIONS`,
+limita o corpo a 21 MiB e pula o log de acesso dessa rota. O navegador pode
+enviar a partir de `https://bolha.kuky.solutions`; os apps nativos enviam sem
+cabeçalho `Origin`. A chave do projeto permanece no gateway.
+
+Na VPS, use `compose.proxy.yml` junto de `compose.yml` para conectar o gateway
+à rede Docker externa `bolha-relatos-proxy` e configure
+`FORWARDED_ALLOW_IPS` com o endereço do Caddy nessa rede. O painel do BugPin
+permanece acessível apenas por loopback ou túnel administrativo. Para suspender
+o recebimento, desative somente a rota no Caddy e preserve o volume do BugPin.
 
 Mantenha o volume restrito ao BugPin e os backups cifrados com expiração
 máxima de 30 dias. Ao atender um pedido recebido pelo canal de suporte, confirme

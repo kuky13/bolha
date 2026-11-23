@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-REPORT_URL = 'https://relatos.kuky.solutions/v1/reports'
+REPORT_URL = 'https://api.kuky.solutions/bolha/v1/reports'
 SUPPORT_URL = 'https://bolha.kuky.solutions/suporte/'
 PRIVACY_URL = SUPPORT_URL + '#privacidade'
 MIB = 1024 * 1024

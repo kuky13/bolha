@@ -280,7 +280,7 @@ public final class ReportActivity extends Activity {
         }
         write(buf, "--" + boundary + "--\r\n");
         HttpURLConnection connection = (HttpURLConnection) new URL(
-            "https://relatos.kuky.solutions/v1/reports").openConnection();
+            "https://api.kuky.solutions/bolha/v1/reports").openConnection();
         try {
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(35000);

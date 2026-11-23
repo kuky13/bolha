@@ -1,0 +1,11 @@
+services:
+  reports:
+    networks:
+      default: {}
+      reports_proxy:
+        aliases: [bolha-reports]
+
+networks:
+  reports_proxy:
+    external: true
+    name: bolha-relatos-proxy

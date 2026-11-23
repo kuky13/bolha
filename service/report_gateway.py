@@ -11,13 +11,20 @@ import shutil
 import time
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 import httpx
 from starlette.datastructures import UploadFile
 
 from bolha.reports import ATTACHMENTS, MIB, RECEIPT_PATTERN, TOTAL_BYTES
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+SITE_ORIGIN = 'https://bolha.kuky.solutions'
+app.add_middleware(CORSMiddleware, allow_origins=[SITE_ORIGIN],
+                   allow_methods=['POST'], allow_headers=['Content-Type'],
+                   expose_headers=['Retry-After'])
 windows = OrderedDict()
+hourly = deque()
+hourly_bytes = 0
 active = asyncio.Semaphore(4)
 ID = re.compile(r'[a-zA-Z0-9_-]{8,64}')
 
@@ -57,21 +64,37 @@ def rate_limit(address):
     entries.append(now)
 
 
+def reserve_upload(size):
+    global hourly_bytes
+    now = time.monotonic()
+    while hourly and now - hourly[0][0] >= 3600:
+        hourly_bytes -= hourly.popleft()[1]
+    if len(hourly) >= 120 or hourly_bytes + size > 512 * MIB:
+        raise HTTPException(429, 'Limite de envios.', headers={'Retry-After': '600'})
+    hourly.append((now, size))
+    hourly_bytes += size
+
+
 @app.post('/v1/reports', status_code=201)
 async def submit(request: Request):
+    origin = request.headers.get('origin')
+    if origin is not None and origin != SITE_ORIGIN:
+        raise HTTPException(403, 'Origem não permitida.')
     rate_limit(request.client.host if request.client else 'local')
     if active.locked():
         raise HTTPException(503, 'Aguarde e tente novamente.')
     length = request.headers.get('content-length', '')
     if not length.isascii() or not length.isdecimal() or len(length) > 10:
         raise HTTPException(411, 'Tamanho obrigatório.')
-    if not 0 < int(length) <= TOTAL_BYTES + 128 * 1024:
+    size = int(length)
+    if not 0 < size <= TOTAL_BYTES + 128 * 1024:
         raise HTTPException(413, 'Envio grande demais.')
     key = os.environ.get('BUGPIN_PROJECT_KEY')
     target = os.environ.get('BUGPIN_URL', '').rstrip('/')
     storage = Path(os.environ.get('BUGPIN_STORAGE', '/bugpin-data'))
     if not key or not target or not storage.is_dir() or shutil.disk_usage(storage).free < 3072 * MIB:
         raise HTTPException(503, 'Serviço de relatos indisponível.')
+    reserve_upload(size)
     async with active:
         async with request.form(max_files=3, max_fields=1, max_part_size=64 * 1024) as form:
             try:
