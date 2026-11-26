@@ -4,7 +4,7 @@ A Bolha é uma mascote virtual de desktop, open source e feita pela comunidade.
 Ela passeia pela tela, reage a carinho e brinca com um brinquedo e um notebook.
 Seu cérebro e seu aprendizado funcionam localmente.
 
-**Windows x64 e Android.** [Baixar para Windows 0.5.9.2](https://github.com/kuky13/bolha/releases/download/v0.5.9.2/Bolha-Setup-0.5.9.2-x64.exe) ·
+**Windows x64 e Android.** [Baixar para Windows 0.5.9.5](https://github.com/kuky13/bolha/releases/download/v0.5.9.5/Bolha-Setup-0.5.9.5-x64.exe) ·
 [Baixar APK 0.5.9.0](https://github.com/kuky13/bolha/releases/download/v0.5.9.0/Bolha-0.5.9.0-Android.apk) (APK em alfa · ainda não totalmente testado) ·
 [Notas da versão](https://github.com/kuky13/bolha/releases/latest) · [Guia Android](android/README.md)
 
