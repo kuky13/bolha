@@ -1,4 +1,4 @@
-# Bolha 0.5.9.3
+# Bolha 0.5.9.5
 
 - A Central ganhou uma aba Sobre com créditos ao Pestinha, licenças e privacidade disponíveis no próprio aplicativo.
 - O botão de apoio abre o BotaPix da KukySolutions no navegador. A contribuição é voluntária.
@@ -11,7 +11,7 @@ A edição instalada do Windows procura atualizações automaticamente. Você ta
 
 ## Android
 
-APK em alfa · ainda não totalmente testado. O download Android público continua na versão 0.5.9.0 enquanto a candidata release passa pela validação de assinatura e migração. A atualização Windows desta página é a 0.5.9.3.
+APK em alfa · ainda não totalmente testado. O download Android público continua na versão 0.5.9.0 enquanto a candidata release passa pela validação de assinatura e migração. A atualização Windows desta página é a 0.5.9.5.
 
 ## Licenças
 
