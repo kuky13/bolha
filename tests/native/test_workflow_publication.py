@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Bolha is based on Pestinha by @mille-okws and contributors; see NOTICE.md.
 """Executa o passo PowerShell real com GitHub/CLI simulados: nunca publica nada."""
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -22,7 +23,6 @@ def publication_code():
 def harness(case):
     return r'''
 $case = '__CASE__' | ConvertFrom-Json
-$env:BOLHA_VERSION='0.3.0.0'
 $env:GITHUB_SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 $env:GITHUB_REPOSITORY='kuky13/bolha'
 $env:GITHUB_EVENT_NAME=$case.Event
@@ -63,7 +63,7 @@ if ($script:Created) {
 def cases():
     base=dict(Event='workflow_dispatch',RefType='branch',RefName='native/qt-0.3',Publish='true',
               CodeVersion='0.3.0.0',LocalSha=SHA,RemoteSha=SHA,ApiExit=0,CreateExit=0,Refs='[]',
-              MustFail=False,MustCreate=True,ReleaseTags='')
+              MustFail=False,MustCreate=True,ReleaseTags='',Tampered=False,Missing=False)
     edits=[{},dict(Refs='[{"ref":"refs/tags/v0.3.0.0-next"}]'),
            dict(Refs='[{"ref":"refs/tags/v0.3.0.0"}]',MustFail=True,MustCreate=False),
            dict(Publish='false',MustFail=True,MustCreate=False),
@@ -73,14 +73,20 @@ def cases():
            dict(Event='push',RefType='tag',RefName='v0.3.0.0'),
            dict(Event='push',RefType='tag',RefName='v0.3.0.0',RemoteSha='b'*40,MustFail=True,MustCreate=False),
            dict(ReleaseTags='v0.3.0.0',MustFail=True,MustCreate=False),
-           dict(CreateExit=1,MustFail=True)]
+           dict(CreateExit=1,MustFail=True),
+           dict(Tampered=True,MustFail=True,MustCreate=False),
+           dict(Missing=True,MustFail=True,MustCreate=False)]
     return [dict(base,**edit) for edit in edits]
 
 
 def test_workflow_publication_is_opt_in_and_requires_success_and_legacy_tests():
     source=WORKFLOW.read_text(encoding='utf-8')
     assert re.search(r'publish_release:\n(?:.*\n){0,4}?\s+default: false\n',source)
-    assert "if: success() && (github.ref_type == 'tag' || inputs.publish_release)" in source
+    build, publish = source.split('  publish:', 1)
+    assert 'contents: write' not in build and 'contents: write' in publish
+    assert 'needs: windows' in publish and 'always()' not in publish
+    assert "github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && inputs.publish_release)" in publish
+    assert 'bolha-windows-${{ github.sha }}' in build and 'bolha-windows-${{ github.sha }}' in publish
     assert source.count("if: github.ref_type == 'tag' || inputs.legacy_validation || inputs.publish_release")==4
     assert 'GH_TOKEN: ${{ github.token }}' in source
     assert '--target $env:GITHUB_SHA' in publication_code()
@@ -91,7 +97,23 @@ def test_workflow_publication_is_opt_in_and_requires_success_and_legacy_tests():
 def test_powershell_publication_guards(case,tmp_path):
     shell=shutil.which('pwsh') or (shutil.which('powershell.exe') if __import__('os').name=='nt' else None)
     if not shell:pytest.skip('O teste funcional do passo PowerShell roda no Windows CI.')
-    script=tmp_path/'publication-mock.ps1';script.write_text(harness(case),encoding='utf-8-sig')
-    result=subprocess.run([shell,'-NoProfile','-NonInteractive','-File',str(script)],capture_output=True,text=True,
+    release=tmp_path/'release'
+    release.mkdir()
+    names=('Bolha-Setup-0.3.0.0-x64.exe','latest.yml','THIRD-PARTY-NOTICES.txt',
+           'bolha-0.3.0.0-windows.cdx.json','BatteryHub-1.1.0-source.tar.gz',
+           'headsetcontrol-4.3.0.tar.gz')
+    checksums=[]
+    for name in names:
+        data=name.encode()
+        (release/name).write_bytes(data)
+        checksums.append(f'{hashlib.sha256(data).hexdigest()}  {name}')
+    if case['Tampered']:
+        (release/names[0]).write_bytes(b'arquivo alterado')
+    if case['Missing']:
+        checksums.pop()
+    (release/'SHA256SUMS.txt').write_text('\n'.join(checksums)+'\n', encoding='utf-8')
+    script=tmp_path/'publication-mock.ps1'
+    script.write_text(harness(case),encoding='utf-8-sig')
+    result=subprocess.run([shell,'-NoProfile','-NonInteractive','-File',str(script)],cwd=tmp_path,capture_output=True,text=True,
                           encoding='utf-8',errors='replace',timeout=30)
     assert result.returncode==0,result.stdout+'\n'+result.stderr

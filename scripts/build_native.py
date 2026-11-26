@@ -21,9 +21,11 @@ from scripts.package_batteryhub import prepare as prepare_batteryhub, verify as 
 
 def collect_licenses(target):
     target.mkdir(parents=True,exist_ok=True)
-    for name in ('LICENSE','NOTICE.md'):
+    for name in ('LICENSE', 'NOTICE.md', 'PRIVACY.md'):
         shutil.copy2(ROOT/name,target/name)
-    shutil.copytree(ROOT/'licenses',target,dirs_exist_ok=True)
+    for name in ('BOLHA-ASSETS.md','PYWINRT-MIT.txt'):
+        shutil.copy2(ROOT/'licenses'/name,target/name)
+    shutil.copytree(ROOT/'licenses'/'third-party',target/'third-party',dirs_exist_ok=True)
     for name in ('numpy','psutil','PyInstaller','PySide6-Essentials','shiboken6','pywin32','typing_extensions'):
         try: package=distribution(name)
         except Exception:
@@ -110,7 +112,7 @@ def build(version, output, makensis=None, reuse_bundle=None):
         subprocess.run(args,cwd=ROOT,check=True)
     verify_batteryhub(bundle/'_internal/third_party/batteryhub')
     prune_optional_qt(bundle)
-    subprocess.run([sys.executable,str(ROOT/'scripts/audit_native.py'),str(bundle),'--output-json',str(ROOT/'validation/package-audit.json')],check=True)
+    subprocess.run([sys.executable,str(ROOT/'scripts/audit_native.py'),str(bundle),'--strict','--output-json',str(ROOT/'validation/package-audit.json')],check=True)
     manifest={}
     for path in bundle.rglob('*'):
         if path.is_file() and path.name!='installed-files.json':
@@ -134,6 +136,12 @@ def build(version, output, makensis=None, reuse_bundle=None):
                     '/DOUTPUT='+str(output),'/DICON='+str(resource/'icons/icon.ico'),'/DFILELIST='+str(filelist),
                     str(ROOT/'packaging/bolha.nsi')],check=True,cwd=ROOT)
     shutil.copy2(ROOT/'packaging/THIRD-PARTY-NOTICES.txt',output/'THIRD-PARTY-NOTICES.txt')
+    if version == VERSION and not reuse_bundle:
+        from scripts.generate_sbom import generate as generate_sbom
+        generate_sbom(
+            target='windows', output_dir=output, windows_bundle=bundle,
+            windows_installer=output / f'Bolha-Setup-{version}-x64.exe',
+        )
     generate(output,version)
     print(bundle)
     return bundle

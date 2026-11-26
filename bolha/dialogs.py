@@ -12,10 +12,12 @@ reset_learning() True confirma a solicitação de backup/reinício, cuja conclus
 é assíncrona; falhas posteriores ficam no diagnóstico do controlador.
 """
 import math
+from pathlib import Path
+import sys
 import time
 
-from PySide6.QtCore import Qt, QTimer, QRectF, QPointF
-from PySide6.QtGui import QColor, QPainter, QPalette
+from PySide6.QtCore import Qt, QTimer, QRectF, QPointF, QUrl
+from PySide6.QtGui import QColor, QPainter, QPalette, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
@@ -24,6 +26,11 @@ from PySide6.QtWidgets import (
 )
 from . import VERSION
 from .preferences import DEFAULTS, OBJECT_SCALE_TYPES, ACTIVITY_SWITCHES
+
+SOURCE_URL = 'https://github.com/kuky13/bolha'
+UPSTREAM_URL = 'https://github.com/mille-okws/pestinha'
+SITE_URL = 'https://bolha.kuky.solutions'
+SUPPORT_URL = 'https://botapix.gg/kuky'
 
 
 def _label(text=''):
@@ -74,6 +81,7 @@ class SettingsDialog(QDialog):
         self._test_tab()
         self._privacy_tab()
         self._app_tab()
+        self._about_tab()
         self.status = _label()
         self.status.setMinimumHeight(32)
         self.status.setAccessibleName('Resultado das configurações')
@@ -201,8 +209,8 @@ class SettingsDialog(QDialog):
         self.pop_throw_limit = self._spin(5, 30, '', 'Arremessos fortes para estourar')
         pop_form.addRow('&Limite de arremessos fortes:', self.pop_throw_limit)
         layout.addLayout(pop_form)
-        self._check('onlineReactions', 'Buscar memes e GIFs online', layout,
-                    'Consulta ReactionGIFs e Nekos.best apenas com termos genéricos de humor; mídia fica só em memória.')
+        self._check('onlineReactions', 'Mostrar reações e memes locais', layout,
+                    'Exibe reações originais da Bolha geradas localmente em memória, sem consultas externas.')
         form = QFormLayout()
         self.interval = self._spin(1, 30, ' min', 'Intervalo mínimo entre travessuras')
         self.object_limit = self._spin(1, 5, '', 'Máximo de memes e bilhetes na tela')
@@ -267,7 +275,7 @@ class SettingsDialog(QDialog):
             ('senseWindows', 'Posição e tamanho das janelas', 'Usa a geometria para pousar e evitar telas cheias, sem capturar imagens.'),
         ):
             self._check(key, text, layout, description)
-        layout.addWidget(_label('Cada leitura pode ser desligada separadamente. Memes online usam só termos genéricos de humor; imagens ficam na memória RAM.'))
+        layout.addWidget(_label('Cada leitura pode ser desligada separadamente. As reações da Bolha são geradas localmente em memória RAM, sem consultas externas.'))
         layout.addStretch()
 
     def _app_tab(self):
@@ -305,6 +313,62 @@ class SettingsDialog(QDialog):
             self.windows_settings = WindowsSettings(self._details('Integrações do Windows', layout),
                                                      features, self._dirty)
         layout.addStretch()
+
+    def _open_external(self, url):
+        return bool(QDesktopServices.openUrl(QUrl(url)))
+
+    def _about_tab(self):
+        layout = self._tab('Sobre')
+        layout.addWidget(_label(f'Bolha {VERSION}'))
+        layout.addWidget(_label('Autoria: personagem Bolha, interface, artes próprias e reações locais por André Ribeiro Lima (KukySolutions).'))
+        layout.addWidget(_label('Origem: projeto comunitário baseado no Pestinha (mille-okws/pestinha), criado por @mille-okws e colaboradores.'))
+        layout.addWidget(_label('Licença: GNU GPL v3 ou posterior (GPL-3.0-or-later) para código, artes próprias e animações.'))
+        layout.addWidget(_label(
+            'Privacidade: preferências, cérebro e aprendizado ficam neste computador. '
+            'As reações da Bolha funcionam localmente e offline, sem leitura de tela, janelas ou texto digitado. '
+            'Leituras locais opcionais podem ser desligadas na aba Privacidade. '
+            'A edição instalada consulta atualizações apenas no GitHub.'
+        ))
+        layout.addWidget(_label(
+            'A Bolha é gratuita e de código aberto. Se quiser, você pode apoiar seu desenvolvimento.'
+        ))
+        layout.addWidget(_button('Ler créditos e licenças', self._read_legal_notices))
+        layout.addWidget(_button('Ler política de privacidade', lambda: self._read_legal_notices(privacy=True)))
+        links = QHBoxLayout()
+        links.addWidget(_button('Abrir código-fonte', lambda: self._open_external(SOURCE_URL)))
+        links.addWidget(_button('Abrir origem (Pestinha)', lambda: self._open_external(UPSTREAM_URL)))
+        layout.addLayout(links)
+        more_links = QHBoxLayout()
+        more_links.addWidget(_button('Abrir site da Bolha', lambda: self._open_external(SITE_URL)))
+        more_links.addWidget(_button('Apoiar (botapix.gg/kuky)', lambda: self._open_external(SUPPORT_URL)))
+        layout.addLayout(more_links)
+        layout.addStretch()
+
+    def _read_legal_notices(self, *, privacy=False):
+        root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
+        license_root = root / 'licenses' if getattr(sys, 'frozen', False) else root
+        third_party_root = root if getattr(sys, 'frozen', False) else root / 'packaging'
+        if privacy:
+            files = (license_root / 'PRIVACY.md',)
+        else:
+            files = (license_root / 'NOTICE.md', license_root / 'LICENSE',
+                     root / 'licenses' / 'BOLHA-ASSETS.md', third_party_root / 'THIRD-PARTY-NOTICES.txt')
+        texts = []
+        for path in files:
+            try:
+                texts.append(path.read_text(encoding='utf-8'))
+            except (OSError, UnicodeError):
+                texts.append(f'Não foi possível ler o arquivo local {path.name}.')
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Privacidade da Bolha' if privacy else 'Créditos e licenças da Bolha')
+        layout = QVBoxLayout(dialog)
+        reader = QPlainTextEdit('\n\n'.join(texts))
+        reader.setReadOnly(True)
+        layout.addWidget(reader)
+        close = _button('Fechar', dialog.accept)
+        layout.addWidget(close)
+        _fit(dialog, 680, 560)
+        dialog.exec()
 
     def _values(self):
         values = dict({key: control.isChecked() for key, control in self.checks.items()},
@@ -788,7 +852,7 @@ class NeuralDialog(QDialog):
                 factors = current.get('factors', {})
                 action_names = {'watch':'observar', 'explore':'explorar', 'attention':'pedir atenção',
                                 'rest':'descansar', 'play':'brincar', 'work':'trabalhar',
-                                'request_refused':'pedido recusado', 'attempt_online_reaction':'pedir uma reação online',
+                                'request_refused':'pedido recusado', 'attempt_online_reaction':'pedir uma reação local',
                                 'blink':'piscar', 'wink':'piscadinha', 'stretch':'espreguiçar',
                                 'sneeze':'espirrar', 'hiccup':'soluçar', 'doze':'cochilar', 'ear_wiggle':'sacudir orelhas',
                                 'roam_move':'movimento do passeio', 'roam_target':'destino do passeio',
@@ -853,7 +917,7 @@ class NeuralDialog(QDialog):
                 if not blocked and current.get('action') == 'request_refused':
                     blocked = 'A recusa ainda não tem um motivo registrado.'
                 if blocked:
-                    reasons = {'network_or_mischief_disabled':'Reações online ou travessuras estão desligadas.',
+                    reasons = {'network_or_mischief_disabled':'Reações locais ou travessuras estão desligadas.',
                                'hidden_or_panicked':'A Bolha está escondida ou em modo de emergência.',
                                'hidden_panicked_or_no_active_display':'A Bolha está escondida, em emergência ou sem uma tela disponível.',
                                'sleeping':'A Bolha está dormindo.',
@@ -910,7 +974,7 @@ class NeuralDialog(QDialog):
                 if 'state' in status:
                     rows = [value for value in status.values() if isinstance(value, dict)]
                     latest = rows[-1] if rows else {}
-                    labels = {'loading':'Carregando a reação…', 'network':'Aguardando a rede…',
+                    labels = {'loading':'Carregando a reação…', 'network':'Preparando a reação local…',
                               'no-results':'A busca não encontrou reações.', 'decode':'Não foi possível abrir a reação.',
                               'memory':'A reação não coube na memória disponível.', 'canceled':'Busca cancelada.',
                               'ready':'Reação pronta para exibição.'}

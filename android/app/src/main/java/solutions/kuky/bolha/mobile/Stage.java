@@ -4,12 +4,10 @@ package solutions.kuky.bolha.mobile;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.net.Uri;
 import android.os.Build;
 import android.text.Layout;
 import android.text.StaticLayout;
@@ -288,20 +286,20 @@ final class Stage extends View {
     }
 
     private void objectMenu(JSONObject item,String id) {
-        String source = item.optString("sourceUrl");
-        String[] choices = source.isEmpty() ? new String[]{"Dispensar"} : new String[]{"Informações e origem","Abrir origem","Dispensar"};
-        AlertDialog dialog = new AlertDialog.Builder(getContext()).setTitle(item.optString("kind").equals("meme") ? "Reação da Bolha" : "Objeto da Bolha").setItems(choices,(window,selected) -> {
+        String kind = item.optString("kind");
+        boolean isReaction = kind.equals("meme");
+        String[] choices = isReaction ? new String[]{"Informações e origem","Dispensar"} : new String[]{"Dispensar"};
+        AlertDialog dialog = new AlertDialog.Builder(getContext()).setTitle(isReaction ? "Reação da Bolha" : "Objeto da Bolha").setItems(choices,(window,selected) -> {
             if (selected == choices.length-1) {
-                String kind = item.optString("kind");
                 engine.action(kind.equals("notebook") ? "notebook" : kind.equals("corner") ? "corner" : "dismiss",id,0,0,0,0);
-            } else if (selected == 0) {
-                showDialog(new AlertDialog.Builder(getContext()).setTitle("Origem da reação").setMessage(item.optString("provider")+"\n"+item.optString("attribution")+"\n"+source).setPositiveButton("Fechar",null).create());
-            } else {
-                Uri uri = Uri.parse(source); String host = uri.getHost();
-                if ("https".equals(uri.getScheme()) && host != null && (host.equals("reactiongifs.com") || host.equals("www.reactiongifs.com") || host.equals("nekos.best") || host.equals("www.nekos.best"))) {
-                    try { getContext().startActivity(new Intent(Intent.ACTION_VIEW,uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
-                    catch (android.content.ActivityNotFoundException error) { android.util.Log.w("Bolha","Navegador indisponível",error); }
-                }
+            } else if (isReaction) {
+                String origin = item.optString("origin","local-procedural");
+                String author = item.optString("author","André Ribeiro Lima (KukySolutions)");
+                String license = item.optString("licenseSpdx","GPL-3.0-or-later");
+                String attribution = item.optString("attribution");
+                showDialog(new AlertDialog.Builder(getContext()).setTitle("Origem da reação")
+                    .setMessage("Origem: "+origin+"\nAutoria: "+author+"\nLicença: "+license+"\n"+attribution)
+                    .setPositiveButton("Fechar",null).create());
             }
         }).setNegativeButton("Cancelar",null).create();
         showDialog(dialog);

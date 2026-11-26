@@ -24,6 +24,10 @@ import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +40,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public final class CentralActivity extends Activity implements Engine.Listener {
-    private static final String[] SECTIONS={"Aparência","Comportamento","Cérebro","Atividades","Privacidade","App"};
+    private static final String SOURCE_URL="https://github.com/kuky13/bolha";
+    private static final String UPSTREAM_URL="https://github.com/mille-okws/pestinha";
+    private static final String SITE_URL="https://bolha.kuky.solutions";
+    private static final String SUPPORT_URL="https://botapix.gg/kuky";
+    private static final String ALPHA_NOTICE="APK em alfa · ainda não totalmente testado";
+    private static final String[] SECTIONS={"Aparência","Comportamento","Cérebro","Atividades","Privacidade","App","Sobre"};
     private final Map<String,Switch> toggles=new LinkedHashMap<>();
     private final Map<String,SeekBar> sliders=new LinkedHashMap<>();
     private final Map<String,TextView> values=new HashMap<>();
@@ -159,7 +168,8 @@ public final class CentralActivity extends Activity implements Engine.Listener {
             case 2: brain();break;
             case 3: activities();break;
             case 4: privacy();break;
-            default: application();break;
+            case 5: application();break;
+            default: about();break;
         }
         loading=false;
         loadPreferences();
@@ -304,7 +314,7 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         toggle("hapticsEnabled","Vibração","Pulsos leves acompanham carinho, impacto e irritação.");
         divider("Travessuras");
         toggle("mischiefEnabled","Memes, bilhetes e travessuras","");
-        toggle("onlineReactions","Buscar memes e GIFs online","A pesquisa usa o humor da Bolha. As imagens ficam apenas na memória enquanto aparecem.");
+        toggle("onlineReactions","Mostrar reações e memes locais","Exibe reações originais da Bolha geradas localmente em memória, sem uso de rede.");
         slider("mischiefInterval","Intervalo mínimo",1,30,5," min");
         slider("maxObjects","Máximo de memes e bilhetes",1,5,3,"");
         details("Brincadeiras",() -> {
@@ -358,9 +368,9 @@ public final class CentralActivity extends Activity implements Engine.Listener {
         actionRow("Notebook","notebook","Vem trabalhar comigo","work");
         actionRow("Comemorar","celebrate","Trazer uma travessura","mischief");
         actionRow("Cantinho do castigo","corner","Pedir sossego","quiet");
-        button("Pedir meme ou GIF",() -> {
+        button("Pedir reação local",() -> {
             if (!preferences.optBoolean("onlineReactions") || !preferences.optBoolean("mischiefEnabled")) {
-                status.setText("Ative as travessuras e os GIFs online em Comportamento.");
+                status.setText("Ative as travessuras e as reações locais em Comportamento.");
                 return;
             }
             action("reaction-now");finish();
@@ -446,9 +456,50 @@ public final class CentralActivity extends Activity implements Engine.Listener {
             .setNegativeButton("Cancelar",null)
             .setPositiveButton("Reiniciar",(dialog,which) -> { action("reset-memory");status.setText("Reinício solicitado. O diagnóstico mostrará o resultado."); })
             .show());
-        divider("Comunidade");
-        description("Código, artes e animações da Bolha sob GPLv3. Projeto baseado no Pestinha, de mille-okws e colaboradores.");
-        button("Código e créditos",() -> startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/kuky13/bolha"))));
+        button("Sobre, licenças e apoio",() -> showSection(6));
+    }
+
+    private void about() {
+        heading("Sobre");
+        description("Bolha "+BuildConfig.VERSION_NAME);
+        description(ALPHA_NOTICE);
+        description("Autoria: personagem Bolha, interface, artes próprias e reações locais por André Ribeiro Lima (KukySolutions).");
+        description("Origem: projeto comunitário baseado no Pestinha (mille-okws/pestinha), criado por @mille-okws e colaboradores.");
+        description("Licença: GNU GPL v3 ou posterior (GPL-3.0-or-later) para código, artes próprias e animações.");
+        description("Privacidade: preferências, cérebro e aprendizado ficam neste aparelho. As reações da Bolha são locais e offline, sem uso de rede nem leitura de tela ou texto digitado. Leituras opcionais ficam em Privacidade.");
+        button("Ler créditos e licenças",() -> showLegalNotices("Créditos e licenças",
+            "NOTICE.md","LICENSE","licenses/BOLHA-ASSETS.md","licenses/android/NOTICE.md"));
+        button("Ler política de privacidade",() -> showLegalNotices("Privacidade","PRIVACY.md"));
+        divider("Código, site e apoio");
+        description("A Bolha é gratuita e de código aberto. Se quiser apoiar o desenvolvimento de forma voluntária, acesse "+SUPPORT_URL+".");
+        button("Abrir código-fonte",() -> openUrl(SOURCE_URL));
+        button("Abrir origem (Pestinha)",() -> openUrl(UPSTREAM_URL));
+        button("Abrir site da Bolha",() -> openUrl(SITE_URL));
+        button("Apoiar (botapix.gg/kuky)",() -> openUrl(SUPPORT_URL));
+    }
+
+    private void showLegalNotices(String title,String... assets) {
+        StringBuilder text=new StringBuilder();
+        for (String name:assets) {
+            try (BufferedReader reader=new BufferedReader(new InputStreamReader(
+                    getAssets().open(name),StandardCharsets.UTF_8))) {
+                String line;
+                while ((line=reader.readLine())!=null) text.append(line).append('\n');
+            } catch (IOException error) {
+                text.append("Não foi possível ler o arquivo local ").append(name).append(".\n");
+            }
+            text.append('\n');
+        }
+        new AlertDialog.Builder(this).setTitle(title).setMessage(text)
+            .setPositiveButton("Fechar",null).show();
+    }
+
+    private void openUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));
+        } catch (android.content.ActivityNotFoundException error) {
+            status.setText("Nenhum navegador disponível neste aparelho.");
+        }
     }
 
     private Spinner spinner(String[] options) {

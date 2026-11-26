@@ -40,7 +40,8 @@ android {
         }
     }
     buildTypes {
-        debug {
+        release {
+            debuggable false
             if (projectKeystore) signingConfig signingConfigs.projectKey
         }
     }
@@ -68,7 +69,7 @@ chaquopy {
 def sharedAssets = tasks.register('sharedAssets', Sync) {
     into layout.buildDirectory.dir('generated/bolha-assets')
     from(new File(projectRoot, 'assets/bolha/content')) { into 'content' }
-    from(projectRoot) { include 'LICENSE', 'NOTICE.md' }
+    from(projectRoot) { include 'LICENSE', 'NOTICE.md', 'PRIVACY.md' }
     from(new File(projectRoot, 'licenses/BOLHA-ASSETS.md')) { into 'licenses' }
     from(new File(rootProject.projectDir, 'licenses')) { into 'licenses/android' }
 }

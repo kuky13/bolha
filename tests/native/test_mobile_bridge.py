@@ -17,8 +17,11 @@ def mobile(tmp_path):
     spec.loader.exec_module(module)
     module.start(str(tmp_path), str(ROOT/'assets/bolha/content'))
     module.resize(411., 700., 2.625)
-    yield module
-    module.fetcher.stop()
+    try:
+        yield module
+    finally:
+        module.control({"type": "stop-function-test"})
+        module.fetcher.stop()
 
 
 def test_size_preferences_survive_rotation_and_restart(mobile, tmp_path):
@@ -61,7 +64,8 @@ def test_real_function_test_preserves_mobile_memory_and_restores_game(mobile, tm
     assert json.loads(mobile.tick(.016))['functionTest'] is None
 
 
-def test_mobile_test_refuses_disabled_network_without_enabling_it(mobile):
+def test_mobile_test_preserves_disabled_reactions(mobile):
+    mobile.configure({"onlineReactions":False})
     original = mobile.game
     mobile.control({'type': 'test-function', 'key': 'gif'})
     assert mobile.game is original and mobile.function_test is None
@@ -131,13 +135,14 @@ def test_native_media_failure_removes_object_without_punishing_learning(mobile):
     assert 'exibir' in mobile.last_error
 
 
-def test_reaction_button_explains_network_setting_instead_of_failing_silently(mobile, monkeypatch):
+def test_reaction_button_explains_local_setting(mobile, monkeypatch):
     monkeypatch.setattr(mobile.fetcher,'submit',lambda *_:True)
+    mobile.configure({'onlineReactions':False})
     mobile.action('reaction-now')
-    assert 'GIFs online' in json.loads(mobile.tick(.016))['reactionStatus']
+    assert 'memes locais' in json.loads(mobile.tick(.016))['reactionStatus']
     mobile.configure({'onlineReactions':True})
     mobile.action('reaction-now')
-    assert json.loads(mobile.tick(.016))['reactionStatus'].startswith('Buscando')
+    assert json.loads(mobile.tick(.016))['reactionStatus'].startswith('Gerando uma reação local')
 
 
 def test_screen_off_cancels_held_pet_and_toy_without_throwing(mobile):

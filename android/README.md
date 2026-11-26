@@ -1,12 +1,16 @@
 # Bolha no Android
 
+**APK em alfa · ainda não totalmente testado**
+
 A interface Android usa o cérebro local, a física e o relógio de expressões da
 Bolha em Python via Chaquopy, com desenho nativo em Canvas. O projeto é baseado
 no [Pestinha, de mille-okws e colaboradores](https://github.com/mille-okws/pestinha).
 O app roda em Android 7.0 ou posterior em ARM64 e x86_64. Os APKs publicados
 usam uma chave de teste própria do projeto, preservada nas próximas versões
 para permitir a atualização com os dados do aplicativo. Essa chave identifica
-os pacotes do projeto e não envolve verificação comercial de identidade.
+os pacotes do projeto e não envolve verificação comercial de identidade. As
+candidatas de distribuição do workflow são builds release sem depuração.
+O APK de desenvolvimento usa uma chave local separada.
 
 ## Usar e configurar
 
@@ -29,7 +33,7 @@ em telas largas:
   e até 70 das conexões mais fortes que entram ou saem dele.
 - **Atividades:** carinho, sono, brinquedo, bicuda, lançamento para cima,
   pingue-pongue por toque, notebook, trabalho, comemoração, castigo, sossego e
-  pedido de reação online. Há uma prévia de expressões que usa as poses reais
+  pedido de reação local. Há uma prévia de expressões que usa as poses reais
   sem criar uma experiência de aprendizado.
 - **Privacidade:** controles independentes para posição do toque, inatividade
   nas interações com a Bolha e aplicativo ativo.

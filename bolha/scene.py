@@ -4,16 +4,15 @@
 import math
 import random
 import time
-from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent,QUrl
-from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath,QPainterPathStroker,QTransform,QDesktopServices
+from PySide6.QtCore import Qt,QRect,QRectF,QPointF,QEvent
+from PySide6.QtGui import QPainter,QColor,QPen,QFont,QRegion,QPainterPath,QPainterPathStroker,QTransform
 from PySide6.QtWidgets import QWidget,QMenu
 from .pet import FLAGS
 from .objects import paint_notebook,paint_ball,paint_peanut,peanut_shape,notebook_shape
 from .grab import MouseGrab
 from .speech import SpeechWindow, bubble_path, paint_bubble, measure_text_box, paint_box_text
 from .reactions import (
-    InMemoryMedia, MAX_TOTAL_MEDIA_BYTES, NEKOS_HOSTS,
-    OnlineReactionFetcher, REACTIONGIFS_HOSTS, validate_reaction_url,
+    InMemoryMedia, MAX_TOTAL_MEDIA_BYTES, OfflineReactionFetcher,
 )
 from pestinha.scene import minimum_object_dimensions, object_scale
 
@@ -206,14 +205,6 @@ class ObjectWindow(QWidget):
         self.cancel_interaction()
         self.release_reaction_media()
         super().closeEvent(event)
-    def _open_reaction_source(self):
-        url=getattr(self.item,'source_url',None)
-        if not url:return False
-        try:
-            safe=validate_reaction_url(url,REACTIONGIFS_HOSTS|NEKOS_HOSTS,upgrade_http=False)
-        except ValueError:
-            return False
-        return bool(QDesktopServices.openUrl(QUrl(safe)))
     def contextMenuEvent(self,event):
         self.cancel_interaction()
         menu=QMenu(self);action=menu.addAction('Guardar objeto')
@@ -224,17 +215,12 @@ class ObjectWindow(QWidget):
             smaller=scale_menu.addAction('Menor')
             larger=scale_menu.addAction('Maior')
             reset=scale_menu.addAction('Padrão')
-        open_source=None
-        if self.item.kind=='meme' and getattr(self.item,'source_url',None):
-            open_source=menu.addAction('Abrir origem')
-        info=None
         if self.item.kind=='meme' and self.reaction_media is not None:
             candidate=self.reaction_media.candidate
-            provider={'reactiongifs':'ReactionGIFs','nekos.best':'Nekos.best'}.get(candidate.provider,candidate.provider)
-            label=' · '.join(part for part in (provider,candidate.title) if part)
-            if label:
-                info=menu.addAction(label)
-                if hasattr(info,'setEnabled'):info.setEnabled(False)
+            menu.addSeparator()
+            for label in (candidate.title, f'Origem: {candidate.origin}',
+                          f'Autoria: {candidate.author}', f'Licença: {candidate.license_spdx}'):
+                menu.addAction(label).setEnabled(False)
         self._context_open=True
         try:chosen=menu.exec(event.globalPos())
         finally:self._context_open=False
@@ -244,8 +230,6 @@ class ObjectWindow(QWidget):
             elif self.item.kind in ('meme','note','sign'):
                 self.scene.game.interact(dict(type='dismiss',id=self.item.id))
             else:self.item.hide()
-        elif open_source is not None and chosen==open_source:
-            self._open_reaction_source()
         elif chosen is not None and chosen in (smaller,larger,reset):
             current=float(self.scene.game.prefs.get('objectScales',{}).get(scale_kind,1.))
             factor=1. if chosen==reset else max(.6,min(1.8,current+(-.1 if chosen==smaller else .1)))
@@ -294,7 +278,7 @@ class NativeScene:
     def __init__(self,game,reaction_fetcher=None,on_scale_change=None):
         self.game=game;self.windows={}
         self.speech=SpeechWindow(game)
-        self.fetcher=reaction_fetcher or OnlineReactionFetcher()
+        self.fetcher=reaction_fetcher or OfflineReactionFetcher()
         self.on_scale_change=on_scale_change
         self.reaction_status={}
         self._reaction_deadlines={}
@@ -348,7 +332,7 @@ class NativeScene:
         if item is None or item.kind!='meme' or not item.isVisible() or not self.game.visible():
             self._status(ident,'canceled','objeto indisponível ou cena pausada');return False
         if not self.game.prefs.get('mischiefEnabled',True) or not self.game.prefs.get('onlineReactions',True):
-            self._status(ident,'canceled','reações online desativadas');return False
+            self._status(ident,'canceled','reações locais desativadas');return False
         if window is None:
             window=ObjectWindow(self,item);self.windows[ident]=window
         window.reaction_requested=False
@@ -359,7 +343,7 @@ class NativeScene:
             self._abort_meme(ident,item)
             return False
         window.reaction_requested=True;self._reaction_deadlines[str(ident)]=time.monotonic()+30
-        self._status(ident,'loading','buscando GIF em memória');return True
+        self._status(ident,'loading','gerando reação local em memória');return True
     def poll_interactions(self):
         for window in list(self.windows.values()):window.poll_interaction()
     def cancel_interactions(self):
@@ -416,7 +400,7 @@ class NativeScene:
         for ident,deadline in list(self._reaction_deadlines.items()):
             if now>=deadline:
                 self.fetcher.cancel(ident);self._reaction_deadlines.pop(ident,None)
-                self._status(ident,'network','tempo máximo da busca excedido')
+                self._status(ident,'network','tempo máximo da reação excedido')
                 item=self.game.objects.get(ident)
                 if item is not None:self._abort_meme(ident,item)
         online=self.game.prefs.get('onlineReactions',True) and self.game.prefs.get('mischiefEnabled',True)

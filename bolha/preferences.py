@@ -6,6 +6,9 @@ import copy
 from pathlib import Path
 from .migration import atomic_json, prepare_data, read_json
 
+LOCAL_REACTION_PROVIDER = 'local'
+LEGACY_PROVIDER_KEYS = ('reactionProvider', 'reactionsProvider', 'reaction_provider', 'provider')
+
 OBJECT_SCALE_TYPES = ('toy','notebook','reaction','note','sign','corner','effects')
 ACTIVITY_SWITCHES = (
     ('Brincadeiras', 'chaseEnabled', 'Correr atrás do brinquedo'),
@@ -23,7 +26,8 @@ DEFAULTS = dict(avatarSize=136, opacity=1., roaming=True, position=None,
                 mouthEnabled=True, cursorPrankEnabled=False,
                 objectScales={key:1. for key in OBJECT_SCALE_TYPES},
                 toyAppearance='ball',
-                mischiefEnabled=True, onlineReactions=True, mischiefInterval=300, maxObjects=3,
+                mischiefEnabled=True, onlineReactions=True, reactionProvider=LOCAL_REACTION_PROVIDER,
+                mischiefInterval=300, maxObjects=3,
                 popEnabled=True, popThrowLimit=12,
                 senseApp=True,senseIdle=True,senseCursor=True,senseWindows=True,
                 adaptiveBehavior=True,learnRoutine=True,
@@ -46,12 +50,30 @@ def number(value):
     return type(value) in (int,float) and math.isfinite(value)
 
 
+def migrate_reaction_preferences(patch, result):
+    """Migra provedores legados (nekos.best, reactiongifs) para local preservando opt-out."""
+    if isinstance(patch, dict) and 'onlineReactions' not in patch and type(patch.get('reactionsEnabled')) is bool:
+        result['onlineReactions'] = patch['reactionsEnabled']
+    result['reactionProvider'] = LOCAL_REACTION_PROVIDER
+    return result
+
+
+def needs_reaction_migration(saved_preferences):
+    if not isinstance(saved_preferences, dict):
+        return False
+    if saved_preferences.get('reactionProvider') != LOCAL_REACTION_PROVIDER:
+        return True
+    return any(key != 'reactionProvider' and key in saved_preferences for key in LEGACY_PROVIDER_KEYS)
+
+
 def sanitize(patch, previous=None):
     result = copy.deepcopy(previous if previous is not None else DEFAULTS)
-    if not isinstance(patch,dict): return result
+    if not isinstance(patch,dict):
+        return migrate_reaction_preferences(None, result)
     if patch.get('toyAppearance') in ('peanut','ball'):result['toyAppearance']=patch['toyAppearance']
     for key in BOOLEAN_KEYS:
         if type(patch.get(key)) is bool: result[key]=patch[key]
+    migrate_reaction_preferences(patch, result)
     if isinstance(patch.get('objectScales'),dict):
         scales=dict(result.get('objectScales',{}))
         for key in OBJECT_SCALE_TYPES:
@@ -99,8 +121,11 @@ class PreferencesStore:
             for key in SENSOR_KEYS:self.preferences[key]=False
             return
         self.preferences=sanitize(saved.get('preferences'))
-        if saved and saved.get('schemaVersion')!=1:
-            self.save({})
+        if saved and (saved.get('schemaVersion')!=1 or needs_reaction_migration(saved.get('preferences'))):
+            try:
+                self.save({})
+            except OSError as error:
+                self.error = 'Não foi possível salvar a atualização das preferências. ' + str(error)
 
     def save(self,patch):
         next_preferences=sanitize(patch,self.preferences)

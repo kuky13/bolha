@@ -588,12 +588,33 @@ def smoke(apk, output, previous_apk=None):
             indent=2, ensure_ascii=False)+'\n', encoding='utf-8')
 
 
+def smoke_release_migration(apk, output, previous_apk):
+    """Check whether an installed public build upgrades and keeps its settings."""
+    migrate_previous(previous_apk, output)
+    adb('install', '-r', str(apk))
+    activity()
+    wait_for('atividade da candidata em primeiro plano', lambda: foreground_app(PACKAGE))
+    control('470 neurônios', scroll=False)
+    tap(control('Central da Bolha', exact=True, kind='Button', scroll=False))
+    section('Comportamento')
+    assert control('Vibração', exact=True, kind='Switch').get('checked') == 'false'
+    screenshot(output, 'migracao-candidata.png')
+    print('APK de distribuição atualizou o anterior e preservou a preferência de vibração.')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('apk', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--previous-apk', type=Path, default=os.environ.get('BOLHA_TEST_PREVIOUS_APK'),
                         help='Instala e migra um APK anterior antes do restante do teste; preserva os dados.')
+    parser.add_argument('--release-migration', action='store_true',
+                        help='Valida a migração da candidata sem ler seus dados privados.')
     args = parser.parse_args()
+    if args.release_migration and args.previous_apk is None:
+        parser.error('--release-migration exige --previous-apk')
     args.output.mkdir(parents=True, exist_ok=True)
-    smoke(args.apk, args.output, args.previous_apk)
+    if args.release_migration:
+        smoke_release_migration(args.apk, args.output, args.previous_apk)
+    else:
+        smoke(args.apk, args.output, args.previous_apk)

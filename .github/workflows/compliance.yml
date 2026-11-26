@@ -1,0 +1,63 @@
+name: Conformidade · licenças e SBOM
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bolha-compliance-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Validar REUSE.toml e textos de licença
+        run: |
+          python -m pip install --quiet reuse==5.0.2
+          reuse lint
+      - name: Auditar manifestos, avisos e fontes Windows (repositório e fixture)
+        run: |
+          python scripts/audit_native.py --verify-repo --output-json validation/native-repo-audit.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import tomllib
+          import zipfile
+
+          root = Path(os.environ['RUNNER_TEMP']) / 'bolha-bundle-fixture'
+          internal = root / '_internal'
+          (root / 'Bolha.exe').parent.mkdir(parents=True, exist_ok=True)
+          (root / 'Bolha.exe').write_bytes(b'MZfixture')
+          (internal / 'PySide6/plugins/imageformats').mkdir(parents=True, exist_ok=True)
+          (internal / 'PySide6/plugins/imageformats/qgif.dll').write_bytes(b'qgif')
+          (internal / 'PySide6/Qt6Svg.dll').write_bytes(b'qtsvg')
+          (internal / 'PySide6/opengl32sw.dll').write_bytes(b'mesa')
+          version = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']
+          (internal / 'bolha-version.json').write_text(json.dumps({'version': version}), encoding='utf-8')
+          shutil.copy2('packaging/THIRD-PARTY-NOTICES.txt', internal / 'THIRD-PARTY-NOTICES.txt')
+          shutil.copytree('licenses', internal / 'licenses', dirs_exist_ok=True)
+          shutil.copy2('LICENSE', internal / 'licenses/LICENSE')
+          shutil.copy2('NOTICE.md', internal / 'licenses/NOTICE.md')
+          shutil.copy2('PRIVACY.md', internal / 'licenses/PRIVACY.md')
+          (internal / 'licenses/PYTHON-LICENSE.txt').write_text('PSF-2.0 fixture', encoding='utf-8')
+          bh_dir = internal / 'third_party/batteryhub'
+          bh_dir.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile('third_party/batteryhub/BatteryHub-1.1.0-portable.zip') as zf:
+              for name in ('BatteryHub.exe', 'headsetcontrol.exe', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt'):
+                  (bh_dir / name).write_bytes(zf.read(name))
+          PY
+          python scripts/audit_native.py "$RUNNER_TEMP/bolha-bundle-fixture" --strict --output-json validation/native-bundle-audit.json
+      - name: Auditar procedência e licenças Android (repositório)
+        run: python android/tests/audit_apk.py --verify-repo --report validation/android-repo-audit.json
+      - name: Gerar e validar SBOM CycloneDX 1.5
+        run: python scripts/generate_sbom.py --check --output-dir validation/sbom

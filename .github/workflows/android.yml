@@ -1,6 +1,11 @@
 name: Android · compilar e validar
 on:
   workflow_dispatch:
+    inputs:
+      prepare_signed_candidate:
+        description: 'Gerar uma candidata assinada para revisão, sem publicar'
+        type: boolean
+        default: false
   push:
     branches: [fix/visual-dialogue-044]
     paths: [.github/workflows/android.yml, 'android/**', brain/game.py]
@@ -14,13 +19,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.13'
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '21'
@@ -35,19 +40,7 @@ jobs:
           if [[ ! -d "$ANDROID_HOME/platforms/android-35" || ! -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ]]; then
             sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
           fi
-      - name: Preparar chave Android do projeto
-        if: github.repository == 'kuky13/bolha'
-        env:
-          BOLHA_ANDROID_KEYSTORE_B64: ${{ secrets.BOLHA_ANDROID_KEYSTORE_B64 }}
-        run: |
-          set -euo pipefail
-          test -n "$BOLHA_ANDROID_KEYSTORE_B64"
-          umask 077
-          printf '%s' "$BOLHA_ANDROID_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/bolha.keystore"
-          echo "BOLHA_ANDROID_KEYSTORE=$RUNNER_TEMP/bolha.keystore" >> "$GITHUB_ENV"
-      - name: Compilar, testar gestos e vibração e verificar APK
-        env:
-          BOLHA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.BOLHA_ANDROID_KEYSTORE_PASSWORD }}
+      - name: Compilar APK de teste e verificar gestos, vibração e empacotamento
         run: |
           set -euo pipefail
           javac -d "$RUNNER_TEMP/haptics" android/app/src/main/java/solutions/kuky/bolha/mobile/HapticCadence.java android/tests/HapticCadenceTest.java
@@ -55,44 +48,59 @@ jobs:
           javac -d "$RUNNER_TEMP/motion" android/app/src/main/java/solutions/kuky/bolha/mobile/DragMotion.java android/app/src/main/java/solutions/kuky/bolha/mobile/ShakeMotion.java android/tests/MotionInputTest.java
           java -cp "$RUNNER_TEMP/motion" solutions.kuky.bolha.mobile.MotionInputTest
           gradle -p android :app:assembleDebug --console=plain --no-daemon
-          apk=android/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/bolha-cert.txt"
-          if [[ "$GITHUB_REPOSITORY" == 'kuky13/bolha' ]]; then
-            grep -q '10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-cert.txt"
+          python android/tests/audit_apk.py android/app/build/outputs/apk/debug/app-debug.apk --report validation/android/audit-apk.json
+      - name: Compilar APK de distribuição assinado
+        if: github.repository == 'kuky13/bolha' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.prepare_signed_candidate
+        env:
+          BOLHA_ANDROID_KEYSTORE_B64: ${{ secrets.BOLHA_ANDROID_KEYSTORE_B64 }}
+          BOLHA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.BOLHA_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$BOLHA_ANDROID_KEYSTORE_B64"
+          test -n "$BOLHA_ANDROID_KEYSTORE_PASSWORD"
+          umask 077
+          export BOLHA_ANDROID_KEYSTORE="$(mktemp "$RUNNER_TEMP/bolha-keystore.XXXXXXXX")"
+          trap 'rm -f "$BOLHA_ANDROID_KEYSTORE"' EXIT
+          printf '%s' "$BOLHA_ANDROID_KEYSTORE_B64" | base64 --decode > "$BOLHA_ANDROID_KEYSTORE"
+          unset BOLHA_ANDROID_KEYSTORE_B64
+          gradle -p android :app:assembleRelease --console=plain --no-daemon
+      - name: Verificar assinatura, versão, licenças e configuração do APK candidato
+        if: github.repository == 'kuky13/bolha' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.prepare_signed_candidate
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          [[ "$version" =~ ^[0-9]+(\.[0-9]+){3}$ ]]
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          "$tools/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/bolha-cert.txt"
+          grep -Fxq 'Signer #1 certificate SHA-256 digest: 10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-cert.txt"
+          "$tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/bolha-badging.txt"
+          grep -q "^package: name='solutions.kuky.bolha.mobile'" "$RUNNER_TEMP/bolha-badging.txt"
+          grep -Fq "versionName='$version'" "$RUNNER_TEMP/bolha-badging.txt"
+          grep -q "^native-code: .*'arm64-v8a'.*'x86_64'" "$RUNNER_TEMP/bolha-badging.txt"
+          if grep -q '^application-debuggable' "$RUNNER_TEMP/bolha-badging.txt"; then
+            echo '::error::O APK de distribuição é depurável.'
+            exit 1
           fi
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/bolha-apk.txt"
-          grep -q "package: name='solutions.kuky.bolha.mobile'" "$RUNNER_TEMP/bolha-apk.txt"
-          grep -q "^native-code: .*'arm64-v8a'.*'x86_64'" "$RUNNER_TEMP/bolha-apk.txt"
-          python android/tests/audit_apk.py "$apk" --report validation/android/audit-apk.json
-      - name: Verificar APK anterior para migração sem apagar dados
-        if: github.repository == 'kuky13/bolha'
+          installed_code=$(sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p" "$RUNNER_TEMP/bolha-badging.txt")
+          test "$installed_code" -gt 5009000
+          mkdir -p validation/android-candidate
+          candidate="Bolha-${version}-Android.apk"
+          cp "$apk" "validation/android-candidate/$candidate"
+          python android/tests/audit_apk.py "$apk" --report validation/android-candidate/audit-apk.json
+          python scripts/generate_sbom.py --target android --android-apk "$apk" --output-dir validation/android-candidate
+          (cd validation/android-candidate && sha256sum "$candidate" > ANDROID-SHA256SUMS.txt)
+      - name: Obter o APK público anterior para testar a migração
+        if: github.repository == 'kuky13/bolha' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.prepare_signed_candidate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           previous="$RUNNER_TEMP/bolha-previous-android"
           mkdir -p "$previous"
-          gh release download v0.5.6 --repo kuky13/bolha --pattern Bolha-0.5.6-Android.apk --pattern ANDROID-SHA256SUMS.txt --dir "$previous"
-          (cd "$previous" && awk '$2 == "Bolha-0.5.6-Android.apk"' ANDROID-SHA256SUMS.txt > previous-apk.sha256 && test -s previous-apk.sha256 && sha256sum --check previous-apk.sha256)
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous/Bolha-0.5.6-Android.apk" > "$RUNNER_TEMP/bolha-previous-cert.txt"
-          grep -q '10ee7539af414f9aa88d1c015717181b65bd92c918c723bc653c75d660a67b22' "$RUNNER_TEMP/bolha-previous-cert.txt"
-          echo "BOLHA_TEST_PREVIOUS_APK=$previous/Bolha-0.5.6-Android.apk" >> "$GITHUB_ENV"
-      - name: Guardar o APK candidato e seu checksum para diagnóstico
-        run: |
-          set -euo pipefail
-          mkdir -p validation/android
-          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          if ! [[ "$version" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
-            echo 'Use MAJOR.MINOR.PATCH.REVISION no APK.' >&2
-            exit 1
-          fi
-          grep -Fq "versionName='$version'" "$RUNNER_TEMP/bolha-apk.txt"
-          installed_code=$(sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p" "$RUNNER_TEMP/bolha-apk.txt")
-          test "$installed_code" -gt 5006
-          apk="Bolha-${version}-Android.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "validation/android/$apk"
-          (cd validation/android && sha256sum "$apk" > ANDROID-SHA256SUMS.txt)
+          gh release download v0.5.9.0 --repo kuky13/bolha --pattern Bolha-0.5.9.0-Android.apk --dir "$previous"
+          (cd "$previous" && echo 'adf270cdda8e847579d11f6dd0e7eb60470737be800b0d2e252ec79e4cb4a2ba  Bolha-0.5.9.0-Android.apk' | sha256sum --check)
+          echo "BOLHA_CANDIDATE_PREVIOUS_APK=$previous/Bolha-0.5.9.0-Android.apk" >> "$GITHUB_ENV"
       - name: Habilitar aceleração do emulador descartável
         run: |
           if [[ ! -c /dev/kvm ]]; then
@@ -117,10 +125,22 @@ jobs:
           emulator-boot-timeout: 480
           disable-linux-hw-accel: auto
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: python android/tests/smoke.py android/app/build/outputs/apk/debug/app-debug.apk validation/android
-      - uses: actions/upload-artifact@v4
+          script: |
+            set -euo pipefail
+            python android/tests/smoke.py android/app/build/outputs/apk/debug/app-debug.apk validation/android
+            if [[ -n "${BOLHA_CANDIDATE_PREVIOUS_APK:-}" ]]; then
+              adb uninstall solutions.kuky.bolha.mobile
+              python android/tests/smoke.py android/app/build/outputs/apk/release/app-release.apk validation/android-candidate --release-migration --previous-apk "$BOLHA_CANDIDATE_PREVIOUS_APK"
+            fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: bolha-android-${{ github.sha }}
           retention-days: 7
           path: validation/android/
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.repository == 'kuky13/bolha' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.prepare_signed_candidate
+        with:
+          name: bolha-android-candidate-${{ github.sha }}
+          retention-days: 7
+          path: validation/android-candidate/

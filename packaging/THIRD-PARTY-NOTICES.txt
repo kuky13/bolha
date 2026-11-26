@@ -1,39 +1,90 @@
-Bolha 0.4.4 — componentes redistribuídos
+Bolha — componentes redistribuídos
+(Consulte _internal/bolha-version.json para a versão exata do pacote instalado.)
 
 Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-or-later.
 Pestinha: mille-okws e contribuidores, GPL-3.0-or-later.
 Código fonte e instruções: https://github.com/kuky13/bolha
-Artes, animações e conteúdo Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-or-later; consulte BOLHA-ASSETS.md.
+Base original (Pestinha): https://github.com/mille-okws/pestinha
+Artes, animações e conteúdo Bolha: André Ribeiro Lima (KukySolutions), GPL-3.0-or-later; consulte _internal/licenses/BOLHA-ASSETS.md.
 
-Qt 6.11.3 / PySide6 / Shiboken6: The Qt Company Ltd. e contribuidores.
-Este programa GPLv3 utiliza a opção GPLv3 dos componentes Qt/PySide6.
+PySide6 / Qt6 6.11.3 (PySide6-Essentials, Shiboken6, QtBase):
+The Qt Company Ltd. e contribuidores.
+Licença: LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only.
+Este programa GPL-3.0-or-later utiliza a opção GPLv3 dos componentes Qt6/PySide6.
 Bibliotecas compartilhadas Qt permanecem separadas e podem ser substituídas.
-Fontes correspondentes: https://code.qt.io/cgit/qt/qtbase.git/tag/?h=v6.11.3
-https://code.qt.io/cgit/pyside/pyside-setup.git/tag/?h=v6.11.3
+Fontes correspondentes:
+  QtBase 6.11.3: https://code.qt.io/cgit/qt/qtbase.git/tag/?h=v6.11.3
+  PySide6 / Shiboken6 6.11.3: https://code.qt.io/cgit/pyside/pyside-setup.git/tag/?h=v6.11.3
 Documentação de licenças: https://doc.qt.io/qt-6/licensing.html
-Texto GPLv3 incluído em licenses/LICENSE. Os textos de licença e avisos de
-terceiros do QtBase 6.11.3 acompanham licenses/third-party/QtBase-6.11.3.
-São os originais oficiais dos componentes Core/Gui/Widgets/OpenGL; alguns
-componentes opcionais listados podem não estar presentes nesta distribuição. As demais licenças e avisos coletados
-dos pacotes de distribuição ficam em licenses/third-party/.
+Texto GPLv3 incluído em _internal/licenses/LICENSE.
+Os textos de licença e avisos de terceiros do QtBase 6.11.3 acompanham
+_internal/licenses/third-party/QtBase-6.11.3. São os originais oficiais dos
+componentes Core/Gui/Widgets/OpenGL; alguns componentes opcionais listados
+podem não estar presentes nesta distribuição. As demais licenças e avisos
+coletados dos pacotes de distribuição ficam em _internal/licenses/third-party/.
 
-CPython 3.11: Python Software Foundation, licença PSF e avisos associados.
-NumPy: NumPy Developers, BSD e licenças dos componentes incluídos (OpenBLAS etc.).
-psutil: Giampaolo Rodola e contribuidores, BSD-3-Clause.
-pywin32: Mark Hammond e contribuidores, PSF-2.0.
-PyInstaller: PyInstaller Development Team, GPLv2+ com exceção de bootloader
-que permite distribuir programas segundo suas próprias licenças.
-NSIS: contribuidores do NSIS, zlib/libpng e avisos dos componentes do instalador.
+QtSvg 6.11.3 (PySide6/Qt6Svg.dll):
+The Qt Company Ltd. e contribuidores, opção GPL-3.0-only (dual LGPL-3.0-only / GPL-2.0-only / GPL-3.0-only).
+Incluído em suporte aos plugins SVG do runtime PySide6.
+Fonte correspondente: https://code.qt.io/cgit/qt/qtsvg.git/tag/?h=v6.11.3
 
-Windows integrations
-Multi-Monitor-Mouse-Finder by inspiringsource (MIT): visual and multi-monitor reference,
-no source code bundled. https://github.com/inspiringsource/Multi-Monitor-Mouse-Finder
-BatteryHub 1.1.0 by krisgfx9 and contributors (GPL-3.0), invoked locally with --json.
-https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/releases/tag/v1.1.0
-HeadsetControl 4.3.0 by Sapd and contributors (GPL-3.0), distributed with BatteryHub.
-https://github.com/Sapd/HeadsetControl/releases/tag/4.3.0
-The original license and notices are in _internal/third_party/batteryhub.
-Corresponding sources accompany the Windows release as BatteryHub-1.1.0-source.tar.gz
-and headsetcontrol-4.3.0.tar.gz.
-Python/WinRT 3.2.1 (MIT): https://github.com/pywinrt/pywinrt/tree/v3.2.1
-See _internal/licenses/PYWINRT-MIT.txt for the notice.
+Plugins Qt 6.11.3 (PySide6/plugins/):
+Inclui plugins de plataforma (platforms/qwindows.dll), estilo
+(styles/qmodernwindowsstyle.dll), formatos de imagem (imageformats/qgif.dll,
+qico.dll, qjpeg.dll, qsvg.dll, qwebp.dll) e ícones (iconengines/qsvgicon.dll),
+oriundos de QtBase, QtSvg e QtImageFormats v6.11.3 sob opção GPL-3.0-only.
+O plugin qtuiotouchplugin.dll e Qt6Network.dll são removidos no empacotamento.
+Fontes correspondentes:
+  https://code.qt.io/cgit/qt/qtbase.git/tag/?h=v6.11.3
+  https://code.qt.io/cgit/qt/qtsvg.git/tag/?h=v6.11.3
+  https://code.qt.io/cgit/qt/qtimageformats.git/tag/?h=v6.11.3
+
+OpenSSL 3.0.13 (Windows: libssl-3.dll, libcrypto-3.dll):
+The OpenSSL Project Authors, licença Apache-2.0.
+Distribuído junto ao runtime CPython 3.11 para Windows (OpenSSL 3.0.13; no Android é usado OpenSSL 3.5.9).
+Origem / fonte correspondente:
+  https://github.com/openssl/openssl/tree/openssl-3.0.13
+  https://github.com/python/cpython (dependências Windows)
+
+Mesa / LLVM (PySide6/opengl32sw.dll):
+Rasterizador OpenGL por software Mesa (llvmpipe) compilado com LLVM, incluído
+pelas wheels Windows do PySide6/Qt6 para fallback de renderização sem aceleração.
+O binário publicado 0.5.9.2 contém referências a Mesa 11.2.2 e LLVM 3.6.2.
+Mesa tem componentes sob licenças permissivas, incluindo MIT. LLVM 3.6.2 é
+distribuído sob University of Illinois/NCSA, com avisos de terceiros. Ainda
+falta confirmar a composição completa e as opções do build Qt em uso.
+Origem / fontes correspondentes:
+  Builds Qt llvmpipe: https://download.qt.io/development_releases/prebuilt/llvmpipe/windows/
+  Mesa: https://gitlab.freedesktop.org/mesa/mesa
+  LLVM 3.6.2: https://releases.llvm.org/3.6.2/LICENSE.TXT
+
+CPython 3.11: Python Software Foundation, licença PSF-2.0 e avisos associados (_internal/licenses/PYTHON-LICENSE.txt).
+  Fonte correspondente: https://github.com/python/cpython
+NumPy 2.4.6: NumPy Developers, BSD-3-Clause e licenças dos componentes incluídos (OpenBLAS etc.).
+  Fonte correspondente: https://github.com/numpy/numpy
+psutil 7.2.2: Giampaolo Rodola e contribuidores, BSD-3-Clause.
+  Fonte correspondente: https://github.com/giampaolo/psutil
+pywin32 311: Mark Hammond e contribuidores; o pacote usa licenças por módulo.
+  O módulo win32 é BSD-3-Clause. Ver os avisos originais incluídos no pacote.
+  Fonte e textos: https://github.com/mhammond/pywin32/tree/b311
+PyInstaller 6.22.3: PyInstaller Development Team, GPL-2.0-or-later com exceção de bootloader
+  que permite distribuir programas segundo suas próprias licenças.
+  Fonte correspondente: https://github.com/pyinstaller/pyinstaller
+NSIS 3.11: contribuidores do NSIS, Zlib / bzip2-1.0.6 e avisos dos componentes do instalador.
+  Fonte correspondente: https://nsis.sourceforge.io/
+
+Integrações do Windows / Windows integrations:
+- Multi-Monitor-Mouse-Finder by inspiringsource (MIT): visual and multi-monitor reference,
+  no source code bundled. https://github.com/inspiringsource/Multi-Monitor-Mouse-Finder
+- BatteryHub 1.1.0 by krisgfx9 and contributors (GPL-3.0-only), invoked locally with --json.
+  https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/releases/tag/v1.1.0
+- headsetcontrol 4.3.0 (HeadsetControl) by Sapd and contributors (GPL-3.0-only), distributed with BatteryHub.
+  https://github.com/Sapd/HeadsetControl/releases/tag/4.3.0
+  The original license and notices are in _internal/third_party/batteryhub.
+  Corresponding sources accompany the Windows release as BatteryHub-1.1.0-source.tar.gz
+  and headsetcontrol-4.3.0.tar.gz (mirrored in third_party/batteryhub/).
+- PyWinRT (Python/WinRT) 3.2.1 (MIT): winrt-runtime, winrt-Windows.Foundation,
+  winrt-Windows.Foundation.Collections, winrt-Windows.Storage.Streams,
+  winrt-Windows.Media.Control.
+  https://github.com/pywinrt/pywinrt/tree/v3.2.1
+  See _internal/licenses/PYWINRT-MIT.txt for the notice.

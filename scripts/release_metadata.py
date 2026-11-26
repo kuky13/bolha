@@ -29,6 +29,7 @@ def generate(directory, version):
     notice = directory/'THIRD-PARTY-NOTICES.txt'
     if notice.exists(): files.append(notice)
     files.extend(sorted(directory.glob('*.tar.gz')))
+    files.extend(sorted(directory.glob(f'bolha-{version}-windows.cdx.json')))
     lines = []
     for path in files:
         with path.open('rb') as source: digest=hashlib.file_digest(source,'sha256').hexdigest()

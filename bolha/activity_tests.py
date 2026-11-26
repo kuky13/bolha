@@ -34,7 +34,7 @@ ACTIVITY_TESTS = (
     ActivityTest('fireworks', 'Comemoração e fogos', ('O cérebro recebeu um pedido para comemorar.', 'Observe os fogos terminando sem novos disparos em sequência.'), ('fireworksEnabled',)),
     ActivityTest('speech', 'Falas e pensamentos', ('Faça carinho para provocar uma fala; confira se todo o texto cabe no balão.', 'Leve a Bolha para um canto e repita a interação.'), ('speechEnabled',)),
     ActivityTest('note', 'Bilhete com prazo', ('Veja o bilhete próximo da Bolha, sem cortar o texto.', 'Espere alguns segundos: o bilhete deve desaparecer sozinho.'), ('mischiefEnabled', 'notesEnabled')),
-    ActivityTest('gif', 'Meme ou GIF online', ('A consulta usa somente o humor. Aguarde a resposta da rede.', 'Veja o GIF sumir; clique com o botão direito para consultar sua origem.'), ('mischiefEnabled', 'onlineReactions')),
+    ActivityTest('gif', 'Reação local (GIF)', ('A reação é gerada localmente no aparelho, sem uso de rede.', 'Veja a reação sumir; clique com o botão direito para ver os detalhes locais.'), ('mischiefEnabled', 'onlineReactions')),
     ActivityTest('pop', 'Estouro e volta pelo canto', ('A cópia atingiu o limite de arremessos. Observe o estouro.', 'Espere 30 segundos para ver a volta tímida pelo canto.', 'Faça carinho para ajudar a Bolha a se soltar.'), ('popEnabled',)),
     ActivityTest('cursor', 'Mastigar e devolver o ponteiro', ('Deixe o mouse próximo da Bolha. O cérebro recebeu um estímulo de irritação.', 'Quando o ponteiro for pego, confira as duas mastigadas e a devolução. Mover ou clicar deve devolver imediatamente.'), ('cursorPrankEnabled', 'adaptiveBehavior'), ('senseCursor',)),
 )
@@ -101,7 +101,7 @@ class ActivityTestSession:
             return 'Mostre a Bolha e saia da pausa de emergência para testar.'
         from .preferences import ACTIVITY_SWITCHES
         names = {key: title for _, key, title in ACTIVITY_SWITCHES}
-        names.update(mischiefEnabled='Memes e bilhetes', onlineReactions='GIFs online',
+        names.update(mischiefEnabled='Memes e bilhetes', onlineReactions='Reações locais',
                      cursorPrankEnabled='Brincar de comer o ponteiro', adaptiveBehavior='Aprendizado adaptativo',
                      popEnabled='Estouro', roaming='Passear pela tela')
         for preference in test.preferences:

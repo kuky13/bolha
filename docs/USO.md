@@ -69,11 +69,9 @@ janelas podem ser desligadas separadamente. A Bolha não captura a tela, lê
 títulos ou conteúdo de janelas, texto digitado, chats ou arquivos, nem envia
 memória a servidores. O cérebro e a interface rodam no mesmo processo local.
 
-A rede é usada para consultar e baixar atualizações do GitHub e, se habilitadas
-nas configurações, buscar memes/GIFs públicos no ReactionGIFs ou Nekos.best. Essa
-busca envia apenas palavras-chave genéricas de humor em inglês. A mídia fica em
-RAM durante a exibição e não é gravada em disco. As reações online podem ser
-desligadas na Central.
+As reações são GIFs originais, gerados e exibidos em memória. A Central permite
+desligá-las. Clique com o botão direito sobre o GIF para consultar os créditos
+e a licença. As atualizações usam o GitHub nas edições instaladas.
 
 Na edição instalada, o atualizador verifica tamanho e SHA-256 do arquivo
 baixado, salva o aprendizado antes da troca e só limpa arquivos temporários

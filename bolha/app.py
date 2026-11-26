@@ -235,7 +235,7 @@ class NativeApp:
         before=set(self.game.objects)
         self.interact('reaction-now')
         if not (set(self.game.objects)-before):
-            if not self.store.preferences.get('onlineReactions',True):reason='Ative as reações online nas configurações.'
+            if not self.store.preferences.get('onlineReactions',True):reason='Ative as reações locais nas configurações.'
             elif not self.store.preferences.get('mischiefEnabled',True):reason='Ative as travessuras nas configurações.'
             elif not self.game.visible():reason='Mostre a Bolha e saia do modo de emergência para tentar.'
             elif self.game.body.held:reason='Solte a Bolha antes de pedir uma reação.'
@@ -510,7 +510,7 @@ class NativeApp:
                     frameCount=len(self.frame_times),thinkCount=len(self.think_times),uptimeSeconds=round(time.monotonic()-self.started,2),errors=list(self.errors))
     def diagnostics_text(self):
         metrics=self.metrics()
-        return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Reações online: '+json.dumps(self.reaction_status(),ensure_ascii=False),'Avisos: '+'; '.join(self.errors),'Log local (trecho):',local_log_excerpt(self.data_dir)))
+        return '\n'.join((f'Bolha {VERSION}',f'{sys.platform} {os.name} · Python {sys.version.split()[0]} · Qt nativo',f'Neurônios: {self.game.brain.N}',f"RSS total do aplicativo: {metrics['appRssMiB']:.1f} MiB",f'Arrays principais do cérebro: {self.game.brain_array_mib:.2f} MiB (não é RSS isolado)',f"Intervalo de quadros p95: {metrics['frameP95Ms']} ms",f"Ciclo do cérebro p95: {metrics['thinkP95Ms']} ms",'Leituras: '+json.dumps({k:v for k,v in self.store.preferences.items() if k.startswith('sense')}),'Reações: '+json.dumps(self.reaction_status(),ensure_ascii=False),'Avisos: '+'; '.join(self.errors),'Log local (trecho):',local_log_excerpt(self.data_dir)))
     def quit(self):
         if self.quitting:return
         self.stop_activity_test()

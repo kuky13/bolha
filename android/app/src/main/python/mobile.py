@@ -16,8 +16,8 @@ from bolha.dialogue import Dialogue, speech_duration
 from bolha.desk import typing_frame
 from bolha.migration import atomic_json, read_json
 from bolha.motion import ExpressionMotion, animation_pose, QUIRK_SECONDS
-from bolha.preferences import defaults, sanitize, number
-from bolha.reactions import OnlineReactionFetcher, MAX_TOTAL_MEDIA_BYTES, validate_media_signature
+from bolha.preferences import defaults, sanitize, number, needs_reaction_migration
+from bolha.reactions import OfflineReactionFetcher, MAX_TOTAL_MEDIA_BYTES, validate_media_signature
 
 EXPRESSION_NAMES = [
     'observando', 'feliz', 'curioso', 'triste', 'bravo', 'entediado', 'held',
@@ -71,25 +71,32 @@ def start(data, content):
         return
     settings_path = Path(data) / 'config.json'
     initial = dict(defaults(), avatarSize=120, senseApp=False, senseWindows=False,
-                   senseIdle=True, onlineReactions=False)
+                   senseIdle=True)
+    saved = {}
     try:
         saved = read_json(settings_path)
         if not isinstance(saved, dict) or not isinstance(saved.get('preferences'), dict):
             raise ValueError('Estrutura de preferências inválida.')
-        initial.update(saved['preferences'])
     except FileNotFoundError:
         pass
     except (ValueError, UnicodeError) as error:
         backup = settings_path.with_name('config-corrompida-' + str(time.time_ns()) + '.json')
         shutil.copy2(settings_path, backup)
+        saved = {}
         last_error = 'Preferências ilegíveis preservadas em backup. ' + str(error)
         initial.update(senseApp=False, senseIdle=False, senseCursor=False, shakeEnabled=False)
-    preferences = _mobile_preferences(initial)
+    saved_prefs = saved.get('preferences', {})
+    preferences = _mobile_preferences(saved_prefs, _mobile_preferences(initial))
+    if saved and (saved.get('schemaVersion') != 1 or needs_reaction_migration(saved_prefs)):
+        try:
+            atomic_json(settings_path, dict(schemaVersion=1, preferences=preferences))
+        except OSError as error:
+            last_error = 'Não foi possível salvar a atualização das preferências. ' + str(error)
     game = Game(data, content)
     game.configure(preferences)
     motion_clock = ExpressionMotion(time.monotonic())
     dialogue = Dialogue()
-    fetcher = OnlineReactionFetcher()
+    fetcher = OfflineReactionFetcher()
 
 
 def configure(value):
@@ -157,8 +164,8 @@ def action(kind, target='', x=0., y=0., vx=0., vy=0.):
         event.update(type='play', trick=kind)
     accepted = game.interact(event)
     if kind == 'reaction-now':
-        reaction_status = ('Buscando uma reação…' if accepted else
-            'Ative “Buscar memes e GIFs online” em Comportamento.' if not preferences['onlineReactions'] else
+        reaction_status = ('Gerando uma reação local…' if accepted else
+            'Ative “Mostrar reações e memes locais” em Comportamento.' if not preferences['onlineReactions'] else
             'Ative as travessuras em Comportamento.' if not preferences['mischiefEnabled'] else
             'Não deu para pedir agora. Libere espaço na tela e tente novamente.')
 
@@ -197,7 +204,7 @@ def control(value):
             game.mischief_ctl.abort_thing(item)
             media_cache.pop(ident, None)
             media_requested.discard(ident)
-            last_error = 'Não foi possível exibir esta reação online.'
+            last_error = 'Não foi possível exibir esta reação local.'
             reaction_status = last_error
         return
     if kind == 'expression':
@@ -245,7 +252,7 @@ def _start_function_test(key):
         function_test_saved = {name: globals()[name] for name in names}
         function_test_saved['paused_at'] = time.monotonic()
         globals().update(game=session.game, motion_clock=ExpressionMotion(time.monotonic()),
-            dialogue=Dialogue(), fetcher=OnlineReactionFetcher(), media_cache={}, media_requested=set(),
+            dialogue=Dialogue(), fetcher=OfflineReactionFetcher(), media_cache={}, media_requested=set(),
             monitor_cache={}, selected_neuron=None, preview=None, say_until=0., say_started=0.,
             say_text='', say_thought=False, last_gaze=(0., 0.), last_ear_gaze=(0., 0.))
         function_test = session
@@ -348,8 +355,8 @@ def _update_reactions(now, dt):
         if item is None or key not in active:
             continue
         if error or payload is None or sum(len(row[0].data) for row in media_cache.values()) + len(payload.data) > MAX_TOTAL_MEDIA_BYTES:
-            last_error = 'Reação online indisponível. ' + str(error or 'Limite de memória atingido.')
-            reaction_status = 'Não foi possível carregar o GIF. Tente novamente.'
+            last_error = 'Reação local indisponível. ' + str(error or 'Limite de memória atingido.')
+            reaction_status = 'Não foi possível preparar a reação. Tente novamente.'
             game.mischief_ctl.abort_thing(item)
             continue
         kind = validate_media_signature(payload.data, payload.content_type)
@@ -364,6 +371,10 @@ def _update_reactions(now, dt):
         item.source_url = payload.candidate.source_url
         item.provider = payload.candidate.provider
         item.attribution = payload.candidate.attribution
+        item.origin = payload.candidate.origin
+        item.author = payload.candidate.author
+        item.license_spdx = payload.candidate.license_spdx
+        item.commercial_verified = payload.candidate.commercial_verified
     for key, (payload, remaining, kind) in list(media_cache.items()):
         if not game.panel:
             remaining -= dt
@@ -450,7 +461,10 @@ def tick(dt):
         if item['mediaReady']:
             payload, _, kind = media_cache[item['id']]
             item.update(mediaType=kind, sourceUrl=payload.candidate.source_url,
-                        attribution=payload.candidate.attribution, provider=payload.candidate.provider)
+                        attribution=payload.candidate.attribution, provider=payload.candidate.provider,
+                        origin=payload.candidate.origin, author=payload.candidate.author,
+                        licenseSpdx=payload.candidate.license_spdx,
+                        commercialVerified=payload.candidate.commercial_verified)
         if item['kind']=='notebook':
             notebook = item
             if item['working']:

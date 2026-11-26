@@ -5,7 +5,7 @@ Ela passeia pela tela, reage a carinho e brinca com um brinquedo e um notebook.
 Seu cérebro e seu aprendizado funcionam localmente.
 
 **Windows x64 e Android.** [Baixar para Windows 0.5.9.2](https://github.com/kuky13/bolha/releases/download/v0.5.9.2/Bolha-Setup-0.5.9.2-x64.exe) ·
-[Baixar APK 0.5.9.0](https://github.com/kuky13/bolha/releases/download/v0.5.9.0/Bolha-0.5.9.0-Android.apk) ·
+[Baixar APK 0.5.9.0](https://github.com/kuky13/bolha/releases/download/v0.5.9.0/Bolha-0.5.9.0-Android.apk) (APK em alfa · ainda não totalmente testado) ·
 [Notas da versão](https://github.com/kuky13/bolha/releases/latest) · [Guia Android](android/README.md)
 
 ![Bolha perseguindo o brinquedo](docs/images/bolha-brincando.png)
@@ -45,10 +45,8 @@ Preferências e aprendizado ficam no dispositivo. A Bolha não captura a tela,
 lê o conteúdo de janelas ou texto digitado, nem envia o perfil ou a memória a
 servidores. Leituras locais opcionais podem ser desligadas separadamente.
 
-A edição instalada consulta atualizações no GitHub. Reações online também usam
-a rede quando ativadas; a busca envia palavras-chave genéricas de humor a
-ReactionGIFs ou Nekos.best, e as imagens ficam em memória durante a exibição.
-Você pode desligar as reações online na Central. Os detalhes estão em
+As reações animadas do código atual funcionam offline. A edição instalada
+consulta atualizações no GitHub. Os detalhes estão em
 [dados e rede](docs/USO.md#perfil-privacidade-e-rede).
 
 ## Integrações do Windows
@@ -70,13 +68,14 @@ O localizador é inspirado no [Multi-Monitor-Mouse-Finder](https://github.com/in
 
 ## Código, arte e créditos
 
-O projeto é baseado no **Pestinha**, criado por [@mille-okws e colaboradores](https://github.com/mille-okws/pestinha).
+O projeto é baseado no **Pestinha** ([mille-okws/pestinha](https://github.com/mille-okws/pestinha)), criado por [@mille-okws](https://github.com/mille-okws) e colaboradores.
 O código, as artes e as animações próprias da Bolha são licenciados sob
 **GPL-3.0-or-later**. Preserve os créditos e avisos ao compartilhar mudanças.
 
 - [Licença do código](LICENSE), [créditos e origem](NOTICE.md)
 - [Licença das artes da Bolha](licenses/BOLHA-ASSETS.md)
 - [Contribuir com o projeto](CONTRIBUTING.md)
+- [Auditoria de licenças e origem das artes](docs/compliance/README.md)
 - [Notas da versão](docs/RELEASE.md) e [histórico de validação](docs/VALIDATION-NATIVE.md)
 - [Roadmap futuro de otimização com Rust](docs/ROADMAP-RUST.md)
 
@@ -85,3 +84,7 @@ O personagem Bolha e suas artes próprias são de André Ribeiro Lima
 a bolinha adapta arte de mille-okws e colaboradores. Memes e textos originais
 do Pestinha não fazem parte do pacote da Bolha. Consulte os avisos de origem
 antes de redistribuir recursos.
+
+## Apoio
+
+A Bolha é gratuita e mantida de forma independente. Se quiser ajudar a cobrir o tempo de desenvolvimento e correção de bugs, [apoie voluntariamente pelo BotaPix](https://botapix.gg/kuky).

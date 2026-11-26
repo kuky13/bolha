@@ -10,7 +10,7 @@ import numpy as np
 from PySide6.QtCore import QObject, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtTest import QSignalSpy, QTest
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QPlainTextEdit, QPushButton
 
 from bolha.dialogs import SettingsDialog, NeuralDialog
 from bolha.preferences import defaults, sanitize
@@ -157,10 +157,32 @@ def test_aplicar_preserva_sensores_desligados_e_valores_nao_editados(app):
     assert not dialog.apply_button.isEnabled()
 
 
+def test_central_abre_licencas_e_privacidade_do_disco(app, monkeypatch):
+    shown = []
+
+    def capture(dialog):
+        reader = dialog.findChild(QPlainTextEdit)
+        assert reader.isReadOnly()
+        shown.append(reader.toPlainText())
+        return 0
+
+    monkeypatch.setattr(QDialog, 'exec', capture)
+    dialog = SettingsDialog(ControllerStub())
+    try:
+        buttons = {button.text(): button for button in dialog.findChildren(QPushButton)}
+        buttons['Ler créditos e licenças'].click()
+        buttons['Ler política de privacidade'].click()
+        assert 'GNU GENERAL PUBLIC LICENSE' in shown[0] and 'mille-okws' in shown[0]
+        assert 'Privacidade da Bolha' in shown[1] and 'Dados que ficam no dispositivo' in shown[1]
+        assert all('Não foi possível ler' not in text for text in shown)
+    finally:
+        dialog.close()
+
+
 def test_central_pausa_a_previa_ao_trocar_de_area(app):
     dialog = SettingsDialog(ControllerStub())
     dialog.show()
-    assert [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]==['Bolha','Testar','Privacidade','App']
+    assert [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]==['Bolha','Testar','Privacidade','App','Sobre']
     assert not dialog.lab.timer.isActive()
     dialog.tabs.setCurrentIndex(1)
     app.processEvents()
